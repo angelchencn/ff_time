@@ -1,0 +1,15 @@
+[
+  {"name": "HOURS_WORKED", "data_type": "NUMBER", "description": "Total hours worked in the period"},
+  {"name": "OVERTIME_HOURS", "data_type": "NUMBER", "description": "Overtime hours in the period"},
+  {"name": "OVERTIME_RATE", "data_type": "NUMBER", "description": "Overtime pay rate multiplier"},
+  {"name": "REGULAR_RATE", "data_type": "NUMBER", "description": "Regular hourly rate"},
+  {"name": "SHIFT_TYPE", "data_type": "TEXT", "description": "Shift type code"},
+  {"name": "WORK_DATE", "data_type": "DATE", "description": "Date of work"},
+  {"name": "DAY_OF_WEEK", "data_type": "TEXT", "description": "Day of week"},
+  {"name": "HOLIDAY_FLAG", "data_type": "TEXT", "description": "Y/N flag for public holiday"},
+  {"name": "EMPLOYEE_ID", "data_type": "NUMBER", "description": "Employee identifier"},
+  {"name": "ASSIGNMENT_ID", "data_type": "NUMBER", "description": "Assignment identifier"},
+  {"name": "ELEMENT_ENTRY_ID", "data_type": "NUMBER", "description": "Element entry identifier"},
+  {"name": "PAY_PERIOD_START", "data_type": "DATE", "description": "Pay period start date"},
+  {"name": "PAY_PERIOD_END", "data_type": "DATE", "description": "Pay period end date"}
+]
