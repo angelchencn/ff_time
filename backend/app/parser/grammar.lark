@@ -1,0 +1,77 @@
+start: statement+
+
+statement: var_decl
+         | assignment
+         | if_stmt
+         | while_stmt
+         | return_stmt
+
+var_decl: DEFAULT FOR NAME data_type? IS expr  -> default_decl
+        | INPUT IS NAME                         -> input_decl
+        | OUTPUT IS NAME                        -> output_decl
+        | LOCAL NAME data_type?                 -> local_decl
+
+data_type: "(" (NUMBER_TYPE | TEXT_TYPE | DATE_TYPE) ")"
+
+assignment: NAME "=" expr
+
+if_stmt: IF expr THEN then_body (ELSE else_body)? ENDIF
+then_body: statement+
+else_body: statement+
+
+while_stmt: WHILE expr LOOP statement+ ENDLOOP
+
+return_stmt: RETURN expr
+
+?expr: or_expr
+?or_expr: and_expr (OR and_expr)*
+?and_expr: not_expr (AND not_expr)*
+?not_expr: NOT not_expr -> not_op
+         | comparison
+?comparison: add_expr (COMP_OP add_expr)?
+?add_expr: mul_expr (ADD_OP mul_expr)*
+?mul_expr: unary_expr (MUL_OP unary_expr)*
+?unary_expr: "-" unary_expr -> neg
+           | atom
+?atom: NUMBER                    -> number
+     | ESCAPED_STRING            -> string
+     | NAME "(" expr_list? ")"   -> func_call
+     | NAME                      -> var_ref
+     | "(" expr ")"
+
+expr_list: expr ("," expr)*
+
+COMP_OP: "=" | "!=" | "<>" | "<" | ">" | "<=" | ">="
+ADD_OP: "+" | "-"
+MUL_OP: "*" | "/"
+
+DEFAULT.2: /[Dd][Ee][Ff][Aa][Uu][Ll][Tt]/
+FOR.2: /[Ff][Oo][Rr]/
+INPUT.2: /[Ii][Nn][Pp][Uu][Tt]/
+OUTPUT.2: /[Oo][Uu][Tt][Pp][Uu][Tt]/
+LOCAL.2: /[Ll][Oo][Cc][Aa][Ll]/
+IS.2: /[Ii][Ss]/
+IF.2: /[Ii][Ff]/
+THEN.2: /[Tt][Hh][Ee][Nn]/
+ELSE.2: /[Ee][Ll][Ss][Ee]/
+ENDIF.2: /[Ee][Nn][Dd][Ii][Ff]/
+WHILE.2: /[Ww][Hh][Ii][Ll][Ee]/
+LOOP.2: /[Ll][Oo][Oo][Pp]/
+ENDLOOP.2: /[Ee][Nn][Dd][Ll][Oo][Oo][Pp]/
+RETURN.2: /[Rr][Ee][Tt][Uu][Rr][Nn]/
+OR.2: /[Oo][Rr]/
+AND.2: /[Aa][Nn][Dd]/
+NOT.2: /[Nn][Oo][Tt]/
+
+NUMBER_TYPE.2: /[Nn][Uu][Mm][Bb][Ee][Rr]/
+TEXT_TYPE.2: /[Tt][Ee][Xx][Tt]/
+DATE_TYPE.2: /[Dd][Aa][Tt][Ee]/
+
+BLOCK_COMMENT: "/*" /[\s\S]*?/ "*/"
+
+%import common.CNAME -> NAME
+%import common.NUMBER
+%import common.ESCAPED_STRING
+%import common.WS
+%ignore WS
+%ignore BLOCK_COMMENT
