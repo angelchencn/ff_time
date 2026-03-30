@@ -57,6 +57,10 @@ A web application that uses AI (Claude API) to generate, validate, and simulate 
 
 - Chunk existing Fast Formula samples + Oracle documentation, generate embeddings, store in vector database
 - Each chunk has metadata tags: `formula_type` (Time/Labor/Payroll etc.), `use_case` (overtime/scheduling/leave etc.), `complexity`
+- **Embedding model**: `all-MiniLM-L6-v2` (384-dim, fast, good for code similarity)
+- **Chunk strategy**: One formula per chunk for sample code; 512 tokens with 64-token overlap for documentation
+- **Similarity threshold**: Top-k retrieval (k=5), minimum cosine similarity 0.6; below threshold returns empty
+- **Seeding**: CLI script (`python -m app.scripts.seed_knowledge_base`) to batch-ingest from `data/samples/` and `data/docs/`
 
 ### Mode 1: Natural Language Generation (Business Consultants)
 
@@ -93,10 +97,29 @@ ChromaDB (lightweight, Python-native, easy local development). Can migrate to Pi
 
 Three-layer validation built on a custom Fast Formula parser.
 
+### Grammar Scope (MVP)
+
+The Fast Formula language has no published formal BNF from Oracle. The grammar is reverse-engineered from Oracle documentation and existing formula samples.
+
+**MVP-supported constructs:**
+- Variable declarations: `DEFAULT`, `INPUT`, `OUTPUT`, `LOCAL`
+- Data types: `NUMBER`, `TEXT`, `DATE`
+- Operators: arithmetic (`+`, `-`, `*`, `/`), comparison (`=`, `!=`, `<`, `>`, `<=`, `>=`), logical (`AND`, `OR`, `NOT`)
+- Control flow: `IF`/`THEN`/`ELSE`/`ENDIF`, `WHILE`/`LOOP`/`ENDLOOP`
+- Assignments, `RETURN`, comments (`/*...*/`)
+- Built-in functions: `TO_NUMBER`, `TO_CHAR`, `TO_DATE`, `GET_VALUE_SET`, `DAYS_BETWEEN`, `HOURS_BETWEEN`
+- DBI references: `<DBI_NAME>`
+
+**Explicitly out of scope for MVP:**
+- `CURSOR`/`FETCH`, `ALIAS`, `EXECUTE`, `CHANGE_CONTEXTS`, `CALL_FORMULA`
+- User-defined functions, nested formula calls
+
+**Fallback for unsupported syntax:** If the parser encounters an unrecognized construct, it reports a warning (not error) with message "Unsupported syntax — validation skipped for this block. Please verify in Oracle environment." The AI service can still generate formulas using these constructs; only the validator/simulator will skip them.
+
 ### Layer 1 — Syntax Parsing (Parser)
 
 - Built with Python's **Lark** library using a formal Fast Formula grammar
-- Covers: variable declarations (`DEFAULT`/`INPUT`/`OUTPUT`), assignments, IF/ELSE, loops, function calls, RETURN
+- Covers MVP-supported constructs listed above
 - Output: AST (Abstract Syntax Tree) + precise error locations (line, column) for Monaco markers
 
 ### Layer 2 — Semantic Validation
@@ -167,9 +190,17 @@ Tree-Walking Interpreter based on the AST from the Validator:
 
 ### Key Features
 
+**MVP Features:**
+
 | Feature | Description |
 |---------|-------------|
 | **Execution Trace** | Line-by-line execution display for debugging |
+| **Input Form** | Auto-generated form from declared INPUT/DEFAULT variables |
+
+**Post-MVP Features:**
+
+| Feature | Description |
+|---------|-------------|
 | **Breakpoint Debugging** | Click line numbers to set breakpoints, step through execution |
 | **Batch Testing** | Upload CSV to run multiple test data sets, compare results |
 | **Boundary Detection** | Auto-suggest boundary test cases (0 hours, negative values, large values) |
@@ -231,7 +262,7 @@ Formula
 ├── version: int
 ├── status: enum (DRAFT, VALIDATED, EXPORTED)
 ├── created_at / updated_at
-└── user_id: UUID
+└── user_id: string (optional, for future auth)
 
 DBIRegistry
 ├── id: UUID
@@ -270,6 +301,69 @@ ChatSession
 | GET | `/api/dbi` | Query DBI catalog (supports search/filter) |
 | POST | `/api/formulas/{id}/export` | Export to deployable format |
 
+### Key API Schemas
+
+**POST /api/chat** — Multi-turn conversation, streamed via SSE
+```json
+// Request
+{ "session_id": "uuid|null", "message": "string", "formula_type": "TIME_LABOR" }
+// SSE events: { "event": "token", "data": "..." } / { "event": "code", "data": "..." } / { "event": "done" }
+```
+
+**POST /api/complete** — Inline code completion (non-streaming, fast)
+```json
+// Request
+{ "code": "string (full editor content)", "cursor_line": 10, "cursor_col": 5 }
+// Response
+{ "suggestions": [{ "text": "string", "range": { "startLine": 10, "startCol": 5, "endLine": 10, "endCol": 5 } }] }
+```
+
+**POST /api/validate** — Synchronous validation
+```json
+// Request
+{ "code": "string" }
+// Response
+{ "valid": false, "diagnostics": [{ "line": 3, "col": 10, "end_col": 15, "severity": "error|warning", "message": "string", "layer": "syntax|semantic|rule" }] }
+```
+
+**POST /api/simulate** — Execute with test data
+```json
+// Request
+{ "code": "string", "input_data": { "HOURS_WORKED": 45, "OT_RATE": 1.5 } }
+// Response
+{ "status": "SUCCESS|ERROR", "output_data": { "OT_PAY": 7.5 }, "execution_trace": [{ "line": 3, "statement": "IF HOURS_WORKED > 40", "result": "true" }], "error": null }
+```
+
+**POST /api/explain** — AI explanation of code
+```json
+// Request
+{ "code": "string", "selected_range": { "startLine": 1, "endLine": 5 }, "action": "explain|fix" }
+// Response (streamed SSE)
+{ "event": "token", "data": "..." }
+```
+
+**POST /api/formulas/{id}/export** — Export as plain text `.ff` file
+```json
+// Response
+{ "filename": "overtime_calc.ff", "content": "string (raw FF code)", "download_url": "/api/downloads/{token}" }
+```
+
+### Chat vs Complete
+
+| | `/api/chat` | `/api/complete` |
+|---|---|---|
+| **Purpose** | Full formula generation from NL | Inline code suggestions |
+| **Input** | Natural language message | Code + cursor position |
+| **Output** | Streamed SSE (text + code blocks) | JSON array of suggestions |
+| **Context** | Multi-turn session history | Current editor content only |
+| **Latency** | 2-10s (acceptable for chat) | <1s target (debounced) |
+
+### Chat Context Management
+
+- Chat session messages stored in DB, reconstructed per request
+- Context window strategy: include last 10 messages; if total exceeds 80k tokens, summarize older messages via Claude before appending
+- Maximum session length: 100 messages; after that, prompt user to start a new session
+
 ## Storage
 
 | Component | Technology | Rationale |
@@ -283,13 +377,14 @@ ChatSession
 | Layer | Technology |
 |-------|-----------|
 | Frontend | React 18 + TypeScript + Vite |
+| State Management | Zustand (lightweight, no boilerplate) |
 | UI Components | Ant Design |
 | Code Editor | Monaco Editor (`@monaco-editor/react`) |
 | Backend | Python 3.12 + FastAPI |
 | AI | Claude API (Anthropic SDK) |
 | RAG | ChromaDB + `sentence-transformers` for embeddings |
 | Parser | Lark (Python, Fast Formula grammar) |
-| Database | SQLite (MVP) + SQLAlchemy ORM |
+| Database | SQLite (MVP) + SQLAlchemy ORM + Alembic (migrations) |
 | API Communication | REST + SSE (streaming generation) |
 
 ## Project Structure
@@ -345,6 +440,7 @@ ff_time/
 | Simulation execution error | Show error line number and reason (e.g., division by zero, undefined variable); Execution Trace highlights error step in red |
 | RAG retrieval returns nothing | Degrade to pure Claude generation (without sample context); inform user results may be less precise |
 | Unclear user input | AI asks clarifying questions, does not guess |
+| Browser crash / network loss | Editor auto-saves to localStorage every 10 seconds; on reload, prompt to restore draft |
 
 ## Security
 
@@ -354,7 +450,8 @@ ff_time/
 | **Input Validation** | All API inputs validated with Pydantic schemas |
 | **Code Injection** | Simulator uses AST-based interpretation, never uses `eval`, never executes arbitrary code |
 | **Rate Limiting** | FastAPI middleware limits API call frequency, prevents Claude API abuse |
-| **Data Isolation** | Users can only access their own Formulas and ChatSessions |
+| **Data Isolation** | MVP is single-user (no auth). Data isolation deferred to post-MVP with authentication |
+| **CORS** | FastAPI CORS middleware configured to allow frontend origin (localhost:5173 in dev) |
 
 ## Scope
 
