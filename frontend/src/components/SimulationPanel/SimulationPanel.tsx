@@ -4,6 +4,7 @@ import { BulbOutlined } from '@ant-design/icons';
 import { ValidationResults } from './ValidationResults';
 import { InputForm } from './InputForm';
 import { ExecutionTrace } from './ExecutionTrace';
+import { DBIPanel } from './DBIPanel';
 import { useEditorStore } from '../../stores/editorStore';
 import { streamSSE } from '../../services/sse';
 
@@ -46,14 +47,14 @@ function ExplainPanel() {
       {explanation && (
         <div
           style={{
-            backgroundColor: '#2a2a2a',
+            backgroundColor: '#f5f5f5',
             borderRadius: 4,
             padding: 12,
             maxHeight: 400,
             overflowY: 'auto',
           }}
         >
-          <Text style={{ color: '#e0e0e0', fontSize: 13, whiteSpace: 'pre-wrap' }}>
+          <Text style={{ color: '#333', fontSize: 13, whiteSpace: 'pre-wrap' }}>
             {explanation}
           </Text>
         </div>
@@ -80,6 +81,11 @@ export function SimulationPanel() {
       ),
     },
     {
+      key: 'dbis',
+      label: 'DBIs',
+      children: <DBIPanel />,
+    },
+    {
       key: 'explain',
       label: 'Explain',
       children: <ExplainPanel />,
@@ -90,7 +96,7 @@ export function SimulationPanel() {
     <div
       style={{
         height: '100%',
-        backgroundColor: '#1a1a1a',
+        backgroundColor: '#fafafa',
         display: 'flex',
         flexDirection: 'column',
       }}
@@ -99,7 +105,7 @@ export function SimulationPanel() {
         defaultActiveKey="validate"
         items={tabItems}
         style={{ flex: 1 }}
-        tabBarStyle={{ paddingLeft: 16, borderBottomColor: '#333' }}
+        tabBarStyle={{ paddingLeft: 16, borderBottomColor: '#e0e0e0' }}
       />
     </div>
   );

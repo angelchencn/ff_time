@@ -1,22 +1,22 @@
-import { Button, Segmented, Space, Typography } from 'antd';
+import { Button, Space } from 'antd';
 import {
   FileAddOutlined,
   SaveOutlined,
   ExportOutlined,
 } from '@ant-design/icons';
-import { useEditorStore, type EditorMode } from '../../stores/editorStore';
+import { useEditorStore } from '../../stores/editorStore';
+import { useChatStore } from '../../stores/chatStore';
 import { createFormula, updateFormula, exportFormula } from '../../services/api';
 
-const { Text } = Typography;
-
 export function Toolbar() {
-  const { code, currentFormulaId, mode, isDirty, setMode, setCurrentFormulaId, setIsDirty } =
+  const { code, currentFormulaId, isDirty, setCurrentFormulaId, setIsDirty } =
     useEditorStore();
 
   function handleNew() {
     useEditorStore.getState().setCode('');
     setCurrentFormulaId(null);
     setIsDirty(false);
+    useChatStore.getState().clearMessages();
   }
 
   async function handleSave() {
@@ -53,7 +53,6 @@ export function Toolbar() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      // Fall back to exporting current code
       const blob = new Blob([code], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -69,26 +68,14 @@ export function Toolbar() {
       style={{
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
         padding: '8px 16px',
-        backgroundColor: '#111',
-        borderBottom: '1px solid #333',
+        backgroundColor: '#fff',
+        borderBottom: '1px solid #e0e0e0',
         height: 48,
       }}
     >
       <Space>
-        <Text strong style={{ color: '#e0e0e0', fontSize: 15 }}>
-          FF Time
-        </Text>
-      </Space>
-
-      <Space>
-        <Button
-          size="small"
-          icon={<FileAddOutlined />}
-          onClick={handleNew}
-          style={{ backgroundColor: '#2a2a2a', borderColor: '#444', color: '#ccc' }}
-        >
+        <Button size="small" icon={<FileAddOutlined />} onClick={handleNew}>
           New
         </Button>
         <Button
@@ -96,29 +83,13 @@ export function Toolbar() {
           icon={<SaveOutlined />}
           onClick={handleSave}
           type={isDirty ? 'primary' : 'default'}
-          style={isDirty ? {} : { backgroundColor: '#2a2a2a', borderColor: '#444', color: '#ccc' }}
         >
           Save
         </Button>
-        <Button
-          size="small"
-          icon={<ExportOutlined />}
-          onClick={handleExport}
-          style={{ backgroundColor: '#2a2a2a', borderColor: '#444', color: '#ccc' }}
-        >
+        <Button size="small" icon={<ExportOutlined />} onClick={handleExport}>
           Export
         </Button>
       </Space>
-
-      <Segmented<EditorMode>
-        size="small"
-        options={[
-          { label: 'Chat', value: 'chat' },
-          { label: 'Code', value: 'code' },
-        ]}
-        value={mode}
-        onChange={(val) => setMode(val)}
-      />
     </div>
   );
 }

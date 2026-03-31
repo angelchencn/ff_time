@@ -1,6 +1,7 @@
 """Chat API route — POST /api/chat (SSE streaming)."""
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Any, AsyncGenerator, Optional
 
@@ -30,6 +31,7 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = None
     message: str
     formula_type: str = "TIME_LABOR"
+    code: str = ""
 
 
 @router.post("/api/chat")
@@ -54,9 +56,9 @@ async def chat(
         ai = get_ai_service()
         full_response = ""
 
-        for chunk in ai.stream_generate(req.message, req.formula_type, history=history):
+        for chunk in ai.stream_generate(req.message, req.formula_type, history=history, current_code=req.code):
             full_response += chunk
-            yield {"data": chunk}
+            yield {"data": json.dumps({"text": chunk})}
 
         # Persist conversation turns after streaming completes
         updated_messages = list(history) + [

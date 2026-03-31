@@ -3,22 +3,49 @@ import type * as Monaco from 'monaco-editor';
 export const FF_LANGUAGE_ID = 'fast-formula';
 
 export const FF_KEYWORDS = [
-  'DEFAULT', 'FOR', 'IS', 'INPUT', 'OUTPUT', 'LOCAL',
-  'IF', 'THEN', 'ELSE', 'ELSIF', 'ENDIF',
-  'WHILE', 'LOOP', 'ENDLOOP', 'RETURN',
-  'AND', 'OR', 'NOT', 'WAS', 'DEFAULTED',
+  'ALIAS', 'AND', 'ARE', 'AS',
+  'DEFAULT', 'DEFAULTED',
+  'ELSE', 'ELSIF', 'END', 'ENDIF', 'ENDLOOP', 'EXECUTE', 'EXIT',
+  'FOR',
+  'IF', 'INPUT', 'INPUTS', 'IS',
+  'LIKE', 'LOCAL', 'LOOP',
+  'NOT',
+  'OR', 'OUTPUT',
+  'RETURN',
+  'THEN',
+  'USING',
+  'WAS', 'WHILE',
 ];
 
 export const FF_TYPE_KEYWORDS = ['NUMBER', 'TEXT', 'DATE'];
 
 export const FF_BUILTIN_FUNCTIONS = [
-  'TO_NUMBER', 'TO_CHAR', 'TO_DATE',
-  'ROUND', 'ABS', 'GREATEST', 'LEAST',
-  'LENGTH', 'SUBSTR', 'INSTR', 'RPAD', 'LPAD',
-  'UPPER', 'LOWER', 'TRIM', 'LTRIM', 'RTRIM',
-  'ADD_MONTHS', 'MONTHS_BETWEEN', 'LAST_DAY',
-  'NEXT_DAY', 'TRUNC', 'SYSDATE',
-  'GET_TABLE_VALUE', 'DEFINE_BALANCE',
+  // Numeric
+  'ABS', 'CEIL', 'FLOOR', 'GREATEST', 'GREATEST_OF', 'LEAST', 'LEAST_OF',
+  'POWER', 'ROUND', 'ROUNDUP', 'ROUND_UP', 'TRUNC', 'TRUNCATE',
+  // String
+  'CHR', 'INITCAP', 'INSTR', 'INSTRB', 'LENGTH', 'LENGTHB',
+  'LOWER', 'LPAD', 'LTRIM', 'REPLACE', 'RPAD', 'RTRIM',
+  'SUBSTR', 'SUBSTRING', 'SUBSTRB', 'TRANSLATE', 'TRIM', 'UPPER',
+  // Date
+  'ADD_DAYS', 'ADD_MONTHS', 'ADD_YEARS', 'DAYS_BETWEEN', 'HOURS_BETWEEN',
+  'LAST_DAY', 'MONTHS_BETWEEN', 'NEW_TIME', 'NEXT_DAY',
+  // Conversion
+  'CONVERT', 'DATE_TO_TEXT', 'NUM_TO_CHAR',
+  'TO_CHAR', 'TO_DATE', 'TO_NUM', 'TO_NUMBER', 'TO_TEXT',
+  // Lookup/Table
+  'GET_LOOKUP_MEANING', 'GET_TABLE_VALUE', 'RAISE_ERROR',
+  'RATES_HISTORY', 'CALCULATE_HOURS_WORKED',
+  // Globals
+  'SET_TEXT', 'SET_NUMBER', 'SET_DATE',
+  'GET_TEXT', 'GET_NUMBER', 'GET_DATE',
+  'ISNULL', 'CLEAR_GLOBALS', 'REMOVE_GLOBALS',
+  // Accruals
+  'GET_ABSENCE', 'GET_ACCRUAL_BAND', 'GET_CARRY_OVER',
+  'GET_NET_ACCRUAL', 'GET_WORKING_DAYS', 'GET_PAYROLL_PERIOD',
+  'GET_PERIOD_DATES', 'GET_START_DATE', 'GET_ASSIGNMENT_STATUS',
+  // Formula
+  'CALL_FORMULA', 'LOOP_CONTROL', 'PUT_MESSAGE', 'DEBUG',
 ];
 
 export function registerFastFormulaLanguage(monaco: typeof Monaco): void {
@@ -49,8 +76,8 @@ export function registerFastFormulaLanguage(monaco: typeof Monaco): void {
     },
     folding: {
       markers: {
-        start: /\b(IF|WHILE|LOOP)\b/,
-        end: /\b(ENDIF|ENDLOOP)\b/,
+        start: /\b(IF|WHILE|LOOP)\b/i,
+        end: /\b(END\s*IF|END\s*LOOP|ENDIF|ENDLOOP)\b/i,
       },
     },
   });

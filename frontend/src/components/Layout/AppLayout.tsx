@@ -1,17 +1,77 @@
-import { useEditorStore } from '../../stores/editorStore';
-import { ChatPanel } from '../ChatPanel/ChatPanel';
-import { FFEditor } from '../Editor/FFEditor';
+import { useCallback, useRef, useState } from 'react';
+import { EditorWithChat } from '../Editor/EditorWithChat';
 import { SimulationPanel } from '../SimulationPanel/SimulationPanel';
 import { Toolbar } from './Toolbar';
 import { StatusBar } from './StatusBar';
 import { useValidation } from '../../hooks/useValidation';
 
+function DragHandle({ onDrag }: { onDrag: (dx: number) => void }) {
+  const dragging = useRef(false);
+  const lastX = useRef(0);
+
+  const onMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      dragging.current = true;
+      lastX.current = e.clientX;
+
+      const onMouseMove = (ev: MouseEvent) => {
+        if (!dragging.current) return;
+        const dx = ev.clientX - lastX.current;
+        lastX.current = ev.clientX;
+        onDrag(dx);
+      };
+
+      const onMouseUp = () => {
+        dragging.current = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    },
+    [onDrag]
+  );
+
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      style={{
+        width: 5,
+        cursor: 'col-resize',
+        backgroundColor: 'transparent',
+        flexShrink: 0,
+        position: 'relative',
+        zIndex: 10,
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          left: 2,
+          width: 1,
+          backgroundColor: '#e0e0e0',
+        }}
+      />
+    </div>
+  );
+}
+
 export function AppLayout() {
   useValidation();
 
-  const { mode } = useEditorStore();
+  const [rightWidth, setRightWidth] = useState(360);
 
-  const chatWidth = mode === 'chat' ? '35%' : '20%';
+  const handleRightDrag = useCallback((dx: number) => {
+    setRightWidth((w) => Math.max(240, Math.min(600, w - dx)));
+  }, []);
 
   return (
     <div
@@ -19,38 +79,27 @@ export function AppLayout() {
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
-        backgroundColor: '#0d0d0d',
+        backgroundColor: '#f5f5f5',
         overflow: 'hidden',
       }}
     >
       <Toolbar />
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* Left: Chat Panel */}
-        <div
-          style={{
-            width: chatWidth,
-            minWidth: 200,
-            borderRight: '1px solid #333',
-            overflow: 'hidden',
-            transition: 'width 0.2s ease',
-          }}
-        >
-          <ChatPanel />
+        {/* Left: Editor + Chat input */}
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 300 }}>
+          <EditorWithChat />
         </div>
 
-        {/* Center: Editor */}
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <FFEditor height="100%" />
-        </div>
+        <DragHandle onDrag={handleRightDrag} />
 
         {/* Right: Simulation Panel */}
         <div
           style={{
-            width: '30%',
+            width: rightWidth,
             minWidth: 240,
-            borderLeft: '1px solid #333',
             overflow: 'hidden',
+            flexShrink: 0,
           }}
         >
           <SimulationPanel />

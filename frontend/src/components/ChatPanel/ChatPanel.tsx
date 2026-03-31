@@ -9,11 +9,20 @@ import { ChatMessage } from './ChatMessage';
 const { Text } = Typography;
 
 function extractCodeBlocks(text: string): string[] {
-  const regex = /```(?:fast-formula|ff|oracle)?\n([\s\S]*?)```/g;
+  // Match any fenced code block: ```lang\n...\n``` or ```\n...\n```
+  const regex = /```[^\n]*\n([\s\S]*?)```/g;
   const blocks: string[] = [];
   let match: RegExpExecArray | null;
   while ((match = regex.exec(text)) !== null) {
-    blocks.push(match[1].trim());
+    const code = match[1].trim();
+    if (code) blocks.push(code);
+  }
+  // If no fenced blocks found, check if the entire response looks like FF code
+  if (blocks.length === 0) {
+    const ffKeywords = /\b(DEFAULT\s+FOR|INPUT\s+IS|OUTPUT\s+IS|RETURN)\b/i;
+    if (ffKeywords.test(text)) {
+      blocks.push(text.trim());
+    }
   }
   return blocks;
 }
@@ -89,7 +98,7 @@ export function ChatPanel() {
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        backgroundColor: '#1a1a1a',
+        backgroundColor: '#fafafa',
       }}
     >
       {/* Message list */}
@@ -111,7 +120,7 @@ export function ChatPanel() {
               padding: 24,
             }}
           >
-            <Text style={{ color: '#666', fontSize: 13 }}>
+            <Text style={{ color: '#999', fontSize: 13 }}>
               Ask me to generate a Fast Formula.
               <br />
               For example: &ldquo;Write a formula to calculate overtime pay&rdquo;
@@ -124,7 +133,7 @@ export function ChatPanel() {
       </div>
 
       {/* Input area */}
-      <div style={{ padding: '12px 16px', borderTop: '1px solid #333' }}>
+      <div style={{ padding: '12px 16px', borderTop: '1px solid #e0e0e0' }}>
         <Space.Compact style={{ width: '100%' }}>
           <Input.TextArea
             value={inputValue}
@@ -133,7 +142,7 @@ export function ChatPanel() {
             placeholder="Ask about Fast Formulas... (Enter to send, Shift+Enter for newline)"
             autoSize={{ minRows: 1, maxRows: 4 }}
             disabled={isStreaming}
-            style={{ backgroundColor: '#2a2a2a', borderColor: '#444', color: '#e0e0e0' }}
+            style={{ backgroundColor: '#fff', borderColor: '#d9d9d9', color: '#1a1a1a' }}
           />
           <Button
             type="primary"

@@ -45,14 +45,11 @@ def _load_metadata(json_path: Path) -> dict:
 
 def seed(samples_dir: Path, chroma_dir: Path) -> int:
     """Seed the knowledge base and return the number of upserted documents."""
-    ff_files = sorted(samples_dir.glob("*.ff"))
-    if not ff_files:
-        logger.warning("No .ff files found in %s", samples_dir)
-        return 0
-
     engine = RAGEngine(persist_dir=str(chroma_dir))
     upserted = 0
 
+    # 1. Ingest .ff formula samples
+    ff_files = sorted(samples_dir.glob("*.ff"))
     for ff_path in ff_files:
         doc_id = ff_path.stem
         code = ff_path.read_text(encoding="utf-8")
@@ -65,7 +62,19 @@ def seed(samples_dir: Path, chroma_dir: Path) -> int:
         logger.info("Upserted formula: %s", doc_id)
         upserted += 1
 
-    logger.info("Seeded %d formula(s) into ChromaDB at %s", upserted, chroma_dir)
+    # 2. Ingest documentation files (.txt, .md) from data/docs/
+    docs_dir = samples_dir.parent / "docs"
+    if docs_dir.exists():
+        for doc_path in sorted(docs_dir.glob("*.*")):
+            if doc_path.suffix in (".txt", ".md"):
+                doc_id = f"doc_{doc_path.stem}"
+                text = doc_path.read_text(encoding="utf-8")
+                metadata = {"source_file": doc_path.name, "doc_type": "reference"}
+                engine.add_document(doc_id=doc_id, text=text, metadata=metadata)
+                logger.info("Upserted doc: %s", doc_id)
+                upserted += 1
+
+    logger.info("Seeded %d document(s) into ChromaDB at %s", upserted, chroma_dir)
     return upserted
 
 

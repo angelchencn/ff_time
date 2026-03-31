@@ -76,6 +76,7 @@ class AIService:
         self,
         message: str,
         formula_type: str,
+        current_code: str = "",
     ) -> str:
         """Build a user prompt for formula generation with RAG context.
 
@@ -85,6 +86,8 @@ class AIService:
             Natural language description of what the formula should do.
         formula_type:
             The Fast Formula type (e.g. TIME_LABOR, PAYROLL).
+        current_code:
+            The current formula code in the editor, used for modification requests.
         """
         rag_results = self._rag.query(message, top_k=3)
 
@@ -99,10 +102,25 @@ class AIService:
                 f"## Relevant Example Formulas\n\n{examples}"
             )
 
+        has_existing_code = bool(current_code.strip())
+
+        if has_existing_code:
+            sections.append(
+                f"## Current Formula in Editor\n\n```\n{current_code}\n```\n\n"
+                "The user wants to modify this existing formula. "
+                "Output the complete updated formula incorporating the requested change."
+            )
+
         sections.append(
             f"## Request\n\nFormula type: {formula_type}\n\nRequirement: {message}"
         )
-        sections.append("Generate a complete Fast Formula that satisfies the requirement.")
+
+        if has_existing_code:
+            sections.append(
+                "Return the complete modified formula. Do not explain the changes unless asked."
+            )
+        else:
+            sections.append("Generate a complete Fast Formula that satisfies the requirement.")
 
         return "\n\n".join(sections)
 
@@ -179,6 +197,7 @@ class AIService:
         message: str,
         formula_type: str,
         history: Optional[list[dict[str, str]]] = None,
+        current_code: str = "",
     ) -> str:
         """Generate a Fast Formula synchronously.
 
@@ -190,6 +209,8 @@ class AIService:
             Target Fast Formula type.
         history:
             Optional list of prior conversation turns, each with 'role' and 'content'.
+        current_code:
+            The current formula in the editor for modification requests.
 
         Returns
         -------
@@ -197,7 +218,7 @@ class AIService:
             The generated formula text.
         """
         messages = list(history or [])
-        messages.append({"role": "user", "content": self._build_generation_prompt(message, formula_type)})
+        messages.append({"role": "user", "content": self._build_generation_prompt(message, formula_type, current_code)})
 
         response = self._client.messages.create(
             model=_CHAT_MODEL,
@@ -212,6 +233,7 @@ class AIService:
         message: str,
         formula_type: str,
         history: Optional[list[dict[str, str]]] = None,
+        current_code: str = "",
     ) -> Generator[str, None, None]:
         """Stream-generate a Fast Formula, yielding text chunks.
 
@@ -223,6 +245,8 @@ class AIService:
             Target Fast Formula type.
         history:
             Optional prior conversation turns.
+        current_code:
+            The current formula in the editor for modification requests.
 
         Yields
         ------
@@ -230,7 +254,7 @@ class AIService:
             Successive text deltas from the model.
         """
         messages = list(history or [])
-        messages.append({"role": "user", "content": self._build_generation_prompt(message, formula_type)})
+        messages.append({"role": "user", "content": self._build_generation_prompt(message, formula_type, current_code)})
 
         with self._client.messages.stream(
             model=_CHAT_MODEL,

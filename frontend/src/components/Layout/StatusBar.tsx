@@ -18,8 +18,8 @@ export function StatusBar() {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '2px 16px',
-        backgroundColor: isValid ? '#1a2a1a' : '#2a1a1a',
-        borderTop: '1px solid #333',
+        backgroundColor: isValid ? '#f0faf0' : '#faf0f0',
+        borderTop: '1px solid #e0e0e0',
         height: 24,
       }}
     >
@@ -55,7 +55,7 @@ export function StatusBar() {
         )}
       </Space>
 
-      <Text style={{ color: '#666', fontSize: 11 }}>
+      <Text style={{ color: '#999', fontSize: 11 }}>
         {lineCount} line{lineCount !== 1 ? 's' : ''}
       </Text>
     </div>

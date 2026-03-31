@@ -1,0 +1,79 @@
+Oracle Fast Formula Built-in Functions Reference
+
+NUMERIC FUNCTIONS:
+ABS(n) - absolute value. ABS(-17) returns 17
+CEIL(n) - rounds up to integer. CEIL(35.1) returns 36
+FLOOR(n) - rounds down to integer. FLOOR(35.9) returns 35
+GREATEST(n1, n2, ...) - returns largest value. GREATEST(5, 10, 3) returns 10
+LEAST(n1, n2, ...) - returns smallest value. LEAST(5, 10, 3) returns 3
+POWER(m, n) - m raised to power n. POWER(2, 3) returns 8
+ROUND(n, m) - round to m decimal places. ROUND(2.3461, 2) returns 2.35
+ROUNDUP(n, m) - round up. ROUNDUP(2.3401, 2) returns 2.35
+TRUNC(n, m) - truncate to m decimal places. TRUNC(2.3461, 2) returns 2.34
+
+STRING FUNCTIONS:
+CHR(n) - character from ASCII code. CHR(10) returns newline
+INITCAP(text) - capitalize first letters. INITCAP('john smith') returns 'John Smith'
+INSTR(text, search, start, occurrence) - find position. INSTR('hello', 'l') returns 3
+LENGTH(text) - string length. LENGTH('hello') returns 5
+LOWER(text) - lowercase. LOWER('JOHN') returns 'john'
+UPPER(text) - uppercase. UPPER('john') returns 'JOHN'
+LPAD(text, n, pad) - left pad. LPAD('hi', 5, 'x') returns 'xxxhi'
+RPAD(text, n, pad) - right pad. RPAD('hi', 5, 'x') returns 'hixxx'
+LTRIM(text, set) - trim left. LTRIM('aaabbb', 'a') returns 'bbb'
+RTRIM(text, set) - trim right. RTRIM('aaabbb', 'b') returns 'aaa'
+REPLACE(text, search, replacement) - replace. REPLACE('hello', 'l', 'L') returns 'heLLo'
+SUBSTR(text, start, length) - substring. SUBSTR('hello', 2, 3) returns 'ell'
+TRANSLATE(text, from, to) - character translation
+TRIM(char FROM text) - trim character from both sides
+
+DATE FUNCTIONS:
+ADD_DAYS(date, n) - add days. ADD_DAYS('30-DEC-1990' (date), 6) returns 05-JAN-1991
+ADD_MONTHS(date, n) - add months
+ADD_YEARS(date, n) - add years
+DAYS_BETWEEN(date1, date2) - days between two dates (can be negative)
+MONTHS_BETWEEN(date1, date2) - months between two dates
+LAST_DAY(date) - last day of month. LAST_DAY('15-FEB-2000' (date)) returns 29-FEB-2000
+NEXT_DAY(date, weekday) - next specified weekday
+NEW_TIME(date, zone1, zone2) - convert timezone
+
+CONVERSION FUNCTIONS:
+TO_NUMBER(text) - convert text to number. TO_NUMBER('1234') returns 1234
+TO_CHAR(number) - convert number to text. TO_CHAR(1234) returns '1234'
+TO_CHAR(date, format) - convert date to text with format
+TO_DATE(text, format) - convert text to date. TO_DATE('12 January 89', 'DD Month YY')
+TO_TEXT(number) - convert number to text
+NUM_TO_CHAR(number, format) - formatted number to text. NUM_TO_CHAR(1234.5, '$9,990.99') returns '$1,234.50'
+DATE_TO_TEXT(date, format) - date to text
+
+LOOKUP FUNCTIONS:
+GET_TABLE_VALUE(table_name, column_name, row_value, effective_date) - lookup table value
+GET_LOOKUP_MEANING(lookup_type, lookup_code) - lookup meaning from Oracle lookups
+RAISE_ERROR(application_id, message_name) - raise application error
+RATES_HISTORY(name, date, indicator, time_dimension) - historical rate lookup
+
+GLOBAL VARIABLE FUNCTIONS:
+SET_TEXT(var_name, value) - set text global, returns 0 success / 1 error
+SET_NUMBER(var_name, value) - set numeric global
+SET_DATE(var_name, value) - set date global
+GET_TEXT(var_name) - get text global or NULL
+GET_NUMBER(var_name) - get numeric global or NULL
+GET_DATE(var_name) - get date global or NULL
+ISNULL(var_name) - test if NULL, returns 'Y' or 'N'
+CLEAR_GLOBALS() - set all globals to NULL
+REMOVE_GLOBALS() - remove all globals
+
+FORMULA FUNCTIONS:
+CALL_FORMULA(formula_name) - call another formula
+LOOP_CONTROL(formula_name) - repeatedly call formula until CONTINUE_LOOP != 'Y'
+PUT_MESSAGE(text) - add message to output stack
+DEBUG(text) - write debug message to console
+
+ACCRUAL FUNCTIONS:
+CALCULATE_HOURS_WORKED(hours, date1, date2, frequency) - calculate hours worked
+GET_ABSENCE(calc_date, start_date) - total absence between dates
+GET_ACCRUAL_BAND(length_of_service) - determine accrual band
+GET_WORKING_DAYS(start_date, end_date) - working days (Mon-Fri)
+GET_PAYROLL_PERIOD(date) - get payroll period info
+GET_NET_ACCRUAL(calc_date, plan_id, start_date, balance) - net accrual at date
+GET_CARRY_OVER(calc_date, start_date) - carry over days/hours

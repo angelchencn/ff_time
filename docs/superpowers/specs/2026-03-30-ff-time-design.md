@@ -101,18 +101,22 @@ Three-layer validation built on a custom Fast Formula parser.
 
 The Fast Formula language has no published formal BNF from Oracle. The grammar is reverse-engineered from Oracle documentation and existing formula samples.
 
-**MVP-supported constructs:**
-- Variable declarations: `DEFAULT`, `INPUT`, `OUTPUT`, `LOCAL`
+**Supported constructs (based on Oracle FastFormula User Guide):**
+- Variable declarations: `DEFAULT FOR ... IS`, `INPUT IS`, `INPUTS ARE ... , ...`, `OUTPUT IS`, `LOCAL`
+- Alias: `ALIAS long_name AS short_name`
 - Data types: `NUMBER`, `TEXT`, `DATE`
-- Operators: arithmetic (`+`, `-`, `*`, `/`), comparison (`=`, `!=`, `<`, `>`, `<=`, `>=`), logical (`AND`, `OR`, `NOT`)
-- Control flow: `IF`/`THEN`/`ELSE`/`ENDIF`, `WHILE`/`LOOP`/`ENDLOOP`
-- Assignments, `RETURN`, comments (`/*...*/`)
-- Built-in functions: `TO_NUMBER`, `TO_CHAR`, `TO_DATE`, `GET_VALUE_SET`, `DAYS_BETWEEN`, `HOURS_BETWEEN`
-- DBI references: `<DBI_NAME>`
+- Operators: arithmetic (`+`, `-`, `*`, `/`), comparison (`=`, `!=`, `<>`, `><`, `<`, `>`, `<=`, `>=`, `=>`, `=<`), logical (`AND`, `OR`, `NOT`), pattern (`LIKE`, `NOT LIKE`), special (`WAS DEFAULTED`)
+- Control flow: `IF`/`THEN`/`ELSIF`/`ELSE`/`END IF`, `WHILE`/`LOOP`/`END LOOP`
+- Block grouping: `( statement1  statement2 )` for multiple statements under THEN/ELSE
+- Assignments, `RETURN` (multi-value), comments (`/*...*/`)
+- Single-quoted strings with escape: `'O''Brien'`
+- 60+ built-in functions: numeric, string, date, conversion, lookup, globals, accruals, formula calling
+- 65 database items (DBI) across TIME_LABOR, PERSON, PAYROLL modules
 
-**Explicitly out of scope for MVP:**
-- `CURSOR`/`FETCH`, `ALIAS`, `EXECUTE`, `CHANGE_CONTEXTS`, `CALL_FORMULA`
-- User-defined functions, nested formula calls
+**Reserved words:** `ALIAS`, `AND`, `ARE`, `AS`, `DEFAULT`, `DEFAULTED`, `ELSE`, `ELSIF`, `EXECUTE`, `EXIT`, `FOR`, `IF`, `INPUT`, `INPUTS`, `IS`, `LIKE`, `LOCAL`, `LOOP`, `NOT`, `OR`, `OUTPUT`, `RETURN`, `THEN`, `USING`, `WAS`, `WHILE`
+
+**Not yet supported:**
+- `CURSOR`/`FETCH`, `CHANGE_CONTEXTS`, array processing (`A.FIRST`, `A.NEXT`, `A.EXISTS`)
 
 **Fallback for unsupported syntax:** If the parser encounters an unrecognized construct, it reports a warning (not error) with message "Unsupported syntax — validation skipped for this block. Please verify in Oracle environment." The AI service can still generate formulas using these constructs; only the validator/simulator will skip them.
 

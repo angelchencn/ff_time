@@ -19,10 +19,10 @@ export interface ValidateResponse {
 }
 
 export interface SimulateResponse {
-  success: boolean;
-  outputs: Record<string, string | number>;
-  trace: string[];
-  error?: string;
+  status: 'SUCCESS' | 'ERROR';
+  output_data: Record<string, string | number>;
+  execution_trace: Array<{ line: number; statement: string; result: string }>;
+  error: string | null;
 }
 
 export interface CompleteSuggestion {
@@ -45,6 +45,7 @@ export interface DBI {
   name: string;
   description?: string;
   data_type?: string;
+  module?: string;
 }
 
 export async function validateCode(code: string): Promise<ValidateResponse> {
@@ -56,7 +57,7 @@ export async function simulateCode(
   code: string,
   inputs: Record<string, string | number>
 ): Promise<SimulateResponse> {
-  const response = await api.post<SimulateResponse>('/api/simulate', { code, inputs });
+  const response = await api.post<SimulateResponse>('/api/simulate', { code, input_data: inputs });
   return response.data;
 }
 

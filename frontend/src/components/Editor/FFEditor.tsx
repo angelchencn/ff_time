@@ -84,7 +84,7 @@ export function FFEditor({ dbiNames = [], height = '100%' }: FFEditorProps) {
         scrollBeyondLastLine: false,
         tabSize: 2,
       }}
-      theme="vs-dark"
+      theme="light"
     />
   );
 }

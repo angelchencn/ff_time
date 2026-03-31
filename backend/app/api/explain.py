@@ -1,6 +1,7 @@
 """Explain API route — POST /api/explain (SSE streaming)."""
 from __future__ import annotations
 
+import json
 from typing import Any, AsyncGenerator, Optional
 
 from fastapi import APIRouter
@@ -34,7 +35,7 @@ async def explain(req: ExplainRequest) -> EventSourceResponse:
     async def event_generator() -> AsyncGenerator[dict[str, Any], None]:
         ai = get_ai_service()
         for chunk in ai.explain(req.code, req.selected_range, req.action):
-            yield {"data": chunk}
+            yield {"data": json.dumps({"text": chunk})}
         yield {"data": "[DONE]"}
 
     return EventSourceResponse(event_generator())

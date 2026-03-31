@@ -9,7 +9,7 @@ export function ExecutionTrace() {
   if (status === 'idle') {
     return (
       <div style={{ padding: 16 }}>
-        <Text style={{ color: '#888', fontSize: 13 }}>
+        <Text style={{ color: '#999', fontSize: 13 }}>
           Run a simulation to see output and execution trace.
         </Text>
       </div>
@@ -19,7 +19,7 @@ export function ExecutionTrace() {
   if (status === 'running') {
     return (
       <div style={{ padding: 16 }}>
-        <Text style={{ color: '#888', fontSize: 13 }}>Running...</Text>
+        <Text style={{ color: '#999', fontSize: 13 }}>Running...</Text>
       </div>
     );
   }
@@ -41,11 +41,11 @@ export function ExecutionTrace() {
     <div style={{ padding: 16 }}>
       {/* Output Variables */}
       <div style={{ marginBottom: 16 }}>
-        <Text strong style={{ color: '#ccc', fontSize: 13, display: 'block', marginBottom: 8 }}>
+        <Text strong style={{ color: '#333', fontSize: 13, display: 'block', marginBottom: 8 }}>
           Output Variables
         </Text>
         {outputEntries.length === 0 ? (
-          <Text style={{ color: '#888', fontSize: 12 }}>No output variables.</Text>
+          <Text style={{ color: '#999', fontSize: 12 }}>No output variables.</Text>
         ) : (
           outputEntries.map(([key, val]) => (
             <div
@@ -54,13 +54,13 @@ export function ExecutionTrace() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 padding: '4px 8px',
-                backgroundColor: '#2a2a2a',
+                backgroundColor: '#f5f5f5',
                 borderRadius: 4,
                 marginBottom: 4,
               }}
             >
-              <Text style={{ color: '#a8d8a8', fontSize: 12 }}>{key}</Text>
-              <Text style={{ color: '#e0e0e0', fontSize: 12 }}>{String(val)}</Text>
+              <Text style={{ color: '#389e0d', fontSize: 12 }}>{key}</Text>
+              <Text style={{ color: '#1a1a1a', fontSize: 12 }}>{String(val)}</Text>
             </div>
           ))
         )}
@@ -73,7 +73,7 @@ export function ExecutionTrace() {
           items={[
             {
               key: 'trace',
-              label: <span style={{ color: '#ccc', fontSize: 12 }}>Execution Trace ({trace.length} steps)</span>,
+              label: <span style={{ color: '#333', fontSize: 12 }}>Execution Trace ({trace.length} steps)</span>,
               children: (
                 <div
                   style={{
@@ -87,12 +87,12 @@ export function ExecutionTrace() {
                     <div
                       key={idx}
                       style={{
-                        color: '#aaa',
+                        color: '#666',
                         padding: '2px 0',
-                        borderBottom: '1px solid #222',
+                        borderBottom: '1px solid #eee',
                       }}
                     >
-                      <Text style={{ color: '#555', marginRight: 8 }}>{idx + 1}</Text>
+                      <Text style={{ color: '#bbb', marginRight: 8 }}>{idx + 1}</Text>
                       <Text style={{ color: '#ccc' }}>{line}</Text>
                     </div>
                   ))}
@@ -100,7 +100,7 @@ export function ExecutionTrace() {
               ),
             },
           ]}
-          style={{ backgroundColor: '#1a1a1a', borderColor: '#333' }}
+          style={{ backgroundColor: '#fff', borderColor: '#e0e0e0' }}
         />
       )}
     </div>

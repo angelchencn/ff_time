@@ -1,0 +1,20 @@
+/* Overtime Pay Calculation */
+DEFAULT FOR HOURS_WORKED IS 0
+DEFAULT FOR REGULAR_RATE IS 0
+DEFAULT FOR OVERTIME_THRESHOLD IS 40
+DEFAULT FOR OVERTIME_MULTIPLIER IS 1.5
+
+overtime_hours = 0
+overtime_pay = 0
+regular_pay = 0
+
+IF HOURS_WORKED > OVERTIME_THRESHOLD THEN
+  overtime_hours = HOURS_WORKED - OVERTIME_THRESHOLD
+  regular_pay = OVERTIME_THRESHOLD * REGULAR_RATE
+  overtime_pay = overtime_hours * REGULAR_RATE * OVERTIME_MULTIPLIER
+ELSE
+  regular_pay = HOURS_WORKED * REGULAR_RATE
+END IF
+
+total_pay = regular_pay + overtime_pay
+RETURN total_pay

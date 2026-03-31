@@ -1,0 +1,118 @@
+Oracle Fast Formula — Time and Labor Guide
+
+FORMULA TYPES FOR TIME AND LABOR:
+
+1. Time Entry Rule - Validate and modify time entries on submission
+2. Time Calculation Rule - Calculate derived values like overtime and premiums
+3. Time Advanced Category Rule - Categorize time entries
+4. Time Device Rule - Process time clock/device data
+5. Time Submission Rule - Validate time card submissions
+6. Workforce Compliance Rule - Check labor compliance regulations
+
+COMMON TIME AND LABOR PATTERNS:
+
+Overtime Calculation Pattern:
+DEFAULT FOR HOURS_WORKED IS 0
+DEFAULT FOR REGULAR_RATE IS 0
+DEFAULT FOR OT_THRESHOLD IS 40
+DEFAULT FOR OT_MULTIPLIER IS 1.5
+IF HOURS_WORKED > OT_THRESHOLD THEN
+  regular_pay = OT_THRESHOLD * REGULAR_RATE
+  ot_hours = HOURS_WORKED - OT_THRESHOLD
+  ot_pay = ot_hours * REGULAR_RATE * OT_MULTIPLIER
+ELSE
+  regular_pay = HOURS_WORKED * REGULAR_RATE
+  ot_pay = 0
+END IF
+total_pay = regular_pay + ot_pay
+RETURN total_pay
+
+Shift Differential Pattern:
+DEFAULT FOR SHIFT_TYPE IS 'DAY'
+DEFAULT FOR HOURS_WORKED IS 0
+DEFAULT FOR REGULAR_RATE IS 0
+IF SHIFT_TYPE = 'NIGHT' THEN
+  diff_rate = 0.15
+ELSIF SHIFT_TYPE = 'EVENING' THEN
+  diff_rate = 0.08
+ELSE
+  diff_rate = 0
+END IF
+shift_premium = HOURS_WORKED * REGULAR_RATE * diff_rate
+RETURN shift_premium
+
+Holiday Pay Pattern:
+DEFAULT FOR HOLIDAY_FLAG IS 'N'
+DEFAULT FOR HOURS_WORKED IS 0
+DEFAULT FOR REGULAR_RATE IS 0
+DEFAULT FOR HOLIDAY_MULTIPLIER IS 2.0
+IF HOLIDAY_FLAG = 'Y' THEN
+  pay = HOURS_WORKED * REGULAR_RATE * HOLIDAY_MULTIPLIER
+ELSE
+  pay = HOURS_WORKED * REGULAR_RATE
+END IF
+RETURN pay
+
+Weekly Hours Cap Pattern:
+DEFAULT FOR HOURS_WORKED IS 0
+DEFAULT FOR MAX_HOURS IS 60
+IF HOURS_WORKED > MAX_HOURS THEN
+  capped_hours = MAX_HOURS
+  warning_flag = 'Y'
+ELSE
+  capped_hours = HOURS_WORKED
+  warning_flag = 'N'
+END IF
+RETURN capped_hours, warning_flag
+
+California Double Overtime Pattern:
+/* 1-8 hours: regular, 8-12 hours: 1.5x, 12+ hours: 2x */
+DEFAULT FOR HOURS_WORKED IS 0
+DEFAULT FOR REGULAR_RATE IS 0
+IF HOURS_WORKED <= 8 THEN
+  regular_hours = HOURS_WORKED
+  ot_hours = 0
+  dt_hours = 0
+ELSIF HOURS_WORKED <= 12 THEN
+  regular_hours = 8
+  ot_hours = HOURS_WORKED - 8
+  dt_hours = 0
+ELSE
+  regular_hours = 8
+  ot_hours = 4
+  dt_hours = HOURS_WORKED - 12
+END IF
+total = (regular_hours * REGULAR_RATE) + (ot_hours * REGULAR_RATE * 1.5) + (dt_hours * REGULAR_RATE * 2)
+RETURN total
+
+WAS DEFAULTED Pattern:
+DEFAULT FOR hourly_rate IS 15.00
+INPUTS ARE hours_worked
+IF hourly_rate WAS DEFAULTED THEN
+  warning = 'Default rate applied'
+END IF
+pay = hours_worked * hourly_rate
+RETURN pay, warning
+
+COMMON DATABASE ITEMS (DBIs) FOR TIME AND LABOR:
+HWM_PPM_TM_MEASURE - Time measure value (hours/days)
+HWM_PPM_TM_RESOURCE_ID - Resource ID for time entry
+HWM_PPM_TM_START_TIME - Start time
+HWM_PPM_TM_STOP_TIME - Stop time
+HWM_EMP_SCHD_SHIFT_NAME - Employee schedule shift name
+HWM_EMP_SCHD_MEASURE - Schedule hours
+PER_ASG_NORMAL_HOURS - Normal working hours
+PER_ASG_EMPLOYMENT_CATEGORY - Full time / Part time
+PER_EMP_HIRE_DATE - Hire date
+PAY_EARN_PERIOD_START - Pay period start
+PAY_EARN_PERIOD_END - Pay period end
+
+BEST PRACTICES:
+- Always use DEFAULT FOR to set fallback values for all input variables
+- Always end formula with RETURN statement
+- Use meaningful variable names (total_pay, not x)
+- Add comments explaining business logic
+- Validate with WAS DEFAULTED when default values could affect calculations
+- Keep formulas focused on one calculation; use CALL_FORMULA for complex logic
+- Use INPUTS ARE to explicitly declare input parameters with types
+- Follow statement order: ALIAS > DEFAULT > INPUTS > logic > RETURN

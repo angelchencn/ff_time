@@ -1,0 +1,80 @@
+Oracle Fast Formula Syntax Reference
+
+RESERVED WORDS: ALIAS, AND, ARE, AS, DEFAULT, DEFAULTED, ELSE, ELSIF, EXECUTE, EXIT, FOR, IF, INPUT, INPUTS, IS, LIKE, LOCAL, LOOP, NOT, OR, OUTPUT, RETURN, THEN, USING, WAS, WHILE
+
+VARIABLE DECLARATIONS:
+DEFAULT FOR variable_name IS constant_value
+DEFAULT FOR hourly_rate IS 15.00
+DEFAULT FOR start_date IS '1990-01-01 00:00:00' (date)
+DEFAULT FOR status IS 'ACTIVE' (text)
+INPUT IS variable_name
+INPUTS ARE var1 (number), var2 (text), var3 (date)
+OUTPUT IS variable_name
+LOCAL variable_name (type)
+ALIAS long_database_item_name AS short_name
+
+DATA TYPES:
+NUMBER - integer or decimal, no quotes: 63, -2.3, 0.33
+TEXT - single quotes: 'Smith', 'O''Brien' (double single quote to escape)
+DATE - quoted with (date): '2024-01-15 00:00:00' (date), '15-JAN-2024' (date)
+
+ASSIGNMENT:
+variable_name = expression
+wage = hours_worked * hourly_rate
+
+IF STATEMENT:
+IF condition THEN
+  statement1
+  statement2
+ELSIF condition2 THEN
+  statement3
+ELSE
+  statement4
+END IF
+
+For multiple statements under THEN/ELSE, you can use parentheses:
+IF condition THEN
+(
+  statement1
+  statement2
+)
+ELSE
+(
+  statement3
+  statement4
+)
+
+WHILE LOOP:
+WHILE condition LOOP
+  statements
+END LOOP
+Use EXIT to leave a WHILE loop immediately.
+
+RETURN:
+RETURN variable1, variable2, variable3
+Can return multiple variables. Stops formula execution.
+
+ARITHMETIC OPERATORS: + (addition/text concat), - (subtraction), * (multiplication), / (division)
+COMPARISON OPERATORS: = (equals), != <> >< (not equal), < > <= >= => =< (less/greater)
+LOGICAL OPERATORS: AND, OR, NOT (precedence: NOT > AND > OR)
+PATTERN MATCHING: LIKE, NOT LIKE (wildcards: % = any chars, _ = single char)
+SPECIAL: WAS DEFAULTED (test if default value was used)
+
+STATEMENT ORDER (required):
+1. Comments (optional, can appear anywhere)
+2. ALIAS statements
+3. DEFAULT statements
+4. INPUTS statement
+5. Other statements (Assignment, If, While, Return)
+
+VARIABLE NAMING:
+- Words joined by underscores: variable_name
+- Start with alphabetic character (A-Z)
+- Followed by alphanumeric (A-Z, 0-9)
+- Maximum 80 characters
+- Case-insensitive: EMPLOYEE_NAME = employee_name
+- Cannot be reserved words or digits-only
+
+COMMENTS:
+/* This is a block comment */
+Can be placed anywhere. Cannot nest comments.

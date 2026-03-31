@@ -38,9 +38,12 @@ _parser = Lark(
 
 # Keyword terminal names that should be filtered from children
 _KEYWORD_TERMINALS = {
-    "DEFAULT", "FOR", "INPUT", "OUTPUT", "LOCAL", "IS",
-    "IF", "THEN", "ELSE", "ENDIF", "WHILE", "LOOP", "ENDLOOP",
-    "RETURN", "OR", "AND", "NOT", "NUMBER_TYPE", "TEXT_TYPE", "DATE_TYPE",
+    "ALIAS", "AS", "DEFAULT", "DEFAULTED", "FOR", "INPUT", "INPUTS",
+    "OUTPUT", "LOCAL", "IS", "ARE",
+    "IF", "THEN", "ELSIF", "ELSE", "ENDIF",
+    "WHILE", "LOOP", "ENDLOOP", "EXIT",
+    "RETURN", "OR", "AND", "NOT", "WAS", "LIKE", "USING",
+    "NUMBER_TYPE", "TEXT_TYPE", "DATE_TYPE",
 }
 
 
@@ -75,6 +78,11 @@ class FFTransformer(Transformer):
         raw = str(children[0])
         return StringLiteral(value=raw[1:-1])
 
+    def single_string(self, children):
+        raw = str(children[0])
+        # Remove outer quotes and unescape doubled single quotes
+        return StringLiteral(value=raw[1:-1].replace("''", "'"))
+
     def var_ref(self, children):
         return VariableRef(name=str(children[0]))
 
@@ -85,10 +93,18 @@ class FFTransformer(Transformer):
     def not_op(self, children):
         return UnaryOp(op="NOT", operand=children[0])
 
+    def like_op(self, children):
+        return BinaryOp(op="LIKE", left=children[0], right=children[1])
+
+    def not_like_op(self, children):
+        return BinaryOp(op="NOT LIKE", left=children[0], right=children[1])
+
+    def was_defaulted_op(self, children):
+        filtered = _filter_keywords(children)
+        return BinaryOp(op="WAS DEFAULTED", left=filtered[0], right=NumberLiteral(value=1))
+
     def func_call(self, children):
-        # children: [NAME_token, *expr_list_items]
         name = str(children[0])
-        # expr_list returns a plain list; func_call may receive it directly
         args_raw = children[1:]
         if len(args_raw) == 1 and isinstance(args_raw[0], list):
             args = tuple(args_raw[0])
@@ -120,14 +136,15 @@ class FFTransformer(Transformer):
     # ── variable declarations ────────────────────────────────────────────────
     def default_decl(self, children):
         filtered = _filter_keywords(children)
-        # filtered: [NAME, (data_type_str)?, expr]
+        # filtered may be: [name, expr] or [name, type, expr] or [name, expr, type] or [name, type, expr, type]
         name = str(filtered[0])
-        if len(filtered) == 2:
-            data_type = None
-            default_value = filtered[1]
-        else:
-            data_type = filtered[1]
-            default_value = filtered[2]
+        data_type = None
+        default_value = None
+        for item in filtered[1:]:
+            if isinstance(item, str) and item.upper() in ("NUMBER", "TEXT", "DATE"):
+                data_type = item.upper()
+            else:
+                default_value = item
         return VariableDecl(
             kind="default",
             var_name=name,
@@ -139,6 +156,15 @@ class FFTransformer(Transformer):
         filtered = _filter_keywords(children)
         return VariableDecl(kind="input", var_name=str(filtered[0]))
 
+    def name_list(self, children):
+        # children may contain NAME tokens and data_type strings; extract names
+        return [str(c) for c in children if isinstance(c, Token) and c.type == "NAME"]
+
+    def inputs_decl(self, children):
+        filtered = _filter_keywords(children)
+        names = filtered[0] if filtered and isinstance(filtered[0], list) else [str(filtered[0])]
+        return [VariableDecl(kind="input", var_name=n) for n in names]
+
     def output_decl(self, children):
         filtered = _filter_keywords(children)
         return VariableDecl(kind="output", var_name=str(filtered[0]))
@@ -148,6 +174,12 @@ class FFTransformer(Transformer):
         name = str(filtered[0])
         data_type = filtered[1] if len(filtered) > 1 else None
         return VariableDecl(kind="local", var_name=name, data_type=data_type)
+
+    def alias_decl(self, children):
+        filtered = _filter_keywords(children)
+        # ALIAS old AS new — treat as assignment alias, store as VariableDecl
+        return VariableDecl(kind="alias", var_name=str(filtered[1]), data_type=None,
+                            default_value=VariableRef(name=str(filtered[0])))
 
     def data_type(self, children):
         return str(children[0]).upper()
@@ -163,27 +195,66 @@ class FFTransformer(Transformer):
     def else_body(self, children):
         return list(children)
 
-    def if_stmt(self, children):
-        # children includes keyword tokens; filter them first
+    def elsif_clause(self, children):
+        # children after keyword filtering: [condition, *statements]
         filtered = _filter_keywords(children)
-        # After filtering: [condition, then_body_list, (else_body_list)?]
         condition = filtered[0]
-        then_list = filtered[1]  # returned by then_body as list
-        else_list = filtered[2] if len(filtered) > 2 else None
+        body = filtered[1:]
+        return (condition, body)
+
+    def if_stmt(self, children):
+        filtered = _filter_keywords(children)
+        # filtered: [condition, then_body_list, *(elsif_tuples), (else_body_list)?]
+        condition = filtered[0]
+        then_list = filtered[1]
+        if not isinstance(then_list, list):
+            then_list = [then_list]
+
+        # Collect elsif clauses and else body
+        elsif_clauses = []
+        else_list = None
+        for item in filtered[2:]:
+            if isinstance(item, tuple) and len(item) == 2:
+                # elsif clause: (condition, body)
+                elsif_clauses.append(item)
+            elif isinstance(item, list):
+                else_list = item
+
+        # Convert ELSIF chain into nested IfStatements in the else_body
+        if elsif_clauses:
+            # Build from last elsif backwards
+            inner = else_list
+            for elsif_cond, elsif_body in reversed(elsif_clauses):
+                if not isinstance(elsif_body, list):
+                    elsif_body = [elsif_body]
+                inner_else = tuple(inner) if inner else None
+                inner = [IfStatement(
+                    condition=elsif_cond,
+                    then_body=tuple(elsif_body),
+                    else_body=inner_else,
+                )]
+            else_list = inner
+
         return IfStatement(
             condition=condition,
             then_body=tuple(then_list),
-            else_body=tuple(else_list) if else_list is not None else None,
+            else_body=tuple(else_list) if else_list else None,
         )
+
+    def while_body(self, children):
+        return list(children)
 
     def while_stmt(self, children):
         filtered = _filter_keywords(children)
         condition = filtered[0]
-        body = tuple(filtered[1:])
-        return WhileLoop(condition=condition, body=body)
+        body = filtered[1]  # while_body returns a list
+        if not isinstance(body, list):
+            body = filtered[1:]
+        return WhileLoop(condition=condition, body=tuple(body))
 
     def return_stmt(self, children):
         filtered = _filter_keywords(children)
+        # Can return multiple values; for now use first
         return ReturnStatement(value=filtered[0])
 
     # ── top-level ────────────────────────────────────────────────────────────
@@ -191,25 +262,21 @@ class FFTransformer(Transformer):
         return children[0]
 
     def start(self, children):
-        return Program(statements=tuple(children))
+        # Flatten any lists from inputs_decl
+        flat: list = []
+        for child in children:
+            if isinstance(child, list):
+                flat.extend(child)
+            else:
+                flat.append(child)
+        return Program(statements=tuple(flat))
 
 
 def parse_formula(
     code: str,
     return_diagnostics: bool = False,
 ) -> Union[Program, ParseResult]:
-    """Parse Fast Formula source code.
-
-    Args:
-        code: Source text to parse.
-        return_diagnostics: When True always return a ParseResult even on
-            success.  When False (default) return a Program directly, or
-            raise on parse error.
-
-    Returns:
-        Program when return_diagnostics is False and parse succeeds.
-        ParseResult when return_diagnostics is True.
-    """
+    """Parse Fast Formula source code."""
     try:
         tree = _parser.parse(code)
         program: Program = FFTransformer().transform(tree)
@@ -225,11 +292,10 @@ def parse_formula(
             end_col=col + 1,
             severity="error",
             message=str(exc).split("\n")[0],
-            layer="parser",
+            layer="syntax",
         )
         if return_diagnostics:
             return ParseResult(program=None, diagnostics=(diag,))
         raise
     except VisitError as exc:
-        # Unwrap transformer errors and re-raise the original
         raise exc.orig_exc from exc
