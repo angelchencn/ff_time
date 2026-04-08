@@ -1,0 +1,2075 @@
+[
+  {
+    "type_name": "Oracle Payroll",
+    "display_name": "Oracle Payroll",
+    "formula_count": 26864,
+    "sample_prompts": [
+      "Calculates pension deduction",
+      "GB Absence Payment",
+      "Formula for Chapter VIA Deduction calculation",
+      "This formula populates variables from Absences to be used in Pension calculation",
+      "Professional Tax Formula for India localization",
+      "Formula to calculate Deduction Amounts",
+      "Taxation Formula To Fetch State Overrides",
+      "Formula for calculation of Social Insurance in KW legislation",
+      "French Initialization of Calculation Values Formula",
+      "Calculate Workers Compensation for an assignment Author Date GKPUPPAL 04-06-2021 Modified",
+      "This formula calculates resident state taxes",
+      "Social insurance processing formula for Bahrain",
+      "Calculates the pension plan tax amount",
+      "Income Tax Formula",
+      "This formula populates variables from Absences at assignment level to be used in Pension calculation",
+      "Calculate Provincial Pension Plan Tax Author Date",
+      "Formula for Saudi GOSI calculation",
+      "US Specific Involuntary Deduction Protected Pay Calculation Rules For All Common Rules",
+      "1 CARCHANA 2-DEC-16 Initial. 3 SGANAI 2-NOV-20 Changes for BPAD 10960 4 DALJISIN 3-AUG-23 Changes for",
+      "If LOWEST_TAX_RATE = Lowest Provincial tax rate For Regular taxation & Commission methods : K2 returns K2P K2_YTD returns 0 For Bonus taxation meth...",
+      "Calculate Canadian Pension Plan Tax Author Date",
+      "Process Earnings and Earnings Projection for person to calculate total income earned. Other Income apart from Income Charged Under Head Salaries is...",
+      "This formula calculates work city taxes",
+      "Calculates the province pension plan tax amount",
+      "Calculates Provincial taxes",
+      "This formula calculates federal income tax",
+      "This formula calculates work state taxes",
+      "Calculate Mexico Federal Income Tax Author",
+      "SI processing for GCC",
+      "KW SI Calculation Formula for GCC",
+      "US Specific Involuntary Deduction Calculation Rules",
+      "This formula is used to arrive at the disposable income in US terms",
+      "Social Insurance Calculation Formula for GCC",
+      "1 CARCHANA 2-DEC-16 Initial. 3 SGANAI 2-NOV-20 Changes for BPAD 10960",
+      "Work State Spec Miscellaneous Calculator Formula",
+      "Calculates T1/T2/T3/T4",
+      "Process Federal and Resident pretax reduction calculations All residence tax calculation results are adjusted and returned from this formula. This ...",
+      "Social insurance processing formula for Qatar",
+      "AE Social Insurance Calculation formula",
+      "Gratuity Calculation for India localisation",
+      "FR Absence Payment",
+      "/ $ Header: $ Formula Name : US_TAX_WORK_COUNTY Description : County Tax Formula for work",
+      "LGPS Calculation Formula",
+      "Provident Fund calculation for India localisation",
+      "This formula adjusts state disability insurance results",
+      "US Pension 403B Calculator formula",
+      "Calculator Formula for 457 pension plan",
+      "Emirati Gulf Cooperation Council Countries Reciprocity Formula",
+      "Reads US Specific Value Definitions and stores it in WSA",
+      "GB Court Order Attachable Balance Formula",
+      "Formula to read US override and seeded values",
+      "Formula to calculate earnings that are subject to State Tax Inputs: p_gross_earnings p_ytd_gross_earnings p_daily_salary Results: Author",
+      "Calculates Federal taxes",
+      "This formula calculates state disability insurance",
+      "KW Gratuity Processing formula",
+      "Taxation Formula To Calculate FLI and MLI",
+      "This formula calculates home school district tax",
+      "US Order Calculation Rule",
+      "Initiates individual income tax calculation and is attached to a tax element",
+      "Formula for Deduction Calculation",
+      "US Specific Involuntary Deduction Protected Pay Calculation Rules For Garnishment/CreditDebt/EmpReq",
+      "Formula for GOSI Calculation",
+      "House Rent Allowance calculation for India localisation",
+      "Formula to get tru level information and reset few things related to LTA for India localization and LTA calculation",
+      "Formula to calculate the Standard Tax for a Person",
+      "SA Gratuity Calculation",
+      "Formula to get Other Income details",
+      "This is the formula for processing a unit x rate earning element. The formula assumes that the amounts and periodicity are available in element ent...",
+      "This Formula overrides the Entitlement Result for GB Localization",
+      "Taxation Formula For WSA Operations",
+      "Calculates Quebec Parental Insurance Plan taxes",
+      "Calculates Provincial commission tax amount",
+      "This formula calculates state unemployment insurance",
+      "Base Formula",
+      "Distribute pension contributions across the related assignments",
+      "Calculates Vacation Liability Payout",
+      "This formula populates variables from Absences at assignment level to be used in Pension calculation for TPS",
+      "This formula calculates resident county taxes",
+      "Formula to calculate exempted and non exempted amount for allowance type for India localization",
+      "Return tax results from Tax Engine Formulas Author Date from Vertex",
+      "This is Quebec Non Periodic Taxation formula",
+      "This formula calculates resident city taxes",
+      "Calculates Employment Insurance taxes",
+      "Calculator Formula for US Pretax 401K ER Match element, Calculation of amount that Employer will match",
+      "Calculates annual taxable income and determines exit conditions for various fed taxation methods",
+      "Retrieves the Jurisdiction Code for the particular Assignment",
+      "Leave Encashment Calculation for India localisation",
+      "Taxation Formula To Fetch Federal Overrides",
+      "Calculates employee contributions",
+      "US Specific Involuntary Deduction Protected Pay Calculation Rules For RGLevy",
+      "ESI Calculation formula for India Localization",
+      "Process work pretax reduction calculations 1) It retrieves pre-tax, gross and not withholdable from working stoarage. It is done by formula functio...",
+      "Calculate Provincial Medical for an assignment Author Date GKPUPPAL 04-06-2021 Modified",
+      "This is the formula for processing a flat amount earning element. The formula assumes that the amounts and periodicity are available in element ent...",
+      "Formula for Let out House Income Calculation",
+      "France Time Card Calculator formula",
+      "Global Involuntary Deductions seeded results formula",
+      "GB Override Involuntary Deductions Student Loan Calculation",
+      "Calculates Oracle Quebec Provincial Income Tax",
+      "Formula for calculating the SI Contribution for NL Localization",
+      "Performs the Canadian earnings calculation",
+      "GB_PAE_MAIN is the controlling formula used in the assessment of the employee's eligibility for automatic enrolment into a qualified pension scheme",
+      "This formula retrieves results returned from the tax calculation engine",
+      "Adjust tax results if Net is negative Author Date CPP/PPP Basic Exemption and H Factor are getting adjusted when the Net is less than the taxes to ...",
+      "Adjusts Balances for Negative Earnings",
+      "Distributes earnings by jurisdiction and stores them in WSA",
+      "Gratuity processing formula for Oman",
+      "This formula is used to Calculate Fee based on State Rules",
+      "Returns the calculated contribution results for every social security type",
+      "Retrieves federal tax rates",
+      "Calculates Oracle Canadian Federal Income Tax",
+      "Calculate Provincial Payroll Tax (for Nunavut and Northwest Territories) Author Date Added DIR formula calls to fetch data from DIR applicable for ...",
+      "Gratuity processing formula for Qatar",
+      "Formula retrieves override values for a payroll statutory and tax reporting unit",
+      "Global Deductions calculator formula - Common to Voluntary Deductions and Pre-Statutory Deductions Intended for Oracle internal use only. Must be u...",
+      "Taxation Formula To Fetch County Overrides",
+      "Formula for special support proration logic",
+      "Global entitlement calculator formula",
+      "Global Time Card Calculator formula",
+      "This formula calculates work city school district tax",
+      "Formula for determining Pension Automatic Enrolment Postponement Date for GB Localization",
+      "Calculate Mexico Federal Tax Monthly Adjustment Author",
+      "US Specific Involuntary Deduction Disposable Income",
+      "This formula populates variables from Absences to be used in Pension calculation for TPS",
+      "The formula works for entitlement calculator element. Call global formula ORA_ENTITLEMENT_CALCULATOR, The global formula includes logic to get all ...",
+      "Initiates contribution calculation and is attached to every social security type",
+      "To limit the RRSP calculation",
+      "Performs the Canadian sales tax calculation",
+      "US_ADJUST_TAX_BALANCES US_BUILD_GEOCODE DEDUCTION_CARD_BY_EE /",
+      "FR Vacation Payment",
+      "GB Override Involuntary Deductions Postgraduate Loan Calculation",
+      "AE Gratuity Processing formula",
+      "Formula to derive the CPP pensionable months",
+      "Calculator Formula",
+      "Calculator formula for 403B After Tax pension plan",
+      "Gratuity accrual formula for Qatar",
+      "Returns direct and indirect calculation results to NI Employee and NI Employer elements",
+      "Formula for city miscellaneous",
+      "Taxation Formula To Fetch City Overrides",
+      "GB Court Order Fix Amount Calculation",
+      "Home State Spec Miscellaneous Calculator Formula",
+      "Gratuity processing formula for Bahrain",
+      "Shift Diff Cases with NONEXEMPT and having time definition id",
+      "Formula to calculate Vacation Liability",
+      "SA Article 77 Calculation",
+      "Formula to calculate Canadian absence elements",
+      "Calculator Formula for Voluntary Deduction",
+      "Calculator formula for Pre-Statutory Deductions",
+      "Initiates taxable contribution calculation for public housing fund and supplementary public housing fund",
+      "IE Absence Payment",
+      "Global Involuntary Deductions seeded base formula",
+      "Formula for Calculation of Earnings",
+      "Canadian version of entitlement calculator element. Call global formula ZHRX_CA_Vacation_Days_Partial_2104 ENTITLEMENT RESULT, Also includes logic ...",
+      "Formula for Canada Pretax Deduction Calculator",
+      "AE Gratuity Accrual Results Calculation Formula",
+      "Canadian version of entitlement calculator element. Call global formula ZHRX_CA_P1_Qual_Mat_Days_Paid_Percent_131810 ENTITLEMENT RESULT, Also inclu...",
+      "Canadian version of entitlement calculator element. Call global formula ZHRX_CA_Sick_Days_Partial_2004 ENTITLEMENT RESULT, Also includes logic to g...",
+      "SA Unpaid Leave Calculation",
+      "Canadian version of entitlement calculator element. Call global formula ZHRX_CA_P1_NE_Mat_Days_Unpaid_2004 ENTITLEMENT RESULT, Also includes logic ...",
+      "Gratuity accrual formula for Oman",
+      "To Provincial Medical Processor element. Vacation Liability Processor element.Also set the employment level in VA WSA variable",
+      "Formula to handle the vacation liability Absences Adjustment",
+      "NPS for India localisation",
+      "Canadian version of entitlement calculator element. Call global formula ZHRX_CA_P1_Compassionate Care ENTITLEMENT RESULT, Also includes logic to ge...",
+      "Entry of Mexico Employer State Tax Calculation Author Date Description",
+      "Formula to initialize fees",
+      "Formula to find eligibility for the tax calculation",
+      "Calculates previous year's annual income",
+      "This formula reads the WSA variables from Absences to determine number of APP days, working days, unpaid days and non APP days within a period for ...",
+      "Retrenchment Calculation for India localisation",
+      "LWF for India localization",
+      "This formula reads the WSA variables from Absences to determine number of APP days, working days, unpaid days and non APP days within a period. Thi...",
+      "Canadian version of entitlement calculator element. Call global formula ZHRX_CA_ABS_EXP_NoEnt_Other_Hours_1810 ENTITLEMENT RESULT, Also includes lo...",
+      "Canadian version of entitlement calculator element. Call global formula ZHRX_CA_P1_Qual_Mat_Days_Unpaid_1810 ENTITLEMENT RESULT, Also includes logi...",
+      "IE Health and Sickness Absence Payment",
+      "Canadian version of entitlement calculator element. Call global formula ZHRX_CA_Vacation_Hours_Partial_1810 ENTITLEMENT RESULT, Also includes logic...",
+      "Canadian version of entitlement calculator element. Call global formula ZHRX_CA_ABS_EXP_Qual_Mat_Hours_1810 ENTITLEMENT RESULT, Also includes logic...",
+      "Canadian version of entitlement calculator element. Call global formula ZHRX_CA_Vacation_Days_Partial_1810 ENTITLEMENT RESULT, Also includes logic ...",
+      "Canadian version of entitlement calculator element. Call global formula ZHRX_CA_P1_NE_Mat_Days_Unpaid_1810 ENTITLEMENT RESULT, Also includes logic ...",
+      "Seeded formula with different mode to retrieve information from Earning Distribution Card",
+      "Canadian version of entitlement calculator element. Call global formula ZHRX_CA_ABS_EXP_Sick_Hours_1810 ENTITLEMENT RESULT, Also includes logic to ...",
+      "Calculates F5A/F5Q/F5A/F5B/ for enhanced pension deductions For Regular Bonus & YTD Bonus taxation methods : Output variable F5A returns F5A Output...",
+      "Canadian version of entitlement calculator element. Call global formula ZHRX_CA_ABS_EXP_Vac_Hours_1810 ENTITLEMENT RESULT, Also includes logic to g...",
+      "SA Monthly Gratuity Calculation",
+      "Canadian version of entitlement calculator element. Call global formula ZHRX_CA_Sick_Leave_Days_1810 ENTITLEMENT RESULT, Also includes logic to get...",
+      "Multiple orders special calc rules",
+      "Canadian version of entitlement calculator element. Call global formula ZHRX_CA_Sick_Hours_1810 ENTITLEMENT RESULT, Also includes logic to get all ...",
+      "Calculates federal and provincial or territorial tax deductions for the pay period",
+      "This Formula is created by Global Earnings Template. It Recovers the overpayments made in the past, with employee agreed Rate set on the Recovery C...",
+      "Formula for Earning Distribution",
+      "US Specific Involuntary Deduction Disposable Income Calculation Rules For RGLevy",
+      "This formula reads the WSA variables at assignment level from Absences to determine number of APP days, normal days, unpaid days and PPP days withi...",
+      "ER Match Calculator Formula for US Pretax 401K element",
+      "Common WSA operations to store and retrieve Work Locations and Resident Address details",
+      "This formula calculates social security",
+      "Fiscal Exemption Base",
+      "Formula to compute Canada legislation specific results",
+      "Global Involuntary Deductions seeded formula to read component data",
+      "Overridden Base Earnings Formula",
+      "Elective Deferral Limit Check Calculator Formula for US Pretax element"
+    ]
+  },
+  {
+    "type_name": "Auto Indirect",
+    "display_name": "Auto Indirect",
+    "formula_count": 4369,
+    "sample_prompts": [
+      "Chapter VIA Auto Indirect",
+      "Benefits in Kind Expense Payments formula",
+      "Generates indirect NI element entries based on context combination",
+      "GB Override Involuntary Deductions auto indirect formula",
+      "Benefits in Kind Other Items formula",
+      "Auto Indirect Formula",
+      "French Payroll Processing Formula",
+      "KW Involuntary Deductions auto indirect formula",
+      "Benefits in Kind Assets at Employee Disposal formula",
+      "AE Involuntary Deductions auto indirect formula",
+      "SA Involuntary Deductions auto indirect formula",
+      "Benefits in Kind Asset Transfer formula",
+      "Benefits in Kind Services Supplied formula",
+      "Benefits in Kind Payments on Behalf of Employee formula",
+      "Benefits in Kind Private Medical Treatment or Insurance formula",
+      "GB Student Loan auto indirect formula",
+      "Benefits in Kind Vouchers and Credit Cards formula",
+      "Creates multiple instances of Recovery Pre-Results for Area1/2/3 contexts",
+      "Auto indirect formula that brings MX_EMPLOYER_STATE_TAX into the picture Author Date Description",
+      "Generates indirect PAYE element entries based on context combination",
+      "GB Postgraduate Loan auto indirect formula",
+      "IE BIK Statutory arrears auto indirect formula",
+      "Creates multiple instances of Offset Results for Area1/2/3 contexts",
+      "Implements auto indirect rules on the absence and enables the application to call Entitlement Result formula multiple times, once for each day of t...",
+      "This formula generates a list of work cities",
+      "Global Absence auto indirect formula",
+      "This formula generates a list of work counties",
+      "Implements auto indirect rules on the Earnings Recovery Offset element",
+      "Auto indirect rule for Recovery element",
+      "This formula generates a list of work states",
+      "Auto Indirect Formula to fetch unique jurisdictions",
+      "House Rent Information Auto Indirect to capture the results",
+      "I_asc_person_card_id = DEDUCTION_CARD_BY_EE i_asc_component_id = DEDUCTION_COMPONENT_BY_EE i_asc_prel_act_id = GET_CONTEXT(PAYROLL_REL_ACTION_ID,-1...",
+      "Formula for House Loan Income Auto Indirect",
+      "Generates a list of tax reporting units and calculation breakdowns for tax calculation",
+      "PHI Auto Indirect Employer Information",
+      "0.1 andaw 4-Aug-20",
+      "Generates a list of plan terms for vacation liability calculation",
+      "Global Involuntary Deductions seeded auto indirect formula to retrieve third party payees",
+      "Generates a list of provinces and reference codes for Provincial Medical calculation",
+      "Generates a list of provinces and reference codes for workers compensation calculation",
+      "Auto Indirect Premium Formula to fetch unique jurisdictions",
+      "PHI Auto Indirect Employee Pre-Statutory",
+      "PHI Auto Indirect Employee Voluntary",
+      "US Template Formula for Premium Auto Indirect Calculation",
+      "Sets contexts required for social insurance calculations, including tax reporting unit, calculation breakdown ID and sector fund context value",
+      "This formula generates a list of tax reporting units and calculation breakdowns for tax calculation",
+      "Auto Indirect Formula for US Pretax 401K element",
+      "Auto Indirect formula for 401K Roth Employer Match",
+      "Auto Indirect Formula to fetch Third Party Payee",
+      "Auto Indirect Formula for shares processing",
+      "Auto Indirect Formula for US Pretax 401K Catchup element",
+      "1.0 WWFENG 08/20/18",
+      "Formula to generate the tax calculation details for report",
+      "Controls whether public housing fund is processed and the parameters to use",
+      "Global Involuntary Deductions Auto Indirect Formula to get CBID",
+      "Calculate Mexico Social Security Author",
+      "Calculator formula",
+      "Controls whether individual income tax is calculated and the parameters to use",
+      "Benefits in Kind Car Mileage Allowance and Passenger Payments formula",
+      "Benefits in Kind Car and Car Fuel Benefit Calculator formula",
+      "Benefits in Kind Qualifying Relocation Expenses and Benefits formula",
+      "Controls whether enterprise annuity is processed and the parameters to use",
+      "Controls whether basic pension insurance is processed and the parameters to use",
+      "Benefits in Kind Van and Van Fuel Benefit Calculator formula",
+      "Controls whether work-related injury insurance is processed and the parameters to use",
+      "Controls whether supplementary medical insurance is processed and the parameters to use",
+      "Controls whether basic medical insurance is processed and the parameters to use",
+      "Controls whether maternity insurance is processed and the parameters to use",
+      "Controls whether unemployment insurance is processed and the parameters to use",
+      "LWF Auto Indirect",
+      "Controls whether supplementary public housing fund is processed and the parameters to use",
+      "NPS Auto Indirect",
+      "Provident Fund Auto Indirect",
+      "KW Auto Indirect formula",
+      "Income Tax Auto Indirect",
+      "Auto Indirect formula for 401K After tax Employer Match",
+      "Auto Indirect Formula for US 401K Catchup ER Match element",
+      "Auto Indirect Formula for US 401K After-tax element",
+      "Auto Indirect formula for 401K Roth Catchup Employer Match",
+      "AE Gratuity Accrual Auto Indirect formula",
+      "AE Gratuity Auto Indirect formula",
+      "Gratuity auto indirect formula for Bahrain",
+      "Gratuity Accrual Auto Indirect",
+      "SA Gratuity Calculation Auto Indirect",
+      "Termination Payments Auto Indirect",
+      "Oman Gratuity Accrual Auto Indirect",
+      "LTA Auto Indirect",
+      "Gratuity accrual auto indirect formula for Qatar",
+      "Gratuity accrual auto indirect formula for Bahrain",
+      "Gratuity auto indirect formula for Qatar",
+      "Sets contexts required for tax processing, including tax reporting unit and calculation breakdown ID",
+      "Social insurance auto indirect formula for Qatar",
+      "SA GOSI Calculation Auto Indirect",
+      "Global Auto Indirect formula to get Calc Breakdown Id",
+      "BH Auto Indirect formula",
+      "AE Auto Indirect formula",
+      "Article111C auto indirect formula for Bahrain",
+      "Gratuity auto indirect formula for Oman",
+      "Controls whether the default payer element is created"
+    ]
+  },
+  {
+    "type_name": "Extract Record",
+    "display_name": "Extract Record",
+    "formula_count": 2961,
+    "sample_prompts": [
+      "US Third Party Quarterly Tax Extract Fast formula for record Employee State Wage Tax Code Balance",
+      "US End of Year Archive Formula for archiving State balances for box 14",
+      "US Third Party Quarterly Retiree Tax Extract Fast formula for record Employee State Wage Tax Code Balance",
+      "US Third Party Quarterly Tax Extract Employee CIty Wage Tax Code Balance",
+      "This formula associated with <Canadian ROE Tax Payroll ROE Details> record within <Canadian ROE Archive Tax and Payroll Information> Block. This fo...",
+      "US Third Party Quarterly Tax Extract Fast formula for record Employee W2 Box",
+      "Pensions Automatic Enrolment Component Extract Record Formula",
+      "Payroll Archive Employee Information for Saudi Arabia",
+      "This formula associated with <Mexico Payroll Archive CFDI Information> record within <Global Archive Tax Reporting Unit> Block. This formula would ...",
+      "US Third Party Quarterly Tax Extract Fast formula for record Employee Federal Wage Tax Code Balance",
+      "US Third Party Quarterly Retiree Tax Extract Fast formula for record Employee Federal Wage Tax Code Balance",
+      "US Third Party Quarterly Retiree Tax Extract Fast formula for record Employee Personal Information",
+      "US Third Party Quarterly Tax Extract Employee State W2 Box Balance",
+      "US Third Party Quarterly Tax Extract Fast formula for record Employee State Wage Tax Code Information",
+      "US Third Party Quarterly Tax Extract Fast formula for record Employee County Wage Tax Code Balance",
+      "US Third Party Quarterly Tax Extract Fast formula for record Employee Personal Information",
+      "Retrieves the sum for Report 166",
+      "Report 166 Retrieves the sum for oil sector",
+      "US Third Party Monthly Tax Extract Fast formula for record Employee Personal Information",
+      "US Third Party Periodic Data Consolidation Tax Interface Fast formula for record Tax Reporting Unit Tax Code Balance Amount",
+      "State QTD Archive Formula for archiving data from State Balance Information",
+      "US Third Party Periodic Tax Interface Fast formula for record Tax Reporting Unit Tax Code Balance Amount",
+      "RTI NVREQ GB Employee Address Extract Record",
+      "US Third Party Quarterly Retiree Tax Extract Fast formula for record Employee State Wage Tax Code Information",
+      "US Third Party Periodic Tax Interface Fast formula for record Employee Tax Code Balance Amount",
+      "State QTD Archive Formula for archiving data from Employee Personal Information",
+      "US Third Party Periodic Tax Interface Audit Detail Fast formula for record Employee",
+      "Canadian ROE Archive Box 17C Card Information",
+      "Canadian ROE Archive Box 15B, 15C Card Information",
+      "Global Payroll Archive Formula for archiving data from Payroll Assignment",
+      "US Third Party Quarterly Retiree Tax Extract Fast formula for record Federal C Record",
+      "US Third Party Quarterly Tax Extract Fast formula for record Employee PA Act32 City Wage Tax Code Balance",
+      "US Third Party Monthly Tax Extract Fast formula for record Employee PA Act32 City Wage Tax Code Balance",
+      "Archives India Form24Q Salary Detail Information",
+      "Archives India Form24Q Batch Header Information",
+      "Canadian End of Year Archive RL-2 Tax Unit Transmitter Information",
+      "RTI NVREQ GB Employee Extract Record",
+      "Canadian End of Year Archive RL-1 Tax Unit Transmitter Information",
+      "MX Social Security Employee Information Extract Record",
+      "GB Tax Information Extract Record",
+      "Stores information for the Message section of the Payroll Messages Report",
+      "GB NS P46 Pension Notification Details Extract Record Fast Formula",
+      "Stores information for the header section of the YTD Statutory Deduction Register",
+      "GB NS P45PT3 Details Extract Record Fast Formula",
+      "Global End of Year Archive Formula for archiving data from Employee Personal Information",
+      "GB NS Employee Personal Information Extract Record Fast Formula",
+      "GB NS Archive PAYE Details Extract Record Fast Formula",
+      "US Third Party Quarterly Tax Extract Fast formula for record Employee School Wage Tax Code Balance",
+      "Stores information for the detail section of the Global Statutory Deduction Register",
+      "This formula associated with <US EOY Archive Employee Personal Information> record within <Global EOY Archive Payroll Relationships> Block. This fo...",
+      "The name of the automatically generated fast formula used to extract the HWM published schedule record details",
+      "Stores information for the header section of the Payroll Messages Report",
+      "RTI NVREQ GB Tax Information Extract Record",
+      "Canadian End of Year Archive T4A Tax Unit Transmitter Information",
+      "Canadian End of Year Archive T4 Tax Unit Transmitter Information",
+      "GB NS Employee Address Extract Record Fast Formula",
+      "This formulas archives values needed to adjust FUTA balances",
+      "Canadian ROE Archive Box 17A Card Information",
+      "MX Social Security Trans Information Extract Record",
+      "Stores information for the Relationship Action section of the YTD Statutory Deduction Register",
+      "GB Employee Information Extract Record",
+      "US Third Party Monthly Tax Extract Fast formula for record Employee State Wage Tax Code Balance",
+      "UK RTI EAS CB Details Extract Record Fast Formula",
+      "Global Payroll Archive Formula for archiving data from Employee Personal Information",
+      "Canadian End of Year Archive Tax Unit Information",
+      "Global Payroll Archive Formula for archiving data from Payroll Terms",
+      "This formula associated with <US EOY Archive Tax Reporting Unit Information> record within <Global Archive Tax Reporting Unit> Block. This formula ...",
+      "This formula would archive Tax Reporting Unit level Data for a archive run and this data will be used for payments",
+      "GB NS Tax Reporting Unit Information Extract Record Fast Formula",
+      "US Third Party Periodic Tax Interface Fast formula for record Tax Reporting Unit Information",
+      "GB NS P46 Details Extract Record Fast Formula",
+      "US Third Party Periodic Data Consolidation Tax Interface Fast formula for record Tax Reporting Unit Information",
+      "GB NS P46 Default Details Extract Record Fast Formula",
+      "Formula used for retroactive notification report",
+      "This formula associated with <Mexico Legal Employer Information> record within <Global Archive Payroll Relationships> Block. This formula would arc...",
+      "Archives employee information by running the Mexico payroll archive process",
+      "US Third Party Periodic Tax Interface Audit Detail Fast formula for record Payroll Relationship",
+      "This formula associated with <Global Archive Third Party Address> record within <Global Archive Third Party Payment Data> Block. This formula would...",
+      "US Third Party Quarterly Tax Extract Fast formula for record Employee PA Act32 City Wage Tax Code Information",
+      "US Third Party Quarterly Tax Extract Fast formula for record Employee CIty Wage Tax Code Information",
+      "Stores information for the header section of the Global Statutory Deduction Register",
+      "Validates person details",
+      "This formula associated with <Canadian ROE Payroll Relationship Information> record within <Canadian ROE Archive Payroll Relationships> Block. This...",
+      "This formula associated with <Global Tax Reporting Unit Address> record within <Global Archive Tax Reporting Unitt> Block. This formula would archi...",
+      "Global End of Year Archive Formula for archiving data from Employee Address",
+      "Global Payroll Archive Formula for archiving data from Payroll Details at Payroll Relationship level",
+      "GB Tax Information Extract Record for P45",
+      "Canadian End of Year Archive Payroll Relationship Information",
+      "Global Payroll Archive Formula for archiving data from Employee Address",
+      "This formulas archives values needed to adjust City balances",
+      "US Third Party Quarterly Retiree Tax Extract Fast formula for record State C Record",
+      "Retrieves employee payroll records while running the Chinese State-Owned Enterprise Payroll Data Interface Report",
+      "US Payroll Archive Tax Unit Information",
+      "Archives India Employee Information by running the payroll archive process",
+      "Archives India Form24Q Deductee Detail Information",
+      "This formulas archives values needed to adjust School balances",
+      "This formula associated with <Global Payroll Statutory Unit Address> record within <Global Archive Payroll Statutory Unit> Block. This formula woul...",
+      "This formulas archives values needed to adjust County balances",
+      "US Third Party Periodic Tax Interface Fast formula for record Payroll Relationship Information",
+      "US End of Year Archive Formula for archiving City balances for box 14",
+      "Archives employee information by running the Chinese payroll archive process",
+      "Global End of Year Archive Formula for archiving data from Payroll Statutory Unit Address",
+      "Global End of Year Archive Formula for archiving data from Tax Reporting Unit Address",
+      "This formulas archives values needed to adjust State SIT balances",
+      "US End of Year Archive Formula for archiving County balances for box 14",
+      "Global Payroll Archive Formula for archiving CBID level Context values",
+      "US End of Year Archive Formula for archiving City TCD balances for box 14",
+      "US Third Party Quarterly Tax Extract Fast formula for record Employee Federal Wage Tax Code Information",
+      "UK RTI EAS TRU Details Extract Record Fast Formula",
+      "Archives India Form24Q Challan Detail Information",
+      "US Third Party Quarterly Retiree Tax Extract Fast formula for record Employee Federal Wage Tax Code Information",
+      "This formulas archives values needed to adjust State SDI balances",
+      "This formulas archives values needed to adjust State SUI balances",
+      "This formulas archives values needed to adjust FIT balances",
+      "This formula associated with <Saudi Employee Payroll Relationship> record within <Global Archive Payroll Relationships> Block. This formula would a...",
+      "Stores information for the Relationship section of the YTD Statutory Deduction Register",
+      "Global Payroll Archive Formula for archiving Accrual Data available at the Payroll Assignment level",
+      "Global End of Year Archive Formula for archiving data from Employee Payroll Relationship",
+      "Canadian End of Year Employee Tax Exempt Information",
+      "This formula associated with <Global Tax Reporting Unit Information> record within <Global Archive Tax Reporting Unit> Block. This formula would ar...",
+      "Formula for Mexico SDI Audit Report Contributor",
+      "Get the Balance Exception information by running the payroll balance exception report",
+      "This formulas archives values needed to adjust Social Security balances",
+      "US Third Party Quarterly Tax Extract Fast formula for record Employee County Wage Tax Code Information",
+      "This formulas archives values needed to adjust Medicare balances",
+      "This formulas archives values needed to adjust Federal FUTA balances",
+      "This formula associated with <Global Employee Payroll Relationship> record within <Global Archive Payroll Relationships> Block. This formula would ...",
+      "The name of the automatically generated fast formula used to extract the HWM assignment record details",
+      "US End of Year Archive Formula to capture County Information for Indiana",
+      "This formula associated with <Global Payroll National Identifier> record within <Global Archive National Identifier> Block. This formula would arch...",
+      "US Third Party Quarterly Tax Extract Fast formula for record Employee School Wage Tax Code Information",
+      "Retrieves payroll period information while running the Chinese State-Owned Enterprise Payroll Data Interface Report",
+      "Canadian End of Year Additional Information",
+      "This formula associated with <Global Payroll Statutory Unit Information> record within <Global Archive Payroll Statutory Unit> Block. This formula ...",
+      "Retrieves employee payroll detailed records while running the Chinese State-Owned Enterprise Payroll Data Interface Report",
+      "This formula associated with &lt;Global Payroll Third Party Payment Information> record within <Global Archive Third Party Payment Data> Block. Thi...",
+      "Payroll Archive Employee Passport Information for Saudi Arabia",
+      "Canadian ROE Archive Card Reason Information",
+      "US Third Party Quarterly Retiree Tax Extract Fast formula for record Tax Reporting Unit Information",
+      "Global End of Year Archive Formula for archiving data from Tax Reporting Unit Information",
+      "Formula for archiving person level validations common for all validation reports",
+      "Pensions Automatic Enrolment Payroll Extract Record",
+      "Global End of Year Archive Formula for archiving data from Payroll Statutory Information",
+      "UK RTI EAS Person Details Extract Record Fast Formula",
+      "Stores information for the Relationship section of the YTD Payroll Activity Report",
+      "Retrieves payroll element information while running the Chinese State-Owned Enterprise Payroll Data Interface Report",
+      "Archives assignment information by running the Chinese payroll archive process",
+      "Global End of Year Archive Formula for archiving data from Reporting Reference Code",
+      "UK RTI EAS Person Address Details Extract Record Fast Formula",
+      "This formula associated with <CA Payroll Archive Assignment Information> record within <Global Archive Payroll Assignments> Block. This formula wou...",
+      "This formula associated with <US Payroll Archive Assignment Information> record within <Global Archive Payroll Assignments> Block. This formula wou...",
+      "This formula associated with US Payroll Archive Third Party Payment Information record within US Third Party Payment Data Block. This formula would...",
+      "US Third Party Periodic Data Consolidation Tax Interface Fast formula for record Legislative Data Group Information",
+      "Canadian ROE Archive Box 19 Card Information",
+      "Archives tax reporting unit information by running the Chinese payroll archive process",
+      "GB NS Tax Reporting Unit Address Extract Record Fast Formula",
+      "UK RTI EAS TRU Address Details Extract Record Fast Formula",
+      "This formula associated with Canadian EOY Employer Information record within Global EOY Archive Payroll Statutory Unit Block. This formula would ar...",
+      "This formula associated with <US Payroll Archive Term Information> record within <Global Archive Payroll Terms> Block. This formula would archive P...",
+      "MX Social Security TRU Information Extract Record",
+      "Pensions Automatic Enrolment Legal Employer Record Formula",
+      "Get the Balance Exception report information by running the payroll balance exception report",
+      "US Third Party Monthly Tax Extract Fast formula for record Tax Reporting Unit Information",
+      "US Third Party Quarterly Tax Extract Fast formula for record Tax Reporting Unit Information",
+      "This formula associated with <Mexico Payroll Archive TRU Information> record within <Global Archive Tax Reporting Unit> Block. This formula would a...",
+      "This formula associated with CA Payroll Archive Third Party Payment Information record within CA Third Party Payment Data Block. This formula would...",
+      "Payroll Relationship Group Details",
+      "Payroll Group Details",
+      "This formula associated with <US Payroll Archive Employee Information> record within <Global Archive Payroll Relationships> Block. This formula wou...",
+      "This formula associated with <US Payroll Archive School District Information> record within <US Payroll Archive School District> Block. This formul...",
+      "State QTD Archive Formula for archiving data from State Information",
+      "Pensions Automatic Enrolment Threshold Extract Record Formula",
+      "This formulas archives Payroll Relationship information",
+      "US Third Party Quarterly Retiree Tax Extract Fast formula for record Legislative Data Group Information",
+      "Get the person additional information by running the payroll balance exception report",
+      "US Third Party Periodic Tax Interface Fast formula for record Legislative Data Group Information",
+      "US Third Party Quarterly Tax Extract Fast formula for record Legislative Data Group Information",
+      "US Third Party Monthly Tax Extract Fast formula for record Legislative Data Group Information",
+      "This formula associated with <Canadian Payslip Tax Reporting Unit Other Information> record within <Global Archive Tax Reporting Unit> Block. This ...",
+      "This formula associated with <Canadian ROE Preface Information> record within <Canadian ROE Archive Preface> Block. This formula would archive CA R...",
+      "Global End of Year Archive Formula for archiving data from Calculation Breakdown ID",
+      "This formula associated with <US Payroll Archive City Information> record within <US Pay Archive City> Block. This formula would archive State leve...",
+      "Archives India Form24Q File Header Information",
+      "Global End of Year Archive Formula for archiving data from Area1",
+      "Canadian End of Year Archive Area 1 Sort Options",
+      "This formula associated with HRX_CA_PAY_PM_BAL_RECORD record within <Canadian Provincial Medical report Employee Balances Block> Block. This formul...",
+      "Australia business registered number under tax law",
+      "This formula associated with <US Payroll Archive State Information> record within <US Pay Archive State> Block. This formula would archive State le...",
+      "This formula associated with <US Payroll Archive County Information> record within <US Pay Archive County> Block. This formula would archive County...",
+      "This formula associated with HRX_CA_PAY_PM_EE_RECORD record within <Canadian Provincial Medical report Employee Block> Block. This formula would ar...",
+      "State QTD Archive Formula for archiving data from Payroll Statutory Information",
+      "US Third Party Periodic Tax Interface Fast formula for record Tax Reporting Unit Payroll Relationship",
+      "This formula is used to determine if a given AREA1 should be included or excluded. The result of inclusion or exclusion will be used in the Report ...",
+      "Canadian ROE Archive Box 17B Card Information",
+      "Archives India Assignment Information",
+      "This formula associated with <Canadian Payslip Tax Reporting Unit Address> record within <Global Archive Tax Reporting Unit> Block. This formula wo...",
+      "Archives India Form24Q Salary under section 16 Information",
+      "US Third Party Periodic Data Consolidation Tax Interface Fast formula for record Legislative Data Group Tax Code Total",
+      "US Third Party Periodic Data Consolidation Tax Interface Fast formula for record Tax Reporting Unit Tax Code Total",
+      "Canadian End of Year Archive Area 1 Information"
+    ]
+  },
+  {
+    "type_name": "Payroll Run Proration",
+    "display_name": "Payroll Run Proration",
+    "formula_count": 2775,
+    "sample_prompts": [
+      "Formula to calculate pro rated amounts A typical example of proration would be when a new employee starts work in the middle of a monthly payroll p...",
+      "Create for MX Loc based on GLB_EARN_PRORATION formula",
+      "US proration formula",
+      "Formula to prorate earnings results element for India Payroll",
+      "US Earn Reduce Regular formula",
+      "Proration formula to calculate average sdi",
+      "US Earn Allocation formula",
+      "Formula to calculate prorated amounts , The proration unit will be WORKDAY or WORKHOUR, or Daily and use Proration Conversion Rule to convert",
+      "Formula to calculate prorated amounts , The proration unit will be WORKDAY or work hour , or Daily and use Proration Conversion Rule to convert",
+      "Formula for US Proration",
+      "Formula for Overtime Premium Proration . Returns pay value (Amount);",
+      "The Formula calculates pro rated amounts for Global Pre Statutory Deductions and Global Voluntary Deductions. It specifically the Flat Rate Calcula...",
+      "Gets the prorated number of pay units, including scheduled workdays and public holidays",
+      "US Overriden Template Formula for Premium US Proration",
+      "Proration Formula - To be used for CA Earnings Element Template",
+      "Formula for Earning Proration Template",
+      "Formula for CA Proration",
+      "Formula for Canadian Proration",
+      "Formula to calculate pro rated amounts. DISCLAIMER : This formula is strictly for example or prototype purposes only. You should update the formula...",
+      "Payroll Run Proration type"
+    ]
+  },
+  {
+    "type_name": "Element Skip",
+    "display_name": "Element Skip",
+    "formula_count": 402,
+    "sample_prompts": [
+      "Formulas using Seeded formulas",
+      "Skip Rule Formula - To be used for CA Earnings Element Template",
+      "Skips calculation of deferred compensation 401k deduction if the condition is met",
+      "Skips calculation of deferred compensation 401k Catchup deduction if the condition is met",
+      "Skips calculation of deferred compensation Roth 401k deduction if the condition is met",
+      "Skips calculation of deferred compensation After-tax 401k deduction if the condition is met",
+      "FR Net Guarantee Skip",
+      "FR Absence Skip",
+      "Gratuity Rule to skip if ORA_HRX_BH_EMP_GRATUITY_DETAILS Card is present and Employee not terminated",
+      "House Rent Information Skip Formula for India",
+      "Deduction Information Skip Formula for India",
+      "Income Calculation Skip Formula for India",
+      "Chapter VIA Skip Formula for India",
+      "ZHRX_CA_RRF_ER Liability_SalesTax11_CHG_DEDN_ESKIP",
+      "SD Prior QPIP Employer Liability A fast formula to skip the processing of the tax credits and charges element",
+      "SD Prior CPP Employer Liability A fast formula to skip the processing of the tax credits and charges element",
+      "SD Prior QPIP Employee Withheld A fast formula to skip the processing of the tax credits and charges element",
+      "SD Prior QPP Employer Liability A fast formula to skip the processing of the tax credits and charges element",
+      "SD Prior QPIP Employee Taxable A fast formula to skip the processing of the tax credits and charges element",
+      "SD Prior CPP Employee Withheld A fast formula to skip the processing of the tax credits and charges element",
+      "SD Prior QPP Employee Withheld A fast formula to skip the processing of the tax credits and charges element",
+      "SD Prior QPIP Employer Taxable A fast formula to skip the processing of the tax credits and charges element",
+      "SD Prior EI Employee Withheld A fast formula to skip the processing of the tax credits and charges element",
+      "SD Prior QPP Employee Taxable A fast formula to skip the processing of the tax credits and charges element",
+      "SD Prior CPP Employer Taxable A fast formula to skip the processing of the tax credits and charges element",
+      "SD Prior QPP Employer Taxable A fast formula to skip the processing of the tax credits and charges element",
+      "SD Prior CPP Employee Taxable A fast formula to skip the processing of the tax credits and charges element",
+      "SD Prior EI Employee Taxable A fast formula to skip the processing of the tax credits and charges element",
+      "SY_Employer_Charges_A A fast formula to skip the processing of the tax credits and charges element",
+      "Skyline Basic Life ER A fast formula to skip the processing of the tax credits and charges element",
+      "SY_Employer_Charges_P A fast formula to skip the processing of the tax credits and charges element",
+      "Skyline Basic LTD ER A fast formula to skip the processing of the tax credits and charges element",
+      "Skyline Basic STD ER A fast formula to skip the processing of the tax credits and charges element",
+      "Skyline Medical ER A fast formula to skip the processing of the tax credits and charges element",
+      "Formula to stop creating duplicate retro results during proration",
+      "Skip Supplemental Earnings Tax as Regular element for Supplemental run",
+      "Gratuity Social insurance SKip formula for Bahrain",
+      "Benefits in Kind Skip Rule formula",
+      "Skip formula for BIK element",
+      "Skip formula for PHI element",
+      "/ Formula Name : HRX_CA_INVDED_SKIP Description : Formula to determine if Involuntary Deductions element should be skipped or not",
+      "Skip formula for PAS Negative Income element",
+      "Skip formula for Statutory Arrears element",
+      "Skip formula for NIC Class 1A",
+      "Bahrain Gratuity Accrual formula for Bahrain",
+      "Skip formula for benefit payrolling element",
+      "Skip Rule Formula - To be used for CA Absences Element Template",
+      "Formula so as to skip Regular elements for supplemental runs",
+      "To Skip processing of Termination Allowance Element",
+      "Gratuity Rule to skip if ORA_HRX_OM_EMP_GRATUITY_DETAILS Card is present and Employee not terminated",
+      "Bahrain Social Insurance Element Skip Processing",
+      "Skip Rule Formula - To be used for CA Absences Base Element Template",
+      "Social Insurance skip formula for Qatar",
+      "Skip rule to skip showing the elements in run results if Registered for SI is not checked",
+      "Decides whether this assignment distribution is skipped or not NEED_CONTEXT(PAYROLL_RELATIONSHIP_ID) NEED_CONTEXT(PAYROLL_ACTION_ID) SKIP_FLAG = 'N...",
+      "Gratuity skip formula for Qatar",
+      "Skips the calculation of a Retirement calculation card component if no associated assignments are in the current payroll. NEED_CONTEXT(PAYROLL_RELA...",
+      "Skips the calculation of a pension calculation card component if no associated assignments are in the current payroll. NEED_CONTEXT(PAYROLL_RELATIO...",
+      "Formula determines if Involuntary Deduction Calculation should be skipped or not",
+      "Gratuity Rule to skip if Gratuity Card is present and Employee not terminated",
+      "If the employee is not a citizen of the GCC then the social insurance calculation should be skipped",
+      "Global Time Card Payroll Assignments Skip formula",
+      "Formula so as to skip calculator formulas",
+      "Gratuity Rule to skip if End of Services Card is present and Employee not terminated",
+      "Formula determines whether or not taxes should be calculated",
+      "Retrenchment Compensation Skip Formula for India",
+      "Leave Encashment Skip Formula for India",
+      "Commuted Pension Skip Formula for India",
+      "/ Formula Name : GLB_INVDED_SKIP Description : Formula determines if Involuntary Deductions should be skipped or not",
+      "Gratuity Skip Formula for India",
+      "House Income Skip Formula for India",
+      "Voluntary Retirement Scheme Skip Formula for India",
+      "/ Formula Name : CA_SKIP_TAXATION Description : Formula determines if taxes should be skipped or not",
+      "Income Tax Skip Formula for India",
+      "Employees State Insurance Skip Formula for India",
+      "National Pension Scheme Skip Formula for India",
+      "Leave Travel Allowance Skip Formula for India",
+      "House Rent Allowance Skip Formula for India",
+      "Labour Welfare Fund Skip Formula for India",
+      "Professional Tax Skip Formula for India",
+      "APEC PT Contributing FT Skip Formula",
+      "Provident Fund Skip Formula for India",
+      "Contributory Salary Retro Skip Rule",
+      "Global Seeded Skip formula for premium Adjustment earnings",
+      "GOSI Reference Salary Retro element should be skipped if its for the previous year",
+      "CET CEG PT Contributing FT Skip Formula",
+      "Specific Contribution 30% Skip Formula",
+      "Skips processing aggregation information element if the condition is met",
+      "A fast formula to skip the processing of the pretax deduction element",
+      "Formula for Pre-Statutory SKIP",
+      "To Skip assignment processing of Termination Allowance Element",
+      "APEC Skip Formula",
+      "General Reduction Skip Formula",
+      "Construction Tax Base",
+      "Skips calculating public housing fund if the condition is met",
+      "Skips supplementary calculating public housing fund if the condition is met",
+      "Social Insurance skip formula for Bahrain",
+      "Apprentice Exoneration Skip",
+      "Skip Rule for France Alsace Moselle Deductions",
+      "CEG and CET Skip Formula",
+      "Skips calculating enterprise annuity if the condition is met",
+      "Skips calculating basic pension insurance if the condition is met",
+      "Skips calculating work-related injury insurance if the condition is met",
+      "Social Tax Skip",
+      "Skips calculating supplementary medical insurance if the condition is met",
+      "Skips calculating basic medical insurance if the condition is met",
+      "Skips calculating maternity insurance if the condition is met",
+      "Additional Information Skip Formula",
+      "Skips calculating unemployment insurance if the condition is met",
+      "Skips severance payments calculation if the condition is met",
+      "Skips termination payments calculation if the condition is met",
+      "Skip for No Base"
+    ]
+  },
+  {
+    "type_name": "Extract Rule",
+    "display_name": "Extract Rule",
+    "formula_count": 379,
+    "sample_prompts": [
+      "Applying date formats after such functions in place of 0 for numeric values",
+      "Applying format masks after such functions",
+      "Call the custom created rule formula for fetching Rate1 Amount",
+      "This formula is to get person's other assignment department name. MODIFIED (MM/DD/YY) jianztia 01/18/19 - jianztia 02/26/19 - Modified - Remove non...",
+      "This formula is to get person's other assignment location name. MODIFIED (MM/DD/YY) jianztia 01/18/19 - jianztia 02/26/19 - Modified - Remove non-p...",
+      "Extract Rule Formula for adding the SubTotals also to separate monetary data into their component parts), for the PDF layout templates",
+      "Retrieves additional SI card component information for balances",
+      "State QTD Archive Formula for archiving data for Report During Month1",
+      "This formula is to get person's primary assignment department name. MODIFIED (MM/DD/YY) jianztia 01/18/19 - jianztia 10/23/19 - Modified - fix the ...",
+      "This formula is to get person's all assignment department name. MODIFIED (MM/DD/YY) pixu 03/22/19 - jianztia 10/23/19 - Modified - fix the issue wh...",
+      "This formula is to get person's primary assignment location name. MODIFIED (MM/DD/YY) jianztia 01/18/19 - jianztia 10/23/19 - Modified - fix the is...",
+      "Extract Rule Formula to validate the account number of third party",
+      "Vacation Balance",
+      "Call the custom created rule formula for fetching assignment extensible fields",
+      "Validation formula for Employee bank account check against the bank account values applicable for the country",
+      "State QTD Archive Formula for archiving data for Report During Month2",
+      "This formula is to get run type name. MODIFIED (MM/DD/YY) jianztia 01/06/20",
+      "The Formula Gets AU Tax Scale For NGA",
+      "This Formula has been delivered for Payroll Interface Internal Use Only",
+      "Extract Rule Formula to validate the National Identifier Family Book for UAE Citizens",
+      "This formula is to get lookup type meaning. MODIFIED (MM/DD/YY) jianztia 01/06/20",
+      "Validates format of Dutch postal code",
+      "State QTD Archive Formula for archiving data for Report During Month3",
+      "Extract Rule Formula for extracting the rolling 36 months balance based on termination date",
+      "Extract Rule Formula to calculate annual Hours",
+      "Validation formula for Employee gender check against the gender values applicable for the country",
+      "Extract Rule Formula to validate the home address",
+      "QA Establishment ID Rule",
+      "Extract Rule Formula to check the Gratuity Salary Formula",
+      "Qatar Payroll Archive Employer and Payer Establishment ID Information",
+      "Archives India IT Computation Document Name",
+      "Extract Rule Formula to validate the EHECS JOB Classification Meaning",
+      "Extract Rule Formula to validate the Working Hour Band Meaning",
+      "Citizenship and Citizenship Code Information for Qatar Payroll Archive",
+      "Extract Rule Formula to validate the employees who are single but have a contact type as spouse",
+      "Get Element Entry Value for Third-Party Deductions Type",
+      "Get Element Entry Value for Third-Party Deductions Code",
+      "Get Element Entry Value for Third-Party Earnings Code",
+      "Get Element Entry Value for Third-Party Earnings Type",
+      "This Rule Computes the Periodic Salary",
+      "Main Contract Count Check",
+      "Extract Rule Formula to check if the previous occupation value is from HRX_AE_OCCUPATION lookup",
+      "The Formula Gets Pay Element Reference Number For NGA",
+      "The Formula Gets Salary Basis Amount For NGA",
+      "The Formula Gets Pay Element Unit Type For NGA",
+      "The Formula Gets Pay Element Hours For NGA",
+      "The Formula Gets Pay Element Rate For NGA",
+      "Derives the location based on the assignment ID",
+      "Verifies that a house or building number addition in an address also has a house or building number",
+      "Populate End Date of a earning for Payroll Interface",
+      "GB NS Archive Higher Reporting Type Fast Formula",
+      "ADP Celergo File Name",
+      "Global Payroll Interface US Taxation SUI State",
+      "Derives the department based on the assignment ID",
+      "Extract Rule Formula The contract type must be either fixed contract or unlimited contract, for gratuity calculations",
+      "Extract Rule Formula to validate the contract type",
+      "Populate Input Value Periodicity of a element for Payroll Interface",
+      "Extract Rule Formula A value for the home address of the employee is required",
+      "Validation formula for Total FTE Count for use in data validation report",
+      "Extract Rule formula to validate if a TRU is available for given PSU",
+      "Extract Rule Formula The contact type cannot be spouse if the marital status is single",
+      "Populate Hourly Rate for Payroll Interface",
+      "The Formula Gets AU Tax Supplementary Code For NGA",
+      "The formula gets personal super contributions super type for NGA",
+      "Archives India IT Computation Assessment Year",
+      "Global Payroll Archive Formula for get Absence Accrual Plan Status",
+      "Payroll Interface Ethnicity Name",
+      "Global Payroll Interface US Taxation Primary Work Address",
+      "US Payroll Archive Overtime Period Start",
+      "US Payroll Archive Overtime Period End",
+      "Global Payroll Interface US Taxation Cumulative Taxation",
+      "Archives India IT Computation Financial Year",
+      "The Formula Gets Pay Element Type For NGA",
+      "Payroll Interface Religion Name",
+      "Global Payroll Interface US Taxation SDI State",
+      "This Extract Rule returns the Ethnicity of a Person",
+      "Derives the tax unit name based on the tax unit ID",
+      "Global Payroll Interface US W4 TRU",
+      "Check whether element exists in run results",
+      "This Extract Rule returns the Religion of a Person",
+      "Archives India IT Computation Remaining Months",
+      "Calculate manager has workers or not",
+      "Get Work E-Mail",
+      "Get Home E-Mail",
+      "Derives the time definition name based on the time definition ID",
+      "Derives the deduction card definition name based on the deduction card ID",
+      "Rule formula to get lookup meaning",
+      "To calculate rate type on the basis of Assignment and Salary",
+      "Get Home Mobile Phone",
+      "Get Work Mobile Phone",
+      "US Payroll Archive Overtime Period Hours",
+      "The Formula Gets Person Name Initials For NGA",
+      "Payroll Interface Assignment Number",
+      "Get Element Processing Type",
+      "Global Payroll Archive Formula for Unit of Measure Meaning",
+      "Get payment source name",
+      "Derives the assignment department based on the HR assignment ID",
+      "Payroll Interface Term Number",
+      "The Formula Gets Logical ID For NGA",
+      "Derives the assignment number based on the HR assignment ID",
+      "Derives the assignment location based on the HR assignment ID",
+      "Derives the third party payee name based on the third party payee ID",
+      "Person Manager Name",
+      "Payroll Interface Position Information",
+      "Global Payroll Interface Assignment Name",
+      "The Formula Gets GUID For NGA",
+      "Derives the balance dimension period types for the balance group usage",
+      "Derives the HR assignment ID based on the payroll assignment ID",
+      "Archives India IT Computation Current Month",
+      "Australian Third Party Payee Name",
+      "EAS Occupational Pension Fast Formula",
+      "The formula gets employer super contributions super type for NGA",
+      "The Formula Gets Code Mapping Absence Reason for NGA",
+      "The Formula Gets Code Mapping Time Element for NGA",
+      "The Formula Gets Code Mapping Pay Element for NGA",
+      "The Formula Gets Code Mapping Pay Scale Level for NGA",
+      "The Formula Gets Code Mapping Pay Group for NGA"
+    ]
+  },
+  {
+    "type_name": "Calculation Utility",
+    "display_name": "Calculation Utility",
+    "formula_count": 196,
+    "sample_prompts": [
+      "Common WSA Operations present in US formulas",
+      "Global Involuntary Deductions WSA Results formula",
+      "Global Involuntary Deductions seeded Order Information API formula",
+      "US W4 Card VD State Resolver",
+      "Benefits in Kind Car and Car Fuel Benefit Utility formula",
+      "Mexico common WSA operations are included in this formula WSA Cache Structure -- Element Secondary Classification Cache -- MX_EARN_SECONDARY_CLASSI...",
+      "Fetches NI balances based on payroll frequency",
+      "Global Involuntary Deductions seeded formula to clean WSA",
+      "Benefits in Kind Van and Van Fuel Benefit Utility formula",
+      "Calculates NI deduction",
+      "This a Global Pay - Seeded Fast Formula for PreTax Iteration. This formula is triggered when either Net < 0 OR if any amount found in Legislative N...",
+      "PHI Calculate Utility",
+      "Global WSA Operations",
+      "Formula for Income Tax Rates for India",
+      "GB_PAE_ASSESS performs the age and earnings calculations used in the assessment of the employee's eligibility for automatic enrolment into a qualif...",
+      "Initiates NI calculation at deduction card level",
+      "Global Involuntary Deductions seeded Order Adapter API formula",
+      "Calculates employer contributions",
+      "Calculates PAYE deduction",
+      "Calculates NI threshold based on payroll period type and payroll frequency",
+      "Benefits in Kind Car Mileage Allowance and Passenger Payments utility formula",
+      "US W4 Card Value Definition Resolver",
+      "Sets NI calculation result in global working storage area",
+      "Fetches NI threshold for calculation",
+      "Fetches NIable balance at employment terms level",
+      "Adjusts NI running balance during NI calculation",
+      "Benefits in Kind Qualifying Relocation Expenses and Benefits Utiltiy formula",
+      "This formula calculates the State Pension age of a given employee based on the Date of Birth and Gender",
+      "Get Element Entry Values",
+      "Rolls up NI LEL and NI contribution",
+      "Validates NI information",
+      "Calculation Card Formula Resolver Utility",
+      "Formula for determining employee notification letter types",
+      "Global Involuntary Deductions seeded formula for proration",
+      "Utility Formula for Student Loan/Postgraduate Loan to get Matching CPE from Statutory Card",
+      "Access the employer contribution calculation data in the CIR DEFAULT FOR PAYROLL_PERIOD_TYPE IS 'PRD' payroll_period = PAYROLL_PERIOD_TYPE vd_perio...",
+      "Access the employee contribution calculation data in the CIR DEFAULT FOR PAYROLL_PERIOD_TYPE IS 'PRD' payroll_period = PAYROLL_PERIOD_TYPE vd_perio...",
+      "Benefits in Kind utility formula",
+      "Checks and sets return message for PAYE",
+      "/ Formula Name : US_GET_GEOGRAPHY_IDENTIFIER Description : Formula to retrieve Geocodes for a given address",
+      "Fetches the number of pay units within a date range, including scheduled workdays and public holidays for China",
+      "This formula stores the tagged values in WSA for the US Test Harness",
+      "Formula splits geography codes into state, county, city, and school district geography codes",
+      "Formula to get number of days in P(eriod), M(onth) and Y(ear) for Time Card Template Inputs: mode Results: number_of_days",
+      "Calculate Period Start and End",
+      "Global Seeded Formula API for configured Involuntary Deduction Rules",
+      "Validates PAYE information",
+      "Canadian Flexfield Segment Resolver",
+      "This formula builds Vertex code from state, county, city, and school district geography codes",
+      "Calculates additional contributions",
+      "Get Element Entry Value - To be used for CA Earnings Element Template",
+      "Common Seeded Auto Indirect formula for regular and premium earnings",
+      "Auto Indirect Formula for US Pretax 401K element",
+      "Calculates the tax year information based on the deduction date",
+      "Access the additional contribution calculation data in the CIR DEFAULT FOR PAYROLL_PERIOD_TYPE IS 'PRD' payroll_period = PAYROLL_PERIOD_TYPE vd_per...",
+      "Kuwait Override Context Formula",
+      "IE Benefit proration formula",
+      "Person age check Formula",
+      "Global Involuntary Deductions seeded formula to retrieve values stored in deduction information repository",
+      "Global Involuntary Deductions seeded formula to sort array values along with indexes",
+      "Validate payroll term associations",
+      "Fetches termination information from payroll relationship",
+      "NI Termination Balance Adjustment Fast Formula",
+      "Generate list of TRUs and Calculation Break Down Ids",
+      "Seeded auto indirect formula for Mexico which retrives AREA1 list to distribute earings INPUTS N/A RESULTS state MODIFIED (DD-MON-YYYY) DESCRIPTION",
+      "This formula is to get include Rest days value INPUTS RESULTS Include Rest Days MODIFIED (DD-MON-YYYY) DESCRIPTION",
+      "The formula to calculate unused legislation balance values",
+      "Performs enrolment for pensions automatic enrolment",
+      "Calculates postponement values for pensions automatic enrolment"
+    ]
+  },
+  {
+    "type_name": "Batch Loader",
+    "display_name": "Batch Loader",
+    "formula_count": 68,
+    "sample_prompts": [
+      "Transfer Incentive Compensation to Payroll transformation formula",
+      "Formula for transforming incoming data for the Batch Loader",
+      "Deletes a Payroll associated to a Payroll Relationship",
+      "Assign Payroll",
+      "End a Payroll to a Payroll Relationship",
+      "Updates the table column information"
+    ]
+  },
+  {
+    "type_name": "Task Repeat",
+    "display_name": "Task Repeat",
+    "formula_count": 60,
+    "sample_prompts": [
+      "Process Bank Corrections File Formula",
+      "Formula to iterate the Employee Active Balance Report",
+      "Rollback all processes of a Payroll",
+      "Bulk rollback Payroll Run and Quick Pay",
+      "US End of Year Formula for repeating archives for multiple PSUs in LDG"
+    ]
+  },
+  {
+    "type_name": "WORKFORCE_MANAGEMENT_UTILITY",
+    "display_name": "WFM Utility",
+    "formula_count": 52,
+    "sample_prompts": [
+      "Helper utility to test Time and Labor Detail Employment Schedule DBI",
+      "Helper utility for Time and Labor Detail Employment Schedule DBI",
+      "Helper utility for Time and Labor Employment Schedule DBI's Formula Type: Workforce Management Utility",
+      "Helper utility for Time and Labor Allocation DBI",
+      "Helper utility for Data Access View Entry (DAVE). Formula Type: Workforce Management Utility - Get Detail Record",
+      "Helper utility for Time and Labor events change DBI. Input Parameters: eventAtrbName: Attribute Name to check for . Required AtrbInitialValText: An...",
+      "Retrieves all of the values passed from the worker's time card data to the various DAVE_TIME_SCAN_REC_DTL2 and DTL_DT functions",
+      "Helper utility for Time and Labor Employment Schedule DBI's Formula Type: WORKFORCE_MANAGEMENT_UTILITY - Workforce Management Utility",
+      "Retrieves all of the values passed from the worker's time card data to the various DAVE_TIME_SCAN_REC_DAY functions",
+      "Test formula to get the default Payroll Rate and periodicity. Displays results in Analyze log file",
+      "Helper utility for Time and Labor worker assigned holidays Formula Type: Workforce Management Utility DBI's HWM_PUB_HOLIDAY_AVAILABILITY_CODE HWM_P...",
+      "Utility program that defines shift hours between a start and end time that receive an additional time attribute",
+      "Helper utility for Time and Labor period overtime date and profiles. Formula Type: WORKFORCE_MANAGEMENT_UTILITY - Workforce Management Utility Rout...",
+      "This utility to converts time in hours and minutes format to Date Time data type format",
+      "Calculates duration based on start and stop time. Formula Type: WORKFORCE_MANAGEMENT_UTILITY",
+      "Retrieve and cache Value sets",
+      "A Placeholder for JAVA OTL Rules"
+    ]
+  },
+  {
+    "type_name": "IRC_CANDIDATE_SELECTION_PROCESS_RULES",
+    "display_name": "IRC Candidate Selection Process Rules",
+    "formula_count": 44,
+    "sample_prompts": [
+      "Prescreening_RIF_Single Ques responsecode",
+      "Background Check is Completed To Be Verified",
+      "Background Check is Declined By Candidate",
+      "Prescreen Single response score",
+      "Background Check is Completed Pass",
+      "Background Check is Completed Fail",
+      "Background check is completed",
+      "Prescreening_multiple Ques response total score",
+      "Tax Credit is Completed Eligible",
+      "Using Request DB Items- Candidate has sent schedule invites scheduled",
+      "Tax Credit is Candidate Declined",
+      "Tax Credit is in Progress",
+      "Tax Credit is Completed",
+      "Assessment is completed",
+      "Prescreening score > 60",
+      "All interview feedback is received",
+      "Using Request DB Items- Candidate has sent schedule invites",
+      "Using Operation Parameter - Schedule Interview Request is Sent [INTERVIEW_REQUEST_SENT]",
+      "Using Operation Param",
+      "Using Operation Parameter - Schedule Interview Request is Sent [INTERVIEW_RESCHEDULED]",
+      "Using Operation Parameter - Schedule Interview Request is Sent [INTERVIEW_CANCELLED]",
+      "Using Operation Parameter - Schedule Interview Request is Sent [INTERVIEW_SCHEDULED]",
+      "Using Operation Parameter - Schedule Interview Request is Sent [INTERVIEW_COMPLETED]",
+      "Using Operation Parameter - Schedule Interview Request is Sent [INTERVIEW_UPDATED]",
+      "Primary location",
+      "FF Organization_Test",
+      "FF Organization_DEL",
+      "External Job Application"
+    ]
+  },
+  {
+    "type_name": "Participation and Rate Eligibility",
+    "display_name": "Participation And Rate Eligibility",
+    "formula_count": 42,
+    "sample_prompts": [
+      "Validate if Emp is eligibility for options in Supp Group Term Life DISCLAIMER :",
+      "Validate if Emp is eligibility for options in Supp Personal Accident DISCLAIMER :",
+      "Derives collective agreement B01,B02, B06, B07, B09, B12, B13, B15, B16, B18, B19 & B20",
+      "This formula determines if a person is eligible for a eligibility profile",
+      "If Job Management level is either AVP, VP, SVP OR Top Leaders return Yes, else return No",
+      "The eligibility Fast Formula should return as Success if Person is NOT eligible. Wellness Discount field is identified by PER_PERSONS_DFF -> ATTRIB...",
+      "This rule returns Yes if employee's job class is Class2 or Class3",
+      "This rule returns Yes if employee's job class is Class 1",
+      "Formula Used to Force Ineligible Plans",
+      "This sample formula determines if a person is eligible for a compensation object based on the FTE on the assignment",
+      "This sample formula determines if a person is eligible for a compensation object based his country of residence. Note: Needs PERSON_ID context to work"
+    ]
+  },
+  {
+    "type_name": "WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES",
+    "display_name": "WFM Time Calculation Rules",
+    "formula_count": 37,
+    "sample_prompts": [
+      "Retrieves all of the values passed from the worker's time card data to the various DAVE functions. Time Calculation Rules version of ORA_WFM_TCR_DA...",
+      "Defines the start of the workday as the first entry start time after a specified time. The defined day is used when calculating time above and belo...",
+      "Evaluates an answer from an attestation and generates an additional time entry if required based on the answer",
+      "Daily overtime calculation using event database items and assignment values",
+      "Allocates either the reported or calculated time based on the processing sequence of the allocation rule in the rule set. Also allocates the time a...",
+      "Identifies units quantity based on reported time that implies an additional Units time attribute. Reported time and specific days are inputs to the...",
+      "Defines shift hours between a start and end time that receive an additional time attribute. Reported time and specific time attribute results are i...",
+      "Identifies units quantity based on reported time that implies an additional Units time attribute. Reported time and specific time range are inputs ...",
+      "Divides reported daily or period time and absence time into calculated time attributes for values above and below defined threshold hours. Reported...",
+      "Defines the start of the work day as the first entry start time after a specified time. The defined day is used when calculating time above and bel...",
+      "Divides reported daily or period time into calculated time attributes for hours above and below defined threshold hours. Reported time and specific...",
+      "Evaluates whether time entered is on public holiday defined in the assigned schedule. The category of public holidays and specific time attribute e...",
+      "Identifies unit quantity based on reported time that implies an additional Units time attribute. Reported time and specific time attribute results ...",
+      "Divides reported daily, period, and seventh-consecutive-day time entries into calculated time attributes for hours above and below defined threshol...",
+      "Calculates the overtime day and earned day to calculate time for reported time entries that span days. The rules for time entries that span days (o...",
+      "Evaluates whether the time between reported consecutive shifts is less than the defined rest period. The rest period and specific time attribute re...",
+      "Formula that subtracts the time not worked entry for the scheduled shift from a reported time entry's calculated duration if the entries match shift",
+      "Specifies on what day to calculate time for reported time entries that span days. The rule for time entries that span days, the method for breaking...",
+      "Converts the IDs associated with the selected Project Costing time attributes to project names or numbers for storage in payroll costing segments",
+      "Copies the selected Project Costing time attributes to the payroll costing segments",
+      "Apply cost overrides to calculated time entries"
+    ]
+  },
+  {
+    "type_name": "Element Input Validation",
+    "display_name": "Element Input Validation",
+    "formula_count": 35,
+    "sample_prompts": [
+      "Added code to check for spaces and throw an error if space exist in the value entered for Registration Number",
+      "This formula is to get the time period for element input value",
+      "A fast formula to validate the uniqueness of the deduction element reference code",
+      "This formula validates the vacation term payout offset input value",
+      "Validates the years of service input value of the severance payments element",
+      "This formula will set contexts for PAYE and NI adjustment element",
+      "A formula that returns the next value of the reference code. The reference code is generated using a database sequence",
+      "Created 240402 CDRM",
+      "This formula set default value for Student Loan Adjustment element",
+      "Element Input Validation"
+    ]
+  },
+  {
+    "type_name": "Payroll Access to HR",
+    "display_name": "Payroll Access To Hr",
+    "formula_count": 33,
+    "sample_prompts": [
+      "France Get HR Data",
+      "SA Formula to fetch HR data",
+      "Formula for fetching HR data",
+      "With PER_ASG_CONTRACT_END_DATE",
+      "Retrieves values of the Address DBI and Standard Working Hours",
+      "4 Samia Bouricha 3-MAR-2020 Added KW_EE_PERIOD_OF_SERVICE_ID_GRATUITY - 30869863",
+      "Payroll access to HR data formula for Oman",
+      "Payroll access to HR data formula for Bahrain",
+      "Retrieves the Workers Compensation value",
+      "Retrieves the Provincial Medical value",
+      "Payroll access to HR data formula for Qatar",
+      "Get Values for the following DBIs: Context: <1,HR_ASSIGNMENT_ID>, <2,EFFECTIVE_DATE>",
+      "Formula to get the number of Hours/Days worked from Core HR Availability",
+      "This formula will return the Salary Amount and Periodicity",
+      "Fetches the number of pay units within a date range, including scheduled workdays and public holidays",
+      "Formula to derive employee length of service",
+      "Retrieves the RRSP rates from PSU",
+      "Helper utility for eligible job DBI's Formula Type: Payroll Access to HR",
+      "Get Values for the following DBIs: DBIs: Context: <1,PERSON_ID>, <2,EFFECTIVE_DATE>",
+      "Formula to get HR data",
+      "Formula for fetching FTE information",
+      "Portal formula to access HR side information INPUTS p_hr_asg_id p_mode RESULTS X_OUTPUT - could be of different types, formulas using this one have...",
+      "Formula to get person service years",
+      "Calculate working days in pay period INPUTS RESULTS MODIFIED (DD-MON-YYYY) DESCRIPTION"
+    ]
+  },
+  {
+    "type_name": "Global Absence Entry Validation",
+    "display_name": "Global Absence Entry Validation",
+    "formula_count": 32,
+    "sample_prompts": [
+      "Validation formula for sickness absences for UK",
+      "FR Maternity Paternity Adoption Leave Validation V6 SSAGHINI - changes as per",
+      "UK Sickness During Maternity Pay Period Validation Formula",
+      "UK Paternity Absence Validation Formula",
+      "UK Adoption Absence Validation Formula",
+      "UK Maternity Leave Validation",
+      "IE Adoption Absence Validation",
+      "IE Health and Safety Absence Validation",
+      "FR Therapeutic part time Validation Formula",
+      "IE Maternity Absence Validation",
+      "IE Sickness Validation",
+      "UK SHPL Absence Validation Formula",
+      "Validation formula for ATMP absences for FR Formula Type: Global Absence Entry Validation This formula validates an absence entry for FR statutory ...",
+      "Validation formula for spbl absences for UK Formula Type: Global Absence Entry Validation This formula validates an absence entry for UK statutory ...",
+      "This sample formula restrict user to not entering three absence of same type in given time period. Name Date Comments",
+      "Italian validation",
+      "IE Parents Absence Validation",
+      "FR Sickness Validation",
+      "FR Paternity Bereavement Validation",
+      "IE Paternity Absence Validation"
+    ]
+  },
+  {
+    "type_name": "Extract Advanced Condition",
+    "display_name": "Extract Advanced Condition",
+    "formula_count": 32,
+    "sample_prompts": [
+      "This formula is an entry to filter and validate data security in global payroll reports. MODIFIED (MM/DD/YY) jianztia 03/12/20",
+      "This formula is to validate person's department security. MODIFIED (MM/DD/YY) jianztia 01/02/20",
+      "This formula is to validate person's location security. MODIFIED (MM/DD/YY) jianztia 01/02/20",
+      "This formula is to filter person's department data. MODIFIED (MM/DD/YY) jianztia 01/02/20",
+      "This formula is to filter person's location data. MODIFIED (MM/DD/YY) jianztia 01/02/20",
+      "This formula is to validate person's PSU security. MODIFIED (MM/DD/YY) jianztia 01/02/20",
+      "This formula is to validate person's TRU security. MODIFIED (MM/DD/YY) jianztia 01/02/20",
+      "This formula is to validate person's PER security. MODIFIED (MM/DD/YY) jianztia 01/02/20",
+      "GB EDI Validation PAYE Reference",
+      "GB EDI Validation Address",
+      "GB EDI Validation RTI Address Order",
+      "GB EDI Validation Character Set A",
+      "GB EDI Validation First Char Alphanumeric",
+      "GB EDI Validation First Char Alpha",
+      "GB EDI Validation Character Set A Lower Case",
+      "GB EDI Validation Character Set D",
+      "GB EDI Validation RTI Character Set A",
+      "GB EDI Validation Character Set C",
+      "GB EDI Validation Character Set B",
+      "GB EDI Validation First Char Not Space",
+      "GB EDI Validation Tax Figures"
+    ]
+  },
+  {
+    "type_name": "HCM Data Loader",
+    "display_name": "HCM Data Loader",
+    "formula_count": 25,
+    "sample_prompts": [
+      "This formula transforms Service Canada provided ROE Serial Number xml data into DOR HDL format"
+    ]
+  },
+  {
+    "type_name": "Global Absence Plan Entitlement",
+    "display_name": "Global Absence Plan Entitlement",
+    "formula_count": 25,
+    "sample_prompts": [
+      "Main entitlement formula for the UK statutory sick pay",
+      "UK Paternity Absence Entitlement Formula",
+      "UK Sickness During Maternity Pay Period Entitlement Formula",
+      "UK Maternity Leave Entitlement",
+      "UK Adoption Absence Entitlement Formula",
+      "UK Statutory sick pay to detect partial days",
+      "Formula to process previous sick pay absences",
+      "Formula to calculate average weekly earnings for statutory sick pay",
+      "Formula to identify previous sickness absences during maternity",
+      "Localization use case is first 3 days in the chain should be paid at 0% and next 28 weeks at 100%. This is being handled in this formula. We loop t...",
+      "FR Maternity Paternity Adoption Leave Entitlement V1",
+      "The formula returns plan entitlements based on FTE of the person. Does pro-ration based on FTE",
+      "Plan entitlement formula which accesses flex field array inputs",
+      "Formula to find if a linking letter exists for statutory sick pay",
+      "This sample formula returns the Entitlement Start Date of absence plan. NOTE: The formula type is the same as that of Global Absence Plan Enrollmen...",
+      "This formula evaluates the entitlement band based on location of",
+      "Basic plan entitlement formula"
+    ]
+  },
+  {
+    "type_name": "Person Change Causes Life Event",
+    "display_name": "Person Change Causes Life Event",
+    "formula_count": 24,
+    "sample_prompts": [
+      "Kaiser NewHire FF3",
+      "Kaiser NewHire FF2",
+      "Kaiser NewHire FF1",
+      "Kaiser NewHire FF4",
+      "To check is person is in service area or not",
+      "Life Event Term Severance is triggered when HR data changes",
+      "Life Event Termination is triggered when HR data changes",
+      "Life Event New Hire is triggered when HR Data changes",
+      "Life Event Legal Employer Transfer is triggered when HR data changes",
+      "Life Event New REHIRE is triggered when HR Data change",
+      "NewHire Return N FF",
+      "When a persons assignment type changes from one specific value to another, the event should get triggered",
+      "Employment Category FF",
+      "Global Transfer FF",
+      "Life event should trigger only for persons based in US or CA. Note: Needs PERSON_ID context to work"
+    ]
+  },
+  {
+    "type_name": "WORKFORCE_MANAGEMENT_TIME_ENTRY_RULES",
+    "display_name": "WFM Time Entry Rules",
+    "formula_count": 21,
+    "sample_prompts": [
+      "Retrieves all of the values passed from the worker's time card data to the various DAVE functions",
+      "Evaluates whether reported Units time entries for the Units time category are less or greater than the defined minimum and maximum units quantities...",
+      "Determines if the selected eligible job is valid for all time entries. The time attribute name for eligible job is an input to the delivered formula",
+      "Evaluates whether the reported time entries for the time category are within the scheduled hours plus or minus the defined variance. The variance v...",
+      "Evaluates whether reported time entries are on an assigned public holiday. Public holiday type and specific time attribute entries are inputs to th...",
+      "Evaluates whether reported time entries for the time category exceed the specified maximum hours. The values shown in the message can appear as hou...",
+      "Evaluates the type of validation message to show when a day’s reported time entries total to more than the specified threshold, and there’s no brea...",
+      "Evaluates whether the time between reported consecutive shifts is less than the defined rest period. The rest period and specific time attribute re...",
+      "Evaluates whether reported time entries for the time category are greater than the defined maximum hours. The maximum hours and time attributes are...",
+      "Evaluates whether reported time entries for the time category are less than the defined minimum hours . The minimum hours and time attributes are i...",
+      "Evaluates whether reported time entries for the time category are less than the defined minimum hours. The minimum hours and time attributes are in...",
+      "Evaluates whether reported time entries for the time. category are greater than the defined maximum hours. The maximum hours and time attributes ar...",
+      "Run Resubmission Validation API"
+    ]
+  },
+  {
+    "type_name": "Postelection Edit",
+    "display_name": "Postelection Edit",
+    "formula_count": 19,
+    "sample_prompts": [
+      "Provide post-election validation that when electing the Health Savings Account plan and option, the allowed Medical Plan and Options are also selec...",
+      "Validate cross plan when benefits enrollment is complete",
+      "If elected the 'Connect to Savings' cannot elect 'Health Care FSA' If elected the 'Health Care FSA' cannot elect 'Limited Purpose FSA' or 'Health S...",
+      "This formula forces a hard stop if correct number of dependents are not enrolled as per option selected for specific plan types Requirement: Design...",
+      "Fast formula to check the post election of employee to determine bundling logic of HDHP Medical plan and HSA Health Savings plans",
+      "Post election rule that would give an error when the employee elects enrollment in Health Care FSA with first electing Medical Plan Coverage in all...",
+      "If elected 'Spouse/DP Supplemental Life' should be enrolled in 'Supplemental Group Term Life' Max Coverage of Spouse/DP Supplemental Life is 50% of...",
+      "Fast formula to check the post elections of employee before electing Spouse Domestic Partner",
+      "Fast formula to check the post elections of employee before electing Child Supplemental Life",
+      "Employee should be able to save elections in Voluntary Spouse Life or Voluntary Child life, only if employee is enrolled in Voluntary Employee Life...",
+      "Demo Post Election FF",
+      "Election into \"Benefits Medical P-PCP Plan\" requires enrollment in \"Benefits Medical D-PCP Plan\"",
+      "When a person makes an election to Spousal supplemental, validate the person is also enrolled in plan Basic Life. This formula relies upon benefits..."
+    ]
+  },
+  {
+    "type_name": "Payroll User Interface Configuration",
+    "display_name": "Payroll User Interface Configuration",
+    "formula_count": 17,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "WORKFORCE_MANAGEMENT_SUBROUTINE",
+    "display_name": "WFM Subroutine",
+    "formula_count": 16,
+    "sample_prompts": [
+      "This Subroutine is called by ORA_WFM_TCR_VARIABLE_DAY_PERIOD_AP formula to use DAVE function to look back at previous time cards and find specified...",
+      "Evaluates whether time entries reported using the time collection device are before or after the scheduled start and end times. The formula also va...",
+      "This Subroutine is called by ORA_WFM_TCR_VARIABLE_DAY_PERIOD_AP formula to Split Time entry by Variable Day Period",
+      "This subroutine for Time Allocation formula handles Allocation Type of Hours",
+      "Submits or saves the time card when the time collection device Out event occurs within the range calculated using the defined threshold and the las...",
+      "This subroutine for Time Allocation formula handles Allocation Type of Percent and Equally",
+      "Divides reported daily, period, and seventh-consecutive-day time entries into calculated time attributes for hours above and below defined threshol...",
+      "Submits or saves the time card when the number of time collection device Out events exceed the defined minimum entries value. The number of Out eve...",
+      "Divides reported daily or period time and absence time into calculated time attributes for values above and below defined threshold hours. Reported...",
+      "Submits or saves the time card when the reported hours from the time collection device exceeds the defined minimum hours. Reported hours and specif...",
+      "Evaluates whether reported Units time entries for the Units time category are less or greater than the defined minimum and maximum units quantities...",
+      "Divides reported daily or period time into calculated time attributes for hours above and below defined threshold hours. Reported time and specific...",
+      "Evaluates whether the time between reported consecutive shifts is less than the defined rest period. The rest period and specific time attribute re...",
+      "Evaluates whether reported time entries for the time category are less than the defined minimum hours . The minimum hours and time attributes are i...",
+      "Evaluates whether reported time entries for the time category are greater than the defined maximum hours. The maximum hours and time attributes are...",
+      "Submits or saves the time card when the time collection device Out event is reported on a specific day to the week. Day action and specific time at..."
+    ]
+  },
+  {
+    "type_name": "Payroll Relationship Group",
+    "display_name": "Payroll Relationship Group",
+    "formula_count": 14,
+    "sample_prompts": [
+      "Formula which evaluates if the process should be run for the passed payroll relationship id. It check if the incoming relationship id is same as th...",
+      "RD CDRM Emp5",
+      "SC 2K Emp Set10"
+    ]
+  },
+  {
+    "type_name": "Rate Conversion",
+    "display_name": "Rate Conversion",
+    "formula_count": 14,
+    "sample_prompts": [
+      "This is seeded formula for converting the 56 day balance into weekly value",
+      "This formula is to convert amount in one periodicity to a different periodicity This converts the in_amount to a annual value, then converts it to ...",
+      "Converts rates according to Chinese legislative requirement",
+      "IE Standard Rate Annualized",
+      "This is seeded formula for converting RTT conversion. It simply returns the input amount as the conversion factor is specified on the rate definition"
+    ]
+  },
+  {
+    "type_name": "Global Absence Accrual Matrix",
+    "display_name": "Global Absence Accrual Matrix",
+    "formula_count": 14,
+    "sample_prompts": [
+      "German Annual Leave Calculation",
+      "France Vacation Accrual Matrix",
+      "France Sample Vacation Accrual",
+      "This sample formula applies the Accrual, Ceiling, CarryOver, Proration Factor, Vesting Units, Vesting UOM, CarryOver Proration and Ceiling Proratio...",
+      "France RTT Accrual Matrix",
+      "This sample formula applies the Accrual, Ceiling, CarryOver based on Length of Service and Accrual Plan the person enrolled into"
+    ]
+  },
+  {
+    "type_name": "HCM Rates Calculate Value",
+    "display_name": "HCM Rates Calculate Value",
+    "formula_count": 12,
+    "sample_prompts": [
+      "HCM Rates_FF_GBK",
+      "Live Rate_Formula",
+      "UnLive Rate_Formula",
+      "BL CDRM FF1"
+    ]
+  },
+  {
+    "type_name": "Global Absence Type Duration",
+    "display_name": "Global Absence Type Duration",
+    "formula_count": 12,
+    "sample_prompts": [
+      "This formula returns the pro-rated duration for absence entries based on work schedule details",
+      "This formula returns the duration for absence entries based on duration formula that reduces the absence duration by 1 hour if the entered absence ...",
+      "France Sample Partial Time Conversion Absence Duration",
+      "This sample formula returns the duration based on effective date falls on Sunday",
+      "Calculates the calendar days within an absence period, after excluding the public holidays if any, as per the work schedule assigned to the assignment"
+    ]
+  },
+  {
+    "type_name": "ACCRUAL",
+    "display_name": "Accrual",
+    "formula_count": 12,
+    "sample_prompts": [
+      "Accrual Payroll Balance Calculation",
+      "Accrual Simple Balance Multiplier",
+      "Accrual Hire Date Anniversary Balance",
+      "Accrual Simple Multiplier",
+      "Accrual Payroll Calculation"
+    ]
+  },
+  {
+    "type_name": "Net to Gross",
+    "display_name": "Net To Gross",
+    "formula_count": 12,
+    "sample_prompts": [
+      "Canadian Pretax Iteration Formula. It will call the Global iteration formula by passing Legislation balance values and other input parameters 10/31...",
+      "This formula calculates the additional amount needed on top of a specified Net pay, so that it covers for the Taxes and Deductions. The employee wi...",
+      "Element PreTax Iteration Formula. It will call the Global iteration formula by passing Legislation balance values and other input parameters 2/21/2...",
+      "FR Guaranteed Net"
+    ]
+  },
+  {
+    "type_name": "Balance Exception",
+    "display_name": "Balance Exception",
+    "formula_count": 11,
+    "sample_prompts": [
+      "This is a sample formula that returns a static value"
+    ]
+  },
+  {
+    "type_name": "Rate Value Calculation",
+    "display_name": "Rate Value Calculation",
+    "formula_count": 11,
+    "sample_prompts": [
+      "Calculate Flex Credit based on Benefit Program",
+      "Formula derives rate based on plan design",
+      "ZBEN RCP Rate Value"
+    ]
+  },
+  {
+    "type_name": "Person Selection",
+    "display_name": "Person Selection",
+    "formula_count": 10,
+    "sample_prompts": [
+      "The formula selects employees based on person ids",
+      "The formula selects employees based on marital status, job and work from home status",
+      "NK PERSON SELECTION FF",
+      "The formula selects employees based on person numbers",
+      "Select 3 Employees - OpenEmp15 ZUK OpenEmp16 ZUK OpenEmp17 ZUK"
+    ]
+  },
+  {
+    "type_name": "Extra Input",
+    "display_name": "Extra Input",
+    "formula_count": 10,
+    "sample_prompts": [
+      "Get GTL Coverage Amount DISCLAIMER :",
+      "Get Dep FSA Coverage Amount DISCLAIMER :",
+      "This EIN Formula passes value to payroll elements for AB Monthly proration method Formula Type: Extra Input",
+      "BEN376 ExtraInput PGM FF"
+    ]
+  },
+  {
+    "type_name": "Global Absence Plan Duration",
+    "display_name": "Global Absence Plan Duration",
+    "formula_count": 10,
+    "sample_prompts": [
+      "Conversion formula for absence type in hours and plan in days",
+      "France Vacation Absence Plan Duration",
+      "Plan duration formula to return duration in days",
+      "Plan duration formula to return duration in calendar days",
+      "This sample formula returns the duration based on effective date falls on Sunday"
+    ]
+  },
+  {
+    "type_name": "WORKFORCE_MANAGEMENT_TIME_COMPLIANCE_RULES",
+    "display_name": "WFM Time Compliance Rules",
+    "formula_count": 9,
+    "sample_prompts": [
+      "Time Card not approved for worker or manager, sends reminder and escalation notification",
+      "Checks the worker or manager time card approval status, and sends a reminder notification if the time card is not approved yet",
+      "Evaluate whether time entries exist for the current day, if the worker is scheduled to work",
+      "Evaluates an answer from an attestation to send a notification to the worker’s manager",
+      "Evaluates if there are incomplete time entries on a given time card",
+      "Evaluate whether a time card exists",
+      "Compliance alert check for mising time card"
+    ]
+  },
+  {
+    "type_name": "Coverage Upper Limit",
+    "display_name": "Coverage Upper Limit",
+    "formula_count": 9,
+    "sample_prompts": [
+      "To determine coverage Limit for Supplemental Group Term Life Options DISCLAIMER :",
+      "To determine coverage Limit for Supplemental PA Options DISCLAIMER :",
+      "Coverage upper limit for Parking Plan DISCLAIMER :",
+      "Coverage upper limit for TRANSIT Plan DISCLAIMER :",
+      "To determine coverage limit for HSA Catchup DISCLAIMER :",
+      "To determine coverage limit for Dependent Care FSA DISCLAIMER :",
+      "To determine coverage limit for Health Care Spending Account DISCLAIMER :",
+      "Fast formula to determine the maximum coverage for Voluntary Employee Life Insurance Plan",
+      "ZBEN RCP Cvg Upper Limit"
+    ]
+  },
+  {
+    "type_name": "TOTAL COMPENSATION ITEM",
+    "display_name": "Total Compensation Item",
+    "formula_count": 9,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "COMPENSATION DEFAULT AND OVERRIDE",
+    "display_name": "Compensation Default And Override",
+    "formula_count": 8,
+    "sample_prompts": [
+      "Averages salary on last day of each month in workforce compensation cycle evaluation period. Uses salary on last day of evaluation period for midmo...",
+      "Averages salary for number of days worker held specified job code 1. Accounts for number of days salary was in effect during workforce compensation...",
+      "Averages daily salary. Accounts for days salary was in effect during workforce compensation cycle evaluation period. Zero is returned for workers w...",
+      "Eligible salary calculated by averaging daily salary. Accounts for number of days salary was in effect during the workforce compensation cycle eval...",
+      "Averages daily salary adjusted for part-time workers. Accounts for the number days salary was in effect and FTE during the workforce compensation c..."
+    ]
+  },
+  {
+    "type_name": "Legislative Check",
+    "display_name": "Legislative Check",
+    "formula_count": 8,
+    "sample_prompts": [
+      "Formula for validating the status of the payroll runs for a payroll relationship",
+      "Performs legislative-specific checks before the payroll run",
+      "Validate the status of a payroll relationship in payroll run INPUTS N/A RESULTS ERROR_ASG_MSG ERROR_WARN_MSG ERROR_INFO_MSG MODIFIED (DD-MON-YYYY) ..."
+    ]
+  },
+  {
+    "type_name": "Coverage Amount Limit",
+    "display_name": "Coverage Amount Limit",
+    "formula_count": 8,
+    "sample_prompts": [
+      "AB Benefits SuppLife Emp Cvg Limit for OE",
+      "AB Benefits SuppLife SpsDP Cvg Limit OE1",
+      "AB Benefits SuppLife Chld Cvg Limit OE"
+    ]
+  },
+  {
+    "type_name": "Flow Schedule",
+    "display_name": "Flow Schedule",
+    "formula_count": 8,
+    "sample_prompts": [
+      "Formula to return a date time. Returns NEXT_SCHEDULED_DATE;",
+      "Next schedule date will be a month from the given scheduled date",
+      "Next schedule date will be a week from the given scheduled date",
+      "Next schedule date will be a day from the given scheduled date"
+    ]
+  },
+  {
+    "type_name": "Global Absence Accrual",
+    "display_name": "Global Absence Accrual",
+    "formula_count": 7,
+    "sample_prompts": [
+      "Sample Vacation accrual for UK",
+      "This sample formula applies the Accrual, Ceiling, CarryOver, Proration Factor, Vesting Units, Vesting UOM, CarryOver Proration and Ceiling Proratio...",
+      "UK Shared Parental Leave plan Validation"
+    ]
+  },
+  {
+    "type_name": "Coverage Amount Calculation",
+    "display_name": "Coverage Amount Calculation",
+    "formula_count": 7,
+    "sample_prompts": [
+      "Coverage amount is determined based on persons DOB",
+      "Formula derives coverage as factor of person’s age",
+      "Coverage Amount Calculation",
+      "ZBEN RCP Coverage Calc"
+    ]
+  },
+  {
+    "type_name": "Deduction Components Group",
+    "display_name": "Deduction Components Group",
+    "formula_count": 6,
+    "sample_prompts": [
+      "Formula for identifying CIR components during NI Category Update process",
+      "To determine if an NI record should be updated for under 21 year old / DEFAULT FOR HRX_GB_DATE_OF_BIRTH IS '0001/01/01 00:00:00' (date) DEFAULT FOR...",
+      "To determine if a PAYE record should be uplifted / DEFAULT FOR HRX_GB_TERMINATION_DATE IS '0001/01/01 00:00:00' (date) DEFAULT FOR PAY_DIR_COMP_DIR...",
+      "To determine if a PAYE record should be cleared down / DEFAULT FOR PAY_DIR_COMP_DIR_CARD_ID IS 0 DEFAULT FOR PAY_DIR_COMP_CONTEXT_VALUE1 IS ' ' DEF..."
+    ]
+  },
+  {
+    "type_name": "Excess Credits Treatment",
+    "display_name": "Excess Credits Treatment",
+    "formula_count": 6,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Global Absence Band Entitlement",
+    "display_name": "Global Absence Band Entitlement",
+    "formula_count": 6,
+    "sample_prompts": [
+      "This formula evaluates the band 2 entitlement based on type of sickness, type of plan (IJSS or Legal) and Prolongation or not of previous absence (...",
+      "This formula evaluates the waiting period based on type of sickness, type of waiting period and Prolongation or not of previous absence Type of abs...",
+      "This formula evaluates the band 3 entitlement based on type of sickness, type of plan (IJSS or Legal) and Prolongation or not of previous absence (...",
+      "This sample formula returns the Band Factors and Entitlements"
+    ]
+  },
+  {
+    "type_name": "Default Enrollment",
+    "display_name": "Default Enrollment",
+    "formula_count": 6,
+    "sample_prompts": [
+      "Fast Formula to determine whether an option in plan should be assigned to a person depending upon the Eligible Covered Contacts",
+      "Formula to determine whether a compensation object should be an defaulted for the person"
+    ]
+  },
+  {
+    "type_name": "Extract Criteria",
+    "display_name": "Extract Criteria",
+    "formula_count": 5,
+    "sample_prompts": [
+      "This formula is used to determine if a given AREA1 should be excluded. The result of inclusion or exclusion will be used in the Report Block Criteria"
+    ]
+  },
+  {
+    "type_name": "Global Absence Plan Enrollment Start",
+    "display_name": "Global Absence Plan Enrollment Start",
+    "formula_count": 5,
+    "sample_prompts": [
+      "This sample formula returns the Enrollment Start Date of absence plan when enrolling a person to a plan which does based on person hire date"
+    ]
+  },
+  {
+    "type_name": "Calculation Method",
+    "display_name": "Calculation Method",
+    "formula_count": 5,
+    "sample_prompts": [
+      "France Calculation Method Formula"
+    ]
+  },
+  {
+    "type_name": "Compensation Calculation",
+    "display_name": "Compensation Calculation",
+    "formula_count": 5,
+    "sample_prompts": [
+      "Calculate the commission amount to be used for benefits",
+      "Calculate gross annual compensation based on bargaining unit",
+      "Calculate gross annual salary"
+    ]
+  },
+  {
+    "type_name": "Life Event Reason Timeliness",
+    "display_name": "Life Event Reason Timeliness",
+    "formula_count": 5,
+    "sample_prompts": [
+      "Salary Change Life Event VOID when logic = true",
+      "The formula voids specific events where notified date is more than 30 days after event occurred date",
+      "The formula voids all events where notified date is more than 90 days after event occurred date. This is to avoid back out of future dated processe..."
+    ]
+  },
+  {
+    "type_name": "Enrollment Opportunity",
+    "display_name": "Enrollment Opportunity",
+    "formula_count": 5,
+    "sample_prompts": [
+      "Marriage/Domestic Partnership and Divorce Life events",
+      "Formula to determine whether a compensation object should be an electable choice for the person"
+    ]
+  },
+  {
+    "type_name": "User Table Validation",
+    "display_name": "User Table Validation",
+    "formula_count": 4,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Rate Periodization",
+    "display_name": "Rate Periodization",
+    "formula_count": 4,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Global Absence Vesting Period",
+    "display_name": "Global Absence Vesting Period",
+    "formula_count": 4,
+    "sample_prompts": [
+      "This sample formula applies the Ceiling based on employment category"
+    ]
+  },
+  {
+    "type_name": "Default to Assign Pending Action",
+    "display_name": "Default To Assign Pending Action",
+    "formula_count": 4,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Beneficiary Certification Required",
+    "display_name": "Beneficiary Certification Required",
+    "formula_count": 4,
+    "sample_prompts": [
+      "Person needs to provide certificates for plans which allow minors/trustees and organizations as beneficiaries",
+      "A Single person need to provide certificates for beneficiary",
+      "Benf 37177024 Cert Req Yes FF",
+      "Benf 37177024 Cert Req No FF"
+    ]
+  },
+  {
+    "type_name": "WORKFORCE_MANAGEMENT_TIME_SUBMISSION_RULES",
+    "display_name": "WFM Time Submission Rules",
+    "formula_count": 4,
+    "sample_prompts": [
+      "Submits or saves the time card when the time collection device Out event is reported on a specific day to the week. Day action and specific time at...",
+      "Submits or saves the time card when the time collection device Out event occurs within the range calculated using the defined threshold and the las...",
+      "Submits or saves the time card when the reported hours from the time collection device exceeds the defined minimum hours. Reported hours and specif...",
+      "Submits or saves the time card when the number of time collection device Out events exceed the defined minimum entries value. The number of Out eve..."
+    ]
+  },
+  {
+    "type_name": "ACCRUAL_CARRYOVER",
+    "display_name": "Accrual Carryover",
+    "formula_count": 4,
+    "sample_prompts": [
+      "Accrual Payroll Carryover",
+      "Accrual Carryover Formula"
+    ]
+  },
+  {
+    "type_name": "Global Absence Discretionary Disbursement Rule",
+    "display_name": "Global Absence Discretionary Disbursement Rule",
+    "formula_count": 4,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Global Absence Partial Period Accrual Rate",
+    "display_name": "Global Absence Partial Period Accrual Rate",
+    "formula_count": 4,
+    "sample_prompts": [
+      "This sample formula returns the Accrual based on Length of Service for partial period"
+    ]
+  },
+  {
+    "type_name": "Global Absence Plan Roll Forward Start",
+    "display_name": "Global Absence Plan Roll Forward Start",
+    "formula_count": 4,
+    "sample_prompts": [
+      "This sample formula returns the reference date to calculate absence roll forward start"
+    ]
+  },
+  {
+    "type_name": "Global Absence Plan Roll Backward End",
+    "display_name": "Global Absence Plan Roll Backward End",
+    "formula_count": 4,
+    "sample_prompts": [
+      "This sample formula returns the Date to calculate the roll backward start",
+      "This sample formula returns the reference date to calculate absence roll Backward end"
+    ]
+  },
+  {
+    "type_name": "Global Absence Discretionary Donation Rule",
+    "display_name": "Global Absence Discretionary Donation Rule",
+    "formula_count": 3,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Global Absence Ceiling",
+    "display_name": "Global Absence Ceiling",
+    "formula_count": 3,
+    "sample_prompts": [
+      "This sample formula applies the Ceiling based on employment category"
+    ]
+  },
+  {
+    "type_name": "Rounding",
+    "display_name": "Rounding",
+    "formula_count": 3,
+    "sample_prompts": [
+      "Round up value to 2 decimal places. Ex - (123.17792,2) WOULD result in 123.18",
+      "Round value"
+    ]
+  },
+  {
+    "type_name": "Balance Adjustment",
+    "display_name": "Balance Adjustment",
+    "formula_count": 3,
+    "sample_prompts": [
+      "Generic Balance Adjustment Formula",
+      "Formula of type balance adjustment"
+    ]
+  },
+  {
+    "type_name": "Work Relationship Group",
+    "display_name": "Work Relationship Group",
+    "formula_count": 3,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "IRC_JOB_REQUISITION",
+    "display_name": "IRC Job Requisition",
+    "formula_count": 3,
+    "sample_prompts": [
+      "For HDL use",
+      "Fast Formula used in Job Requisition",
+      "Fast Formula used in OTBI"
+    ]
+  },
+  {
+    "type_name": "Global Absence Carryover",
+    "display_name": "Global Absence Carryover",
+    "formula_count": 3,
+    "sample_prompts": [
+      "This sample formula returns the carry over based on the department of an employee"
+    ]
+  },
+  {
+    "type_name": "HCM Rates Default Value",
+    "display_name": "HCM Rates Default Value",
+    "formula_count": 3,
+    "sample_prompts": [
+      "CDRM Created on 151209"
+    ]
+  },
+  {
+    "type_name": "Dependent Certification Required",
+    "display_name": "Dependent Certification Required",
+    "formula_count": 3,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Waiting Period Value and UOM",
+    "display_name": "Waiting Period Value And Uom",
+    "formula_count": 3,
+    "sample_prompts": [
+      "Calculate the waiting period and unit of measure",
+      "Determine waiting periods based on org and country of birth"
+    ]
+  },
+  {
+    "type_name": "Age Calculation",
+    "display_name": "Age Calculation",
+    "formula_count": 3,
+    "sample_prompts": [
+      "Fast formula to get the age of employee?s Spouse or DP",
+      "The formula returns the age of the person as of END OF YEAR"
+    ]
+  },
+  {
+    "type_name": "Global Absence Linkage Exclusion",
+    "display_name": "Global Absence Linkage Exclusion",
+    "formula_count": 3,
+    "sample_prompts": [
+      "Period of incapacity to work link exclusion rule",
+      "This formula returns exclusion flag as Y if absence duration is less than 4 days (calendar days)"
+    ]
+  },
+  {
+    "type_name": "WORKFORCE_MANAGEMENT_TIME_ADVANCE_CATEGORY_RULES",
+    "display_name": "WFM Time Advance Category Rules",
+    "formula_count": 3,
+    "sample_prompts": [
+      "Compares the in or out time reported on the web clock to the assigned schedule to identify reported time outside the scheduled time",
+      "Calculates the work duration of a shift and the expected number of meal breaks according to the web clock buttons properties",
+      "Checks if the worker is scheduled to work today"
+    ]
+  },
+  {
+    "type_name": "COMPENSATION PERSON SELECTION",
+    "display_name": "Compensation Person Selection",
+    "formula_count": 3,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Global Absence Plan Period Anniversary Event Date",
+    "display_name": "Global Absence Plan Period Anniversary Event Date",
+    "formula_count": 3,
+    "sample_prompts": [
+      "This sample formula returns the Period Anniversary Event"
+    ]
+  },
+  {
+    "type_name": "COMPENSATION HIERARCHY DETERMINATION",
+    "display_name": "Compensation Hierarchy Determination",
+    "formula_count": 3,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "SALARY PROGRESSION DATE DETERMINATION",
+    "display_name": "Salary Progression Date Determination",
+    "formula_count": 3,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "WORKFORCE_MANAGEMENT_TIME_DEVICE_RULES",
+    "display_name": "WFM Time Device Rules",
+    "formula_count": 3,
+    "sample_prompts": [
+      "Evaluates whether time entries reported using the time collection device are before or after the scheduled start and end times. The formula also va...",
+      "Evaluates whether reported shifts are less than the defined minimum rest period minutes apart. Rest period and specific time attribute results are ...",
+      "Evaluates whether the time collection device automatically generated the event and if so, display the specified message"
+    ]
+  },
+  {
+    "type_name": "Action Type Due Date",
+    "display_name": "Action Type Due Date",
+    "formula_count": 2,
+    "sample_prompts": [
+      "Calculate the waiting period and return 30 days after as due date"
+    ]
+  },
+  {
+    "type_name": "Enrollment End",
+    "display_name": "Enrollment End",
+    "formula_count": 2,
+    "sample_prompts": [
+      "ZBEN RCP Coverage End"
+    ]
+  },
+  {
+    "type_name": "ABSENCE",
+    "display_name": "Absence",
+    "formula_count": 2,
+    "sample_prompts": [
+      "Calculates the Employee's Absence Duration in days or hours. The profile 'HR: Absence Duration Auto Overwrite' determines if an existing duration v..."
+    ]
+  },
+  {
+    "type_name": "FORMULA_VALIDATION_TASK",
+    "display_name": "Formula Validation Task",
+    "formula_count": 2,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Global Absence Plan Use Rate",
+    "display_name": "Global Absence Plan Use Rate",
+    "formula_count": 2,
+    "sample_prompts": [
+      "This sample formula returns the Plan Use Rate"
+    ]
+  },
+  {
+    "type_name": "ACCRUAL_INELIGIBILITY",
+    "display_name": "Accrual Ineligibility",
+    "formula_count": 2,
+    "sample_prompts": [
+      "Accrual Ineligibility Formula"
+    ]
+  },
+  {
+    "type_name": "Evaluate Life Event",
+    "display_name": "Evaluate Life Event",
+    "formula_count": 2,
+    "sample_prompts": [
+      "If a life event is notified after 90 days for a set of people, ignore them",
+      "If a life event is notified after 30 days ignore this potential life event"
+    ]
+  },
+  {
+    "type_name": "Global Absence Ceiling Proration",
+    "display_name": "Global Absence Ceiling Proration",
+    "formula_count": 2,
+    "sample_prompts": [
+      "This sample formula returns the proration factor based on employee type"
+    ]
+  },
+  {
+    "type_name": "Global Absence Carryover Proration",
+    "display_name": "Global Absence Carryover Proration",
+    "formula_count": 2,
+    "sample_prompts": [
+      "This sample formula returns the proration factor based on employee type"
+    ]
+  },
+  {
+    "type_name": "Global Absence Plan Enrollment End",
+    "display_name": "Global Absence Plan Enrollment End",
+    "formula_count": 2,
+    "sample_prompts": [
+      "This sample formula returns the Enrollment End Date when terminating a person from an absence plan"
+    ]
+  },
+  {
+    "type_name": "Global Absence Entitlement End Date",
+    "display_name": "Global Absence Entitlement End Date",
+    "formula_count": 2,
+    "sample_prompts": [
+      "This sample formula returns the entitlement end date added 6 months to absence entry start date"
+    ]
+  },
+  {
+    "type_name": "Age Determination Date",
+    "display_name": "Age Determination Date",
+    "formula_count": 2,
+    "sample_prompts": [
+      "The Age determination date is based on person’s job",
+      "The Age determination date is the start date of next month"
+    ]
+  },
+  {
+    "type_name": "Rate Start Date",
+    "display_name": "Rate Start Date",
+    "formula_count": 2,
+    "sample_prompts": [
+      "The fast formula will determine the rate start date based on the life event date and new FT or PT waiting period",
+      "The fast formula will determine the rate start date based on the life event date and new hire waiting period"
+    ]
+  },
+  {
+    "type_name": "SALARY PROGRESSION RATE CALCULATION",
+    "display_name": "Salary Progression Rate Calculation",
+    "formula_count": 2,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Global Absence Agreement Validation Formula",
+    "display_name": "Global Absence Agreement Validation Formula",
+    "formula_count": 2,
+    "sample_prompts": [
+      "UK Shared Parental Agreement Validation Formula"
+    ]
+  },
+  {
+    "type_name": "Global Absence Proration",
+    "display_name": "Global Absence Proration",
+    "formula_count": 2,
+    "sample_prompts": [
+      "This sample formula returns the proration factor based on employee type"
+    ]
+  },
+  {
+    "type_name": "Rate End Date",
+    "display_name": "Rate End Date",
+    "formula_count": 2,
+    "sample_prompts": [
+      "ZBEN RCP Rate End"
+    ]
+  },
+  {
+    "type_name": "Enrollment Period Start Date",
+    "display_name": "Enrollment Period Start Date",
+    "formula_count": 1,
+    "sample_prompts": [
+      "Enrollment period starts MID of next month of marital status change date"
+    ]
+  },
+  {
+    "type_name": "Enrollment Period End Date",
+    "display_name": "Enrollment Period End Date",
+    "formula_count": 1,
+    "sample_prompts": [
+      "FF to return Enrollment Window End Date based on hire date and LE occurred"
+    ]
+  },
+  {
+    "type_name": "Flow Task Ownership",
+    "display_name": "Flow Task Ownership",
+    "formula_count": 1,
+    "sample_prompts": [
+      "Formula to return flow task owner. Returns Task_Owner;"
+    ]
+  },
+  {
+    "type_name": "Rate Lower Limit",
+    "display_name": "Rate Lower Limit",
+    "formula_count": 1,
+    "sample_prompts": [
+      "ZBEN RCP Rate Low Limit"
+    ]
+  },
+  {
+    "type_name": "WORKFORCE_MANAGEMENT_TIME_INTERACTION_RULES",
+    "display_name": "WFM Time Interaction Rules",
+    "formula_count": 1,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Flow Interaction Skip",
+    "display_name": "Flow Interaction Skip",
+    "formula_count": 1,
+    "sample_prompts": [
+      "Formula to decide whether to skip the flow interaction or not"
+    ]
+  },
+  {
+    "type_name": "Dependent Eligibility",
+    "display_name": "Dependent Eligibility",
+    "formula_count": 1,
+    "sample_prompts": [
+      "Dependents of persons above 60 yrs are ineligible"
+    ]
+  },
+  {
+    "type_name": "Performance Rating Calculation",
+    "display_name": "Performance Rating Calculation",
+    "formula_count": 1,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Coverage Lower Limit",
+    "display_name": "Coverage Lower Limit",
+    "formula_count": 1,
+    "sample_prompts": [
+      "ZBEN RCP Cvg Low Limit"
+    ]
+  },
+  {
+    "type_name": "Global Absence Elective Disbursement Evaluation",
+    "display_name": "Global Absence Elective Disbursement Evaluation",
+    "formula_count": 1,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Global Absence Agreement Eligibility Formula",
+    "display_name": "Global Absence Agreement Eligibility Formula",
+    "formula_count": 1,
+    "sample_prompts": [
+      "UK Shared Parental Leave Agreement Eligibility History : Updated length of service check Sep 2018"
+    ]
+  },
+  {
+    "type_name": "Flow Ownership",
+    "display_name": "Flow Ownership",
+    "formula_count": 1,
+    "sample_prompts": [
+      "Formula For Defaulting the Flow Ownership"
+    ]
+  },
+  {
+    "type_name": "Rate Upper Limit",
+    "display_name": "Rate Upper Limit",
+    "formula_count": 1,
+    "sample_prompts": [
+      "ZBEN RCP Rate Upper Limit"
+    ]
+  },
+  {
+    "type_name": "Enrollment Coverage Start Date",
+    "display_name": "Enrollment Coverage Start Date",
+    "formula_count": 1,
+    "sample_prompts": [
+      "ZBEN RCP Coverage Start"
+    ]
+  },
+  {
+    "type_name": "Global Absence Rollover",
+    "display_name": "Global Absence Rollover",
+    "formula_count": 1,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Benefits Rate Distribution",
+    "display_name": "Benefits Rate Distribution",
+    "formula_count": 1,
+    "sample_prompts": [
+      "Hard Coded Assignments for Employee Chauhan"
+    ]
+  },
+  {
+    "type_name": "Flow Skip",
+    "display_name": "Flow Skip",
+    "formula_count": 1,
+    "sample_prompts": [
+      "Formula to decide whether to skip the flow or not"
+    ]
+  },
+  {
+    "type_name": "Global Absence Agreement Payment Percentage formula",
+    "display_name": "Global Absence Agreement Payment Percentage Formula",
+    "formula_count": 1,
+    "sample_prompts": [
+      "UK Shared Parental Agreement Pay Percentage Formula"
+    ]
+  },
+  {
+    "type_name": "Global Absence Accrual Event",
+    "display_name": "Global Absence Accrual Event",
+    "formula_count": 1,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Global Absence Target Plan",
+    "display_name": "Global Absence Target Plan",
+    "formula_count": 1,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Automatic Enrollment Method",
+    "display_name": "Automatic Enrollment Method",
+    "formula_count": 1,
+    "sample_prompts": []
+  },
+  {
+    "type_name": "Compensation Determination Date",
+    "display_name": "Compensation Determination Date",
+    "formula_count": 1,
+    "sample_prompts": []
+  }
+]

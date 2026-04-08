@@ -34,16 +34,17 @@ def test_dbi_list():
     resp = client.get("/api/dbi")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) > 0
-    assert "name" in data[0]
+    assert data["total"] > 0
+    assert len(data["items"]) > 0
+    assert "name" in data["items"][0]
 
 
 def test_dbi_search():
     resp = client.get("/api/dbi?search=hours")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) > 0
-    for item in data:
+    assert data["total"] > 0
+    for item in data["items"]:
         assert "hours" in item["name"].lower() or "hours" in item.get("description", "").lower()
 
 

@@ -3,15 +3,18 @@ export function streamSSE(
   body: Record<string, unknown>,
   onToken: (text: string) => void,
   onDone: () => void,
-  onError: (error: Error) => void
+  onError: (error: Error) => void,
+  onReplace?: (fullText: string) => void,
+  extraHeaders?: Record<string, string>
 ): AbortController {
   const controller = new AbortController();
 
   (async () => {
     try {
-      const response = await fetch(`http://localhost:8000${url}`, {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extraHeaders };
+      const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(body),
         signal: controller.signal,
       });
@@ -54,10 +57,14 @@ export function streamSSE(
               continue;
             }
             try {
-              const parsed = JSON.parse(dataStr) as { text?: string; content?: string };
-              const text = parsed.text ?? parsed.content ?? '';
-              if (text) {
-                onToken(text);
+              const parsed = JSON.parse(dataStr) as { text?: string; content?: string; replace?: string };
+              if (parsed.replace && onReplace) {
+                onReplace(parsed.replace);
+              } else {
+                const text = parsed.text ?? parsed.content ?? '';
+                if (text) {
+                  onToken(text);
+                }
               }
             } catch {
               // If it's not JSON, treat as plain text

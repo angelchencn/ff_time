@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { EditorWithChat } from '../Editor/EditorWithChat';
 import { SimulationPanel } from '../SimulationPanel/SimulationPanel';
+import { CustomFormulasPanel } from '../CustomFormulas/CustomFormulasPanel';
 import { Toolbar } from './Toolbar';
 import { StatusBar } from './StatusBar';
 import { useValidation } from '../../hooks/useValidation';
@@ -57,7 +58,7 @@ function DragHandle({ onDrag }: { onDrag: (dx: number) => void }) {
           bottom: 0,
           left: 2,
           width: 1,
-          backgroundColor: '#e0e0e0',
+          backgroundColor: 'var(--border-default)',
         }}
       />
     </div>
@@ -68,10 +69,28 @@ export function AppLayout() {
   useValidation();
 
   const [rightWidth, setRightWidth] = useState(360);
+  const [showCustomFormulas, setShowCustomFormulas] = useState(false);
 
   const handleRightDrag = useCallback((dx: number) => {
     setRightWidth((w) => Math.max(240, Math.min(600, w - dx)));
   }, []);
+
+  if (showCustomFormulas) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100vh',
+          backgroundColor: 'var(--bg-base)',
+          overflow: 'hidden',
+        }}
+      >
+        <CustomFormulasPanel onBack={() => setShowCustomFormulas(false)} />
+        <StatusBar />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -79,11 +98,11 @@ export function AppLayout() {
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
-        backgroundColor: '#f5f5f5',
+        backgroundColor: 'var(--bg-base)',
         overflow: 'hidden',
       }}
     >
-      <Toolbar />
+      <Toolbar onManageCustom={() => setShowCustomFormulas(true)} />
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Left: Editor + Chat input */}

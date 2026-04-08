@@ -39,16 +39,16 @@ function CodeBlock({ content }: { content: string }) {
   return (
     <pre
       style={{
-        backgroundColor: '#f8f8f8',
-        border: '1px solid #e0e0e0',
-        borderRadius: 6,
+        backgroundColor: 'var(--bg-inset)',
+        border: '1px solid var(--border-default)',
+        borderRadius: 'var(--radius-md)',
         padding: '10px 12px',
         margin: '8px 0',
         overflowX: 'auto',
-        fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+        fontFamily: 'var(--font-mono)',
         fontSize: 12,
         lineHeight: 1.6,
-        color: '#333',
+        color: 'var(--text-primary)',
         whiteSpace: 'pre',
         tabSize: 2,
       }}
@@ -77,12 +77,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
         style={{
           maxWidth: isUser ? '80%' : '95%',
           padding: '8px 12px',
-          borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-          backgroundColor: isUser ? '#1677ff' : '#f0f0f0',
-          color: isUser ? '#fff' : '#1a1a1a',
+          borderRadius: isUser ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+          background: isUser ? 'var(--chat-user-bg)' : 'var(--chat-assistant-bg)',
+          border: isUser ? 'none' : '1px solid var(--border-default)',
+          color: isUser ? '#ffffff' : 'var(--text-primary)',
           wordBreak: 'break-word',
           fontSize: 13,
           lineHeight: 1.6,
+          boxShadow: 'var(--shadow-sm)',
         }}
       >
         {parts.map((part, i) =>

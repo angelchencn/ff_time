@@ -1,9 +1,23 @@
 import axios from 'axios';
+import { useServerStore } from '../stores/serverStore';
 
-const api = axios.create({
-  baseURL: 'http://localhost:8000',
-  headers: { 'Content-Type': 'application/json' },
-});
+function getApi() {
+  const { current } = useServerStore.getState();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (current.auth) {
+    const token = btoa(`${current.auth.username}:${current.auth.password}`);
+    headers['Authorization'] = `Basic ${token}`;
+  }
+  return axios.create({
+    baseURL: current.baseUrl,
+    headers,
+  });
+}
+
+function prefix(path: string): string {
+  const { current } = useServerStore.getState();
+  return `${current.apiPrefix}${path}`;
+}
 
 export interface Diagnostic {
   line: number;
@@ -49,7 +63,7 @@ export interface DBI {
 }
 
 export async function validateCode(code: string): Promise<ValidateResponse> {
-  const response = await api.post<ValidateResponse>('/api/validate', { code });
+  const response = await getApi().post<ValidateResponse>(prefix('/validate'), { code });
   return response.data;
 }
 
@@ -57,7 +71,7 @@ export async function simulateCode(
   code: string,
   inputs: Record<string, string | number>
 ): Promise<SimulateResponse> {
-  const response = await api.post<SimulateResponse>('/api/simulate', { code, input_data: inputs });
+  const response = await getApi().post<SimulateResponse>(prefix('/simulate'), { code, input_data: inputs });
   return response.data;
 }
 
@@ -65,7 +79,7 @@ export async function completeCode(
   code: string,
   position: { line: number; column: number }
 ): Promise<CompleteSuggestion[]> {
-  const response = await api.post<{ suggestions: CompleteSuggestion[] }>('/api/complete', {
+  const response = await getApi().post<{ suggestions: CompleteSuggestion[] }>(prefix('/complete'), {
     code,
     position,
   });
@@ -73,12 +87,12 @@ export async function completeCode(
 }
 
 export async function fetchDBIs(): Promise<DBI[]> {
-  const response = await api.get<DBI[]>('/api/dbi');
+  const response = await getApi().get<DBI[]>(prefix('/dbi'));
   return response.data;
 }
 
 export async function fetchFormulas(): Promise<Formula[]> {
-  const response = await api.get<Formula[]>('/api/formulas');
+  const response = await getApi().get<Formula[]>(prefix('/formulas'));
   return response.data;
 }
 
@@ -87,12 +101,12 @@ export async function createFormula(
   code: string,
   description?: string
 ): Promise<Formula> {
-  const response = await api.post<Formula>('/api/formulas', { name, code, description });
+  const response = await getApi().post<Formula>(prefix('/formulas'), { name, code, description });
   return response.data;
 }
 
 export async function getFormula(id: string): Promise<Formula> {
-  const response = await api.get<Formula>(`/api/formulas/${id}`);
+  const response = await getApi().get<Formula>(prefix(`/formulas/${id}`));
   return response.data;
 }
 
@@ -100,13 +114,13 @@ export async function updateFormula(
   id: string,
   updates: Partial<Pick<Formula, 'name' | 'code' | 'description'>>
 ): Promise<Formula> {
-  const response = await api.put<Formula>(`/api/formulas/${id}`, updates);
+  const response = await getApi().put<Formula>(prefix(`/formulas/${id}`), updates);
   return response.data;
 }
 
 export async function exportFormula(id: string): Promise<string> {
-  const response = await api.get<{ content: string }>(`/api/formulas/${id}/export`);
+  const response = await getApi().get<{ content: string }>(prefix(`/formulas/${id}/export`));
   return response.data.content;
 }
 
-export default api;
+export default getApi;

@@ -13,15 +13,39 @@ interface InputDeclaration {
 function parseInputDeclarations(code: string): InputDeclaration[] {
   const declarations: InputDeclaration[] = [];
 
-  // Check if INPUTS ARE exists — if so, use those as the authoritative input list
-  // Match INPUTS ARE and grab everything until the next statement keyword or blank line
+  let match: RegExpExecArray | null;
+
+  // First pass: build a type map from DEFAULT FOR lines
+  // Matches: DEFAULT FOR name (TYPE) IS value OR DEFAULT FOR name IS value (TYPE)
+  const typeMap: Record<string, string> = {};
+  const defaultRegex = /^\s*DEFAULT\s+FOR\s+(\w+)\s+(?:\(\s*(NUMBER|TEXT|DATE)\s*\)\s+)?IS\s+(.*?)$/gim;
+  while ((match = defaultRegex.exec(code)) !== null) {
+    const name = match[1].toUpperCase();
+    const explicitType = match[2]?.toUpperCase();
+    const value = match[3].trim();
+
+    if (explicitType) {
+      typeMap[name] = explicitType;
+    } else {
+      // Infer type from the default value
+      const trailingType = value.match(/\(\s*(NUMBER|TEXT|DATE)\s*\)\s*$/i);
+      if (trailingType) {
+        typeMap[name] = trailingType[1].toUpperCase();
+      } else if (/^'/.test(value)) {
+        // Starts with a quote → TEXT
+        typeMap[name] = 'TEXT';
+      } else {
+        typeMap[name] = 'NUMBER';
+      }
+    }
+  }
+
+  // Check if INPUTS ARE exists
   const inputsAreRegex = /INPUTS\s+ARE\s+([\s\S]*?)(?=\n\s*\n|\n\s*(?:IF|DEFAULT|LOCAL|OUTPUT|RETURN|WHILE|\/\*|\w+\s*=))/gi;
   let hasInputsAre = false;
-  let match: RegExpExecArray | null;
 
   while ((match = inputsAreRegex.exec(code)) !== null) {
     hasInputsAre = true;
-    // Join all lines, split by comma
     const raw = match[1].replace(/\n/g, ' ');
     const parts = raw.split(',');
     for (const part of parts) {
@@ -33,20 +57,16 @@ function parseInputDeclarations(code: string): InputDeclaration[] {
       } else {
         const nameOnly = cleaned.match(/^(\w+)/);
         if (nameOnly) {
-          declarations.push({ name: nameOnly[1], type: 'NUMBER' });
+          // Look up type from DEFAULT FOR, fallback to NUMBER
+          const resolvedType = typeMap[nameOnly[1].toUpperCase()] || 'NUMBER';
+          declarations.push({ name: nameOnly[1], type: resolvedType });
         }
       }
     }
   }
 
-  // If no INPUTS ARE, fall back to DEFAULT FOR as inputs
+  // If no INPUTS ARE, only show INPUT IS variables (not DEFAULT FOR)
   if (!hasInputsAre) {
-    const defaultForRegex = /^\s*DEFAULT\s+FOR\s+(\w+)\s+IS\b/gim;
-    while ((match = defaultForRegex.exec(code)) !== null) {
-      declarations.push({ name: match[1], type: 'NUMBER' });
-    }
-
-    // Also check INPUT IS <name>
     const inputIsRegex = /^\s*INPUT\s+IS\s+(\w+)/gim;
     while ((match = inputIsRegex.exec(code)) !== null) {
       declarations.push({ name: match[1], type: 'NUMBER' });
@@ -77,7 +97,11 @@ export function InputForm() {
     const inputs: Record<string, string | number> = {};
     for (const decl of declarations) {
       const raw = inputData[decl.name] ?? '';
-      inputs[decl.name] = decl.type === 'NUMBER' ? parseFloat(raw) || 0 : raw;
+      if (decl.type === 'NUMBER') {
+        inputs[decl.name] = raw ? parseFloat(raw) || 0 : 0;
+      } else {
+        inputs[decl.name] = raw || '';
+      }
     }
 
     try {
@@ -101,7 +125,7 @@ export function InputForm() {
   return (
     <div style={{ padding: 16 }}>
       {declarations.length === 0 ? (
-        <p style={{ color: '#888', fontSize: 13 }}>
+        <p style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>
           No INPUT or DEFAULT declarations found. Add them to your formula to generate input fields.
         </p>
       ) : (
@@ -110,9 +134,9 @@ export function InputForm() {
             <Form.Item
               key={decl.name}
               label={
-                <span style={{ color: '#333', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-primary)', fontSize: 12 }}>
                   {decl.name}{' '}
-                  <span style={{ color: '#999' }}>({decl.type})</span>
+                  <span style={{ color: 'var(--text-tertiary)' }}>({decl.type})</span>
                 </span>
               }
             >

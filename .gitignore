@@ -7,6 +7,8 @@ dist/
 build/
 venv/
 .venv/
+.coverage
+.pytest_cache/
 
 # Environment
 .env
@@ -26,3 +28,13 @@ backend/data/chroma/
 
 # Node (for frontend later)
 node_modules/
+.gstack/
+
+# Java / Maven
+java/target/
+*.class
+
+# Editor/temp
+*.bak
+*.tmp
+*.log

@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.models.base import create_tables
-from app.api import validate, simulate, chat, complete, explain, formulas, dbi
+from app.api import validate, simulate, chat, complete, explain, formulas, dbi, formula_types
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -39,6 +39,7 @@ app.include_router(complete.router)
 app.include_router(explain.router)
 app.include_router(formulas.router)
 app.include_router(dbi.router)
+app.include_router(formula_types.router)
 
 
 @app.get("/api/health")

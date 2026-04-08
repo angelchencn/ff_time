@@ -14,7 +14,7 @@ function DiagnosticRow({ diagnostic }: { diagnostic: Diagnostic }) {
         alignItems: 'flex-start',
         gap: 8,
         padding: '6px 0',
-        borderBottom: '1px solid #f0f0f0',
+        borderBottom: '1px solid var(--border-muted)',
       }}
     >
       <Tag color={severityColor} style={{ marginTop: 1, flexShrink: 0 }}>
@@ -26,9 +26,9 @@ function DiagnosticRow({ diagnostic }: { diagnostic: Diagnostic }) {
         </Tag>
       )}
       <div>
-        <Text style={{ color: '#333', fontSize: 12 }}>{diagnostic.message}</Text>
+        <Text style={{ color: 'var(--text-primary)', fontSize: 12 }}>{diagnostic.message}</Text>
         <br />
-        <Text style={{ color: '#999', fontSize: 11 }}>
+        <Text style={{ color: 'var(--text-tertiary)', fontSize: 11, fontFamily: 'var(--font-mono)' }}>
           Line {diagnostic.line}, Col {diagnostic.column}
         </Text>
       </div>
@@ -53,7 +53,7 @@ export function ValidationResults() {
       </Space>
 
       {diagnostics.length === 0 ? (
-        <Text style={{ color: '#999', fontSize: 13 }}>
+        <Text style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>
           {isValid ? 'No issues found.' : 'No diagnostics available.'}
         </Text>
       ) : (

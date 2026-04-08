@@ -1,48 +1,52 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Input, Typography } from 'antd';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button, Input, Select, Typography } from 'antd';
 import { SendOutlined, MessageOutlined, UpOutlined, DownOutlined } from '@ant-design/icons';
 import { useChatStore } from '../../stores/chatStore';
 import { useEditorStore } from '../../stores/editorStore';
+import { useServerStore } from '../../stores/serverStore';
 import { streamSSE } from '../../services/sse';
 import { extractCodeBlocks } from '../../services/formulaUtils';
 import { ChatMessage } from '../ChatPanel/ChatMessage';
 import { FFEditor } from './FFEditor';
+import { useFormulaTypes } from '../../hooks/useFormulaTypes';
 
 const { Text } = Typography;
 
-const QUICK_PROMPTS = [
-  'Calculate overtime pay (1.5x after 40 hours)',
-  'California double overtime (1x / 1.5x / 2x)',
-  'Shift differential (night 15%, evening 8%)',
-  'Holiday pay with 2x multiplier',
-  'Weekly hours cap at 60 with warning flag',
-  'Weekend overtime (Sat 1.5x, Sun 2x)',
-  'Calculate total pay with regular + overtime + shift premium',
-  'Validate hours worked are within legal limits',
-];
+// Quick prompts are now loaded dynamically per formula type from the API
 
 const MIN_CHAT_HEIGHT = 0;
 const MAX_CHAT_HEIGHT = 500;
 const DEFAULT_CHAT_HEIGHT = 200;
 
 export function EditorWithChat() {
-  const { messages, isStreaming, sessionId, addMessage, appendToLast, setStreaming, setSessionId } =
+  const { messages, isStreaming, sessionId, addMessage, appendToLast, replaceLastContent, setStreaming, setSessionId } =
     useChatStore();
-  const { code, setCode } = useEditorStore();
+  const { code, setCode, formulaType, setFormulaType } = useEditorStore();
+  const { current } = useServerStore();
   const [inputValue, setInputValue] = useState('');
+  const [selectedSample, setSelectedSample] = useState<string | null>(null);
+  const { formulaTypes } = useFormulaTypes();
   const [chatOpen, setChatOpen] = useState(false);
   const [chatHeight, setChatHeight] = useState(DEFAULT_CHAT_HEIGHT);
   const listEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  const quickPrompts = useMemo(() => {
+    const ft = formulaTypes.find((t) => t.type_name === formulaType);
+    return ft?.sample_prompts ?? [];
+  }, [formulaTypes, formulaType]);
+
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Auto-open chat on first message
+  // Toggle busy cursor on body during streaming
   useEffect(() => {
-    if (messages.length > 0 && !chatOpen) setChatOpen(true);
-  }, [messages.length, chatOpen]);
+    document.body.classList.toggle('is-streaming', isStreaming);
+    return () => { document.body.classList.remove('is-streaming'); };
+  }, [isStreaming]);
+
+  // Chat stays closed by default; user opens it manually via toggle
 
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -77,11 +81,18 @@ export function EditorWithChat() {
     addMessage({ role: 'assistant', content: '' });
     setStreaming(true);
 
-    const body: Record<string, unknown> = { message: text, code };
+    const body: Record<string, unknown> = { message: text, code, formula_type: formulaType };
     if (sessionId) body.session_id = sessionId;
+    if (selectedSample) body.selected_sample = selectedSample;
+    setSelectedSample(null);
+
+    const authHeaders: Record<string, string> = {};
+    if (current.auth) {
+      authHeaders['Authorization'] = `Basic ${btoa(`${current.auth.username}:${current.auth.password}`)}`;
+    }
 
     abortRef.current = streamSSE(
-      '/api/chat',
+      `${current.baseUrl}${current.apiPrefix}/chat`,
       body,
       (token) => appendToLast(token),
       () => {
@@ -98,7 +109,11 @@ export function EditorWithChat() {
       (err) => {
         appendToLast(`\n[Error: ${err.message}]`);
         setStreaming(false);
-      }
+      },
+      (fullText) => {
+        replaceLastContent(fullText);
+      },
+      authHeaders
     );
   }
 
@@ -120,15 +135,15 @@ export function EditorWithChat() {
         <FFEditor height="100%" />
       </div>
 
-      {/* Chat toggle bar — always visible, always clickable */}
+      {/* Chat toggle bar */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '4px 12px',
-          borderTop: '1px solid #e0e0e0',
-          backgroundColor: '#f5f5f5',
+          borderTop: '1px solid var(--border-default)',
+          backgroundColor: 'var(--bg-surface)',
           cursor: 'pointer',
           userSelect: 'none',
           flexShrink: 0,
@@ -136,38 +151,53 @@ export function EditorWithChat() {
         onClick={toggleChat}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <MessageOutlined style={{ color: '#888', fontSize: 12 }} />
-          <Text style={{ fontSize: 11, color: '#888' }}>
-            Chat{messages.length > 0 ? ` (${messages.length} messages)` : ''}
+          <MessageOutlined style={{ color: 'var(--text-tertiary)', fontSize: 12 }} />
+          <Text style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+            Chat{messages.length > 0 ? ` (${messages.length})` : ''}
           </Text>
         </div>
-        {chatOpen ? <DownOutlined style={{ color: '#888', fontSize: 10 }} /> : <UpOutlined style={{ color: '#888', fontSize: 10 }} />}
+        {chatOpen
+          ? <DownOutlined style={{ color: 'var(--text-tertiary)', fontSize: 10 }} />
+          : <UpOutlined style={{ color: 'var(--text-tertiary)', fontSize: 10 }} />
+        }
       </div>
 
       {/* Chat history (resizable) */}
       {chatOpen && (
         <>
-          {/* Drag handle for resizing */}
           <div
             onMouseDown={handleDragStart}
             style={{
-              height: 4,
+              height: 5,
               cursor: 'row-resize',
-              backgroundColor: '#eee',
+              backgroundColor: 'var(--border-default)',
               flexShrink: 0,
+              position: 'relative',
+              zIndex: 10,
             }}
-          />
+          >
+            <div style={{
+              width: 36,
+              height: 2,
+              backgroundColor: 'var(--text-tertiary)',
+              borderRadius: 1,
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+            }} />
+          </div>
           <div
             style={{
               height: chatHeight,
               overflowY: 'auto',
-              backgroundColor: '#fafafa',
-              padding: '8px 12px',
+              backgroundColor: 'var(--bg-base)',
+              padding: '12px',
               flexShrink: 0,
             }}
           >
             {messages.length === 0 ? (
-              <Text style={{ color: '#bbb', fontSize: 12 }}>
+              <Text style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>
                 No messages yet. Type below to start a conversation.
               </Text>
             ) : (
@@ -180,39 +210,59 @@ export function EditorWithChat() {
         </>
       )}
 
-      {/* Quick prompts — show when input is empty and no messages yet */}
-      {!inputValue && messages.length === 0 && (
-        <div
-          style={{
-            padding: '6px 12px',
-            borderTop: '1px solid #e0e0e0',
-            backgroundColor: '#fafafa',
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 6,
-            flexShrink: 0,
+      {/* Formula type + sample selector row */}
+      <div
+        style={{
+          padding: '6px 12px',
+          borderTop: '1px solid var(--border-default)',
+          backgroundColor: 'var(--bg-surface)',
+          display: 'flex',
+          gap: 8,
+          flexShrink: 0,
+        }}
+      >
+        <Select
+          value={formulaType}
+          onChange={setFormulaType}
+          size="small"
+          showSearch
+          optionFilterProp="label"
+          style={{ width: 260, flexShrink: 0 }}
+          options={[...formulaTypes]
+            .sort((a, b) => a.display_name.localeCompare(b.display_name))
+            .map((ft) => ({
+              value: ft.type_name,
+              label: ft.display_name,
+            }))}
+          placeholder="Formula Type"
+        />
+        <Select
+          value={selectedSample}
+          onChange={(val: string) => {
+            setSelectedSample(val || null);
+            if (val) {
+              setInputValue(val);
+              setCode('');
+            }
           }}
-        >
-          {QUICK_PROMPTS.map((prompt) => (
-            <Button
-              key={prompt}
-              size="small"
-              type="dashed"
-              onClick={() => setInputValue(prompt)}
-              style={{ fontSize: 11, color: '#555', borderColor: '#d9d9d9' }}
-            >
-              {prompt}
-            </Button>
-          ))}
-        </div>
-      )}
+          size="small"
+          style={{ flex: 1 }}
+          placeholder="Select a sample to start..."
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          options={quickPrompts.map((p) => ({
+            value: p,
+            label: p,
+          }))}
+        />
+      </div>
 
       {/* Chat input bar */}
       <div
         style={{
-          padding: '8px 12px',
-          borderTop: '1px solid #e0e0e0',
-          backgroundColor: '#fff',
+          padding: '6px 12px 8px',
+          backgroundColor: 'var(--bg-surface)',
           display: 'flex',
           gap: 8,
           alignItems: 'flex-end',
@@ -224,7 +274,7 @@ export function EditorWithChat() {
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Describe what you need... (Enter to send)"
-          autoSize={{ minRows: 1, maxRows: 3 }}
+          autoSize={{ minRows: 2, maxRows: 3 }}
           disabled={isStreaming}
           style={{ flex: 1 }}
         />
@@ -234,7 +284,7 @@ export function EditorWithChat() {
           onClick={handleSend}
           loading={isStreaming}
           disabled={!inputValue.trim()}
-          style={{ flexShrink: 0 }}
+          style={{ flexShrink: 0, alignSelf: 'flex-end' }}
         />
       </div>
     </div>

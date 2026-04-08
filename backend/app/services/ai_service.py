@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Generator, Optional
 
 import anthropic
 
 from app.config import settings
+from app.services.formula_templates import get_template
 from app.services.rag_engine import RAGEngine
 
 logger = logging.getLogger(__name__)
@@ -35,18 +37,100 @@ configure payroll, time, and absence rules.
 ## Supported Keywords
 
 DEFAULT, DEFAULT FOR, IS, IF, THEN, ELSE, ELSIF, END IF, RETURN,
-WHILE, LOOP, END LOOP, AND, OR, NOT, WAS, WAS DEFAULTED, INPUTS ARE
+WHILE, LOOP, END LOOP, AND, OR, NOT, WAS, WAS DEFAULTED, INPUTS ARE,
+INPUT IS, OUTPUT IS, OUTPUTS ARE, ALIAS, AS, LOCAL, LIKE, NOT LIKE, EXIT
 
 ## Supported Built-in Functions
 
 ADD_MONTHS, CEIL, FLOOR, ROUND, TRUNC, ABS, GREATEST, LEAST,
 TO_CHAR, TO_DATE, TO_NUMBER, LENGTH, SUBSTR, INSTR,
 GET_TABLE_VALUE, INITIALIZE_TABLE_SS,
-DAYS_BETWEEN, MONTHS_BETWEEN
+DAYS_BETWEEN, MONTHS_BETWEEN, ADD_DAYS, ADD_YEARS, HOURS_BETWEEN,
+UPPER, LOWER, REPLACE, TRIM, LPAD, RPAD, LTRIM, RTRIM,
+GET_LOOKUP_MEANING, RAISE_ERROR, CALL_FORMULA,
+PAY_INTERNAL_LOG_WRITE, PUT_MESSAGE, ISNULL,
+SET_TEXT, SET_NUMBER, SET_DATE, GET_TEXT, GET_NUMBER, GET_DATE,
+CALCULATE_HOURS_WORKED, GET_WORKING_DAYS
 
 ## Formula Types
 
-TIME_LABOR, PAYROLL, ABSENCE_DURATION, PRORATION_CALCULATION, PAY_VALUE
+Oracle Payroll, Auto Indirect, Extract Record, Payroll Run Proration,
+Element Skip, Extract Rule, Calculation Utility,
+WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES,
+WORKFORCE_MANAGEMENT_TIME_ENTRY_RULES,
+WORKFORCE_MANAGEMENT_TIME_SUBMISSION_RULES,
+WORKFORCE_MANAGEMENT_TIME_COMPLIANCE_RULES,
+WORKFORCE_MANAGEMENT_TIME_DEVICE_RULES,
+WORKFORCE_MANAGEMENT_TIME_ADVANCE_CATEGORY_RULES,
+WORKFORCE_MANAGEMENT_SUBROUTINE,
+WORKFORCE_MANAGEMENT_UTILITY,
+Global Absence Accrual, Global Absence Plan Entitlement,
+Global Absence Entry Validation, ACCRUAL
+
+## Formula Structure Convention
+
+Every generated formula MUST follow the standard Oracle Fast Formula structure \
+used in production environments. This includes:
+
+### 1. Header Comment Block (REQUIRED)
+
+Always generate a professional header comment block at the top:
+
+```
+/******************************************************************************
+ *
+ * Formula Name : <FORMULA_NAME>
+ *
+ * Formula Type : <FORMULA_TYPE>
+ *
+ * Description  : <Brief description of what the formula does>
+ *
+ * Change History
+ * --------------
+ *
+ *  Who             Ver    Date          Description
+ * ---------------  ----   -----------   --------------------------------
+ * Payroll Admin    1.0    <YYYY/MM/DD>  Created.
+ *
+ ******************************************************************************/
+```
+
+### 2. Formula Naming Convention
+
+Formula names follow the pattern: `<PREFIX>_<BUSINESS_DESCRIPTION>_<SUFFIX>`
+
+Common suffixes by purpose:
+- `_EARN` / `_EARNINGS` — Earnings calculation
+- `_RESULTS` — Result formulas
+- `_PRORATION` / `_EARN_PRORATION` — Proration logic
+- `_BASE` — Base formulas that call sub-formulas
+- `_CALCULATOR` — Fee/amount calculators
+- `_DISTRIBUTION` — Distribution formulas
+- `_DEDN` — Deduction formulas
+- `_AUTO_INDIRECT` — Auto indirect entry
+
+Common prefixes by module:
+- `ORA_WFM_` / `WFM_` — Workforce Management (Time & Labor)
+- `ORA_HRX_` / `HRX_` — Regional extensions
+- Time rule subtypes: `_TCR_` (Time Calculation Rule), `_TER_` (Time Entry Rule), \
+`_TSR_` (Time Submission Rule), `_TDR_` (Time Device Rule)
+
+### 3. Formula Body Order (REQUIRED)
+
+Formulas MUST follow this strict ordering:
+1. Header comment block
+2. DEFAULT statements (with type annotations where needed)
+3. INPUTS ARE statement
+4. Variable assignments and business logic
+5. Logging calls (PAY_INTERNAL_LOG_WRITE) at entry/exit
+6. RETURN statement
+
+### 4. End Marker
+
+Optionally end the formula with:
+```
+/* End Formula Text */
+```
 
 ## Output Format
 
@@ -54,7 +138,72 @@ TIME_LABOR, PAYROLL, ABSENCE_DURATION, PRORATION_CALCULATION, PAY_VALUE
 - Use consistent 2-space indentation for nested blocks.
 - Include DEFAULT statements for all input variables.
 - End every formula with a RETURN statement.
+- ALWAYS include the header comment block as described above.
+
+## DEFAULT Value Type Rules
+
+Choose the correct DEFAULT value based on the variable name:
+- Use string defaults (`' '` or `'X'`) for variables whose name contains: \
+NAME, TEXT, DESC, CODE, TYPE, STATUS, FLAG, MESSAGE, MSG, LABEL, CATEGORY, \
+TITLE, MODE, REASON, COMMENT, NOTE, KEY, TAG, LEVEL, CLASS, GROUP, ROLE, UNIT.
+- Use numeric defaults (`0`) for variables whose name contains: \
+COUNT, COUNTER, TOTAL, AMOUNT, AMT, RATE, HOURS, DAYS, SALARY, PAY, WAGE, \
+BALANCE, QTY, QUANTITY, NUMBER, NUM, PCT, PERCENT, FACTOR, LIMIT, MAX, MIN, \
+THRESHOLD, INDEX, ID, CYCLE, ITERATION, RESULT, VALUE, SCORE.
+- Use date defaults (`'01-JAN-0001'(DATE)`) for variables whose name contains: \
+DATE, START, END, FROM, TO, EFFECTIVE, EXPIRY, HIRE, TERMINATION, BIRTH.
+- When in doubt, infer the type from how the variable is used in the formula logic \
+(e.g., compared with a string → use string default; used in arithmetic → use numeric default).
 """
+
+
+_STRING_KEYWORDS = frozenset({
+    "NAME", "TEXT", "DESC", "CODE", "TYPE", "STATUS", "FLAG", "MESSAGE",
+    "MSG", "LABEL", "CATEGORY", "TITLE", "MODE", "REASON", "COMMENT",
+    "NOTE", "KEY", "TAG", "LEVEL", "CLASS", "GROUP", "ROLE", "UNIT",
+    "TASK", "PROCESS", "ACTION", "METHOD", "FORMAT", "PATTERN",
+    "PREFIX", "SUFFIX", "STRING", "CHAR", "CURRENCY",
+})
+
+_DATE_KEYWORDS = frozenset({
+    "DATE", "START", "END", "EFFECTIVE", "EXPIRY", "HIRE",
+    "TERMINATION", "BIRTH",
+})
+
+_DEFAULT_LINE_RE = re.compile(
+    r"^(\s*DEFAULT\s+FOR\s+)(\w+)(\s+IS\s+)(\S+.*)$",
+    re.IGNORECASE,
+)
+
+
+def fix_default_types(code: str) -> str:
+    """Post-process generated formula to fix DEFAULT value types based on variable names.
+
+    Scans each DEFAULT line. If the variable name strongly suggests a string
+    but the default value is numeric (e.g. 0), replace with ' '.
+    Similarly for date-like names with numeric defaults.
+    """
+    lines = code.split("\n")
+    fixed: list[str] = []
+
+    for line in lines:
+        m = _DEFAULT_LINE_RE.match(line)
+        if m:
+            prefix, var_name, is_part, value = m.group(1), m.group(2), m.group(3), m.group(4)
+            parts = var_name.upper().split("_")
+
+            value_stripped = value.strip()
+            is_numeric_val = value_stripped in ("0", "0.0", "0.00")
+
+            if is_numeric_val:
+                if any(p in _STRING_KEYWORDS for p in parts):
+                    line = f"{prefix}{var_name}{is_part}' '"
+                elif any(p in _DATE_KEYWORDS for p in parts):
+                    line = f"{prefix}{var_name}{is_part}'01-JAN-0001'(DATE)"
+
+        fixed.append(line)
+
+    return "\n".join(fixed)
 
 
 class AIService:
@@ -111,16 +260,38 @@ class AIService:
                 "Output the complete updated formula incorporating the requested change."
             )
 
+        # Inject formula type template if available
+        template = get_template(formula_type)
+        if template:
+            from datetime import date
+            skeleton = template.skeleton.replace("{date_today}", date.today().strftime("%Y/%m/%d"))
+            sections.append(
+                f"## Formula Type Template\n\n"
+                f"**Type:** {template.display_name}\n"
+                f"**Naming convention:** {template.naming_pattern}\n\n"
+                f"### Skeleton\n```\n{skeleton}\n```\n\n"
+                f"### Example Pattern\n```\n{template.example_snippet}\n```\n\n"
+                f"Use this skeleton as the structural foundation. "
+                f"Replace the placeholder business logic section with the actual implementation. "
+                f"Keep the header, DEFAULT/INPUTS, logging, and RETURN structure intact."
+            )
+
         sections.append(
             f"## Request\n\nFormula type: {formula_type}\n\nRequirement: {message}"
         )
 
         if has_existing_code:
             sections.append(
-                "Return the complete modified formula. Do not explain the changes unless asked."
+                "Return the complete modified formula. Do not explain the changes unless asked. "
+                "Preserve the header comment block if one exists, updating the Change History."
             )
         else:
-            sections.append("Generate a complete Fast Formula that satisfies the requirement.")
+            sections.append(
+                "Generate a complete Fast Formula that satisfies the requirement. "
+                "Follow the skeleton template above exactly — fill in the formula name, "
+                "description, author, date, and replace the business logic placeholder. "
+                "Derive a proper formula name following the naming convention shown."
+            )
 
         return "\n\n".join(sections)
 
@@ -226,7 +397,7 @@ class AIService:
             system=self._build_system_prompt(),
             messages=messages,
         )
-        return response.content[0].text
+        return fix_default_types(response.content[0].text)
 
     def stream_generate(
         self,

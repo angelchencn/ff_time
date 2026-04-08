@@ -6,19 +6,26 @@ start: statement+
 statement: alias_stmt
          | var_decl
          | assignment
+         | array_assignment
          | if_stmt
          | while_stmt
          | return_stmt
+         | call_formula_stmt
+         | change_contexts_stmt
+         | execute_stmt
+         | bare_func_call_stmt
 
 // --- Alias ---
 alias_stmt: ALIAS NAME AS NAME -> alias_decl
 
 // --- Variable declarations ---
-var_decl: DEFAULT FOR NAME data_type? IS expr data_type?  -> default_decl
-        | INPUT IS NAME                                    -> input_decl
-        | INPUTS ARE name_list                             -> inputs_decl
-        | OUTPUT IS NAME                                   -> output_decl
-        | LOCAL NAME data_type?                            -> local_decl
+var_decl: DEFAULT FOR NAME data_type? IS expr data_type?           -> default_decl
+        | DEFAULT_DATA_VALUE FOR NAME IS expr data_type?           -> default_data_value_decl
+        | INPUT IS NAME                                            -> input_decl
+        | INPUTS ARE name_list                                     -> inputs_decl
+        | OUTPUT IS NAME                                           -> output_decl
+        | OUTPUTS ARE name_list                                    -> outputs_decl
+        | LOCAL NAME data_type?                                    -> local_decl
 
 data_type: "(" (NUMBER_TYPE | TEXT_TYPE | DATE_TYPE) ")"
 
@@ -26,19 +33,42 @@ name_list: NAME data_type? ("," NAME data_type?)*
 
 // --- Assignment ---
 assignment: NAME "=" expr
+          | QUOTED_NAME "=" expr  -> quoted_assignment
+// Array assignment: name[index] = expr
+array_assignment: NAME "[" expr "]" "=" expr -> array_assign
+
+// --- CALL_FORMULA with parameter passing (> for in, < for out) ---
+// The > and < in CALL_FORMULA are parameter direction markers, not comparison operators.
+// We parse the entire parameter list permissively.
+call_formula_stmt: CALL_FORMULA "(" call_formula_args ")" -> call_formula_full
+call_formula_args: call_formula_arg ("," call_formula_arg)*
+call_formula_arg: expr ((">" | "<") SINGLE_STRING (DEFAULT expr)?)?
+
+// --- CHANGE_CONTEXTS ---
+change_contexts_stmt: CHANGE_CONTEXTS "(" context_assignment ("," context_assignment)* ")" -> change_contexts
+
+context_assignment: NAME "=" expr
+
+// --- EXECUTE ---
+execute_stmt: EXECUTE "(" SINGLE_STRING ")" -> execute_call
+
+// --- Bare function call as statement (e.g. SET_INPUT('x', y), NEED_CONTEXT(X)) ---
+bare_func_call_stmt: NAME "(" expr_list? ")" -> bare_func_call
 
 // --- IF / THEN / ELSIF / ELSE / END IF ---
-if_stmt: IF expr THEN then_body elsif_clause* (ELSE else_body)? ENDIF
-then_body: statement+
-else_body: statement+
-elsif_clause: ELSIF expr THEN statement+
+// Two styles: with END IF, or with parenthesized blocks (no END IF needed)
+if_stmt: IF expr THEN then_body elsif_clause* (ELSE else_body)? ENDIF?
+then_body: "(" statement+ ")" | statement+
+else_body: "(" statement+ ")" | statement+
+elsif_clause: ELSIF expr THEN ("(" statement+ ")" | statement+)
 
 // --- WHILE / LOOP / END LOOP ---
 while_stmt: WHILE expr LOOP while_body ENDLOOP
-while_body: statement+
+while_body: "(" statement+ ")" | statement+
 
 // --- RETURN ---
 return_stmt: RETURN expr ("," expr)*
+           | RETURN -> empty_return
 
 // --- Expressions ---
 ?expr: or_expr
@@ -46,19 +76,28 @@ return_stmt: RETURN expr ("," expr)*
 ?and_expr: not_expr (AND not_expr)*
 ?not_expr: NOT not_expr -> not_op
          | comparison
-?comparison: add_expr WAS DEFAULTED       -> was_defaulted_op
-           | add_expr LIKE add_expr        -> like_op
-           | add_expr NOT LIKE add_expr    -> not_like_op
+?comparison: add_expr WAS NOT DEFAULTED      -> was_not_defaulted_op
+           | add_expr WAS DEFAULTED          -> was_defaulted_op
+           | add_expr WAS NOT FOUND          -> was_not_found_op
+           | add_expr WAS FOUND              -> was_found_op
+           | add_expr IS NOT NULL_KW         -> is_not_null_op
+           | add_expr IS NULL_KW             -> is_null_op
+           | add_expr LIKE add_expr          -> like_op
+           | add_expr NOT LIKE add_expr      -> not_like_op
            | add_expr (COMP_OP add_expr)?
-?add_expr: mul_expr (ADD_OP mul_expr)*
+?add_expr: mul_expr ((ADD_OP | CONCAT_OP) mul_expr)*
 ?mul_expr: unary_expr (MUL_OP unary_expr)*
 ?unary_expr: "-" unary_expr -> neg
            | atom
-?atom: NUMBER                    -> number
-     | ESCAPED_STRING            -> string
-     | SINGLE_STRING             -> single_string
-     | NAME "(" expr_list? ")"   -> func_call
-     | NAME                      -> var_ref
+?atom: NUMBER                                -> number
+     | ESCAPED_STRING                        -> string
+     | SINGLE_STRING data_type               -> typed_string
+     | SINGLE_STRING                         -> single_string
+     | NAME "." NAME "(" expr_list? ")"      -> method_call
+     | NAME "[" expr "]"                     -> array_access
+     | NAME "(" expr_list? ")"               -> func_call
+     | NAME                                  -> var_ref
+     | QUOTED_NAME                           -> quoted_var_ref
      | "(" expr ")"
 
 expr_list: expr ("," expr)*
@@ -66,17 +105,21 @@ expr_list: expr ("," expr)*
 // --- Operators ---
 COMP_OP: "=" | "!=" | "<>" | "><" | "<" | ">" | "<=" | ">=" | "=>" | "=<"
 ADD_OP: "+" | "-"
+CONCAT_OP: "||"
 MUL_OP: "*" | "/"
 
 // --- Keywords (case-insensitive) ---
 ALIAS.2: /[Aa][Ll][Ii][Aa][Ss]/
 AS.2: /[Aa][Ss]/
 DEFAULT.2: /[Dd][Ee][Ff][Aa][Uu][Ll][Tt]/
+DEFAULT_DATA_VALUE.3: /[Dd][Ee][Ff][Aa][Uu][Ll][Tt]_[Dd][Aa][Tt][Aa]_[Vv][Aa][Ll][Uu][Ee]/
 DEFAULTED.2: /[Dd][Ee][Ff][Aa][Uu][Ll][Tt][Ee][Dd]/
+FOUND.2: /[Ff][Oo][Uu][Nn][Dd]/
 FOR.2: /[Ff][Oo][Rr]/
 INPUT.2: /[Ii][Nn][Pp][Uu][Tt]/
 INPUTS.2: /[Ii][Nn][Pp][Uu][Tt][Ss]/
 OUTPUT.2: /[Oo][Uu][Tt][Pp][Uu][Tt]/
+OUTPUTS.2: /[Oo][Uu][Tt][Pp][Uu][Tt][Ss]/
 LOCAL.2: /[Ll][Oo][Cc][Aa][Ll]/
 IS.2: /[Ii][Ss]/
 ARE.2: /[Aa][Rr][Ee]/
@@ -90,12 +133,16 @@ LOOP.2: /[Ll][Oo][Oo][Pp]/
 ENDLOOP.2: /[Ee][Nn][Dd]\s*[Ll][Oo][Oo][Pp]/
 RETURN.2: /[Rr][Ee][Tt][Uu][Rr][Nn]/
 EXIT.2: /[Ee][Xx][Ii][Tt]/
+EXECUTE.2: /[Ee][Xx][Ee][Cc][Uu][Tt][Ee]/
+CALL_FORMULA.2: /[Cc][Aa][Ll][Ll]_[Ff][Oo][Rr][Mm][Uu][Ll][Aa]/
+CHANGE_CONTEXTS.2: /[Cc][Hh][Aa][Nn][Gg][Ee]_[Cc][Oo][Nn][Tt][Ee][Xx][Tt][Ss]/
 OR.2: /[Oo][Rr]/
 AND.2: /[Aa][Nn][Dd]/
 NOT.2: /[Nn][Oo][Tt]/
 WAS.2: /[Ww][Aa][Ss]/
 LIKE.2: /[Ll][Ii][Kk][Ee]/
 USING.2: /[Uu][Ss][Ii][Nn][Gg]/
+NULL_KW.2: /[Nn][Uu][Ll][Ll]/
 
 NUMBER_TYPE.2: /[Nn][Uu][Mm][Bb][Ee][Rr]/
 TEXT_TYPE.2: /[Tt][Ee][Xx][Tt]/
@@ -103,6 +150,7 @@ DATE_TYPE.2: /[Dd][Aa][Tt][Ee]/
 
 // --- Literals ---
 SINGLE_STRING: "'" /[^']*(''[^']*)*/ "'"
+QUOTED_NAME: "\"" /[^"]+/ "\""
 
 BLOCK_COMMENT: "/*" /[\s\S]*?/ "*/"
 

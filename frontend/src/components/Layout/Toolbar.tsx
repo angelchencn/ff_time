@@ -1,39 +1,29 @@
+import { useState } from 'react';
 import { Button, Space } from 'antd';
 import {
   FileAddOutlined,
-  SaveOutlined,
   ExportOutlined,
+  SettingOutlined,
+  BugOutlined,
 } from '@ant-design/icons';
 import { useEditorStore } from '../../stores/editorStore';
 import { useChatStore } from '../../stores/chatStore';
-import { createFormula, updateFormula, exportFormula } from '../../services/api';
+import { exportFormula } from '../../services/api';
+import { LlmDebugModal } from '../Debug/LlmDebugModal';
 
-export function Toolbar() {
-  const { code, currentFormulaId, isDirty, setCurrentFormulaId, setIsDirty } =
-    useEditorStore();
+interface Props {
+  onManageCustom: () => void;
+}
+
+export function Toolbar({ onManageCustom }: Props) {
+  const { code, currentFormulaId } = useEditorStore();
+  const [debugOpen, setDebugOpen] = useState(false);
 
   function handleNew() {
     useEditorStore.getState().setCode('');
-    setCurrentFormulaId(null);
-    setIsDirty(false);
+    useEditorStore.getState().setCurrentFormulaId(null);
+    useEditorStore.getState().setIsDirty(false);
     useChatStore.getState().clearMessages();
-  }
-
-  async function handleSave() {
-    if (!code.trim()) return;
-
-    try {
-      if (currentFormulaId) {
-        await updateFormula(currentFormulaId, { code });
-      } else {
-        const name = `Formula ${new Date().toISOString().slice(0, 10)}`;
-        const formula = await createFormula(name, code);
-        setCurrentFormulaId(formula.id);
-      }
-      setIsDirty(false);
-    } catch {
-      // Backend may not be running; ignore save errors silently
-    }
   }
 
   async function handleExport() {
@@ -68,28 +58,40 @@ export function Toolbar() {
       style={{
         display: 'flex',
         alignItems: 'center',
-        padding: '8px 16px',
-        backgroundColor: '#fff',
-        borderBottom: '1px solid #e0e0e0',
-        height: 48,
+        justifyContent: 'space-between',
+        padding: '0 16px',
+        backgroundColor: 'var(--bg-surface)',
+        borderBottom: '1px solid var(--border-default)',
+        height: 44,
+        backdropFilter: 'blur(12px)',
       }}
     >
-      <Space>
-        <Button size="small" icon={<FileAddOutlined />} onClick={handleNew}>
-          New
-        </Button>
-        <Button
-          size="small"
-          icon={<SaveOutlined />}
-          onClick={handleSave}
-          type={isDirty ? 'primary' : 'default'}
-        >
-          Save
-        </Button>
-        <Button size="small" icon={<ExportOutlined />} onClick={handleExport}>
-          Export
-        </Button>
-      </Space>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <Space size={4}>
+          <Button size="small" icon={<FileAddOutlined />} onClick={handleNew}>
+            New
+          </Button>
+          <Button size="small" icon={<ExportOutlined />} onClick={handleExport}>
+            Export
+          </Button>
+          <Button size="small" icon={<SettingOutlined />} onClick={onManageCustom}>
+            Custom
+          </Button>
+          <Button size="small" icon={<BugOutlined />} onClick={() => setDebugOpen(true)}>
+            Debug
+          </Button>
+        </Space>
+      </div>
+      <span style={{
+        fontSize: 14,
+        color: 'var(--text-secondary)',
+        fontFamily: 'var(--font-display)',
+        letterSpacing: '-0.3px',
+      }}>
+        Oracle HCM Fast Formula
+      </span>
+
+      <LlmDebugModal open={debugOpen} onClose={() => setDebugOpen(false)} />
     </div>
   );
 }

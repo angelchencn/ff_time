@@ -8,20 +8,26 @@ from lark import Lark, Transformer, Token, Tree
 from lark.exceptions import UnexpectedInput, VisitError
 
 from app.parser.ast_nodes import (
+    ArrayAccess,
+    ArrayAssignment,
+    Assignment,
+    BinaryOp,
+    CallFormulaStatement,
+    ChangeContextsStatement,
     Diagnostic,
+    ExecuteStatement,
+    FunctionCall,
+    IfStatement,
+    MethodCall,
+    NumberLiteral,
     ParseResult,
     Program,
-    VariableDecl,
-    Assignment,
-    IfStatement,
-    WhileLoop,
     ReturnStatement,
-    BinaryOp,
-    UnaryOp,
-    FunctionCall,
-    NumberLiteral,
     StringLiteral,
+    UnaryOp,
+    VariableDecl,
     VariableRef,
+    WhileLoop,
 )
 
 _GRAMMAR_PATH = os.path.join(os.path.dirname(__file__), "grammar.lark")
@@ -38,11 +44,12 @@ _parser = Lark(
 
 # Keyword terminal names that should be filtered from children
 _KEYWORD_TERMINALS = {
-    "ALIAS", "AS", "DEFAULT", "DEFAULTED", "FOR", "INPUT", "INPUTS",
-    "OUTPUT", "LOCAL", "IS", "ARE",
+    "ALIAS", "AS", "DEFAULT", "DEFAULT_DATA_VALUE", "DEFAULTED", "FOR",
+    "INPUT", "INPUTS", "OUTPUT", "OUTPUTS", "LOCAL", "IS", "ARE",
     "IF", "THEN", "ELSIF", "ELSE", "ENDIF",
     "WHILE", "LOOP", "ENDLOOP", "EXIT",
     "RETURN", "OR", "AND", "NOT", "WAS", "LIKE", "USING",
+    "EXECUTE", "CALL_FORMULA", "CHANGE_CONTEXTS", "NULL_KW",
     "NUMBER_TYPE", "TEXT_TYPE", "DATE_TYPE",
 }
 
@@ -83,8 +90,18 @@ class FFTransformer(Transformer):
         # Remove outer quotes and unescape doubled single quotes
         return StringLiteral(value=raw[1:-1].replace("''", "'"))
 
+    def typed_string(self, children):
+        raw = str(children[0])
+        # String with type cast like '01-Jan-2010'(DATE) — treat as string
+        return StringLiteral(value=raw[1:-1].replace("''", "'"))
+
     def var_ref(self, children):
         return VariableRef(name=str(children[0]))
+
+    def quoted_var_ref(self, children):
+        raw = str(children[0])
+        # Strip surrounding double quotes
+        return VariableRef(name=raw.strip('"'))
 
     # ── expressions ──────────────────────────────────────────────────────────
     def neg(self, children):
@@ -103,6 +120,26 @@ class FFTransformer(Transformer):
         filtered = _filter_keywords(children)
         return BinaryOp(op="WAS DEFAULTED", left=filtered[0], right=NumberLiteral(value=1))
 
+    def was_not_defaulted_op(self, children):
+        filtered = _filter_keywords(children)
+        return UnaryOp(op="NOT", operand=BinaryOp(op="WAS DEFAULTED", left=filtered[0], right=NumberLiteral(value=1)))
+
+    def was_found_op(self, children):
+        filtered = _filter_keywords(children)
+        return BinaryOp(op="WAS FOUND", left=filtered[0], right=NumberLiteral(value=1))
+
+    def was_not_found_op(self, children):
+        filtered = _filter_keywords(children)
+        return UnaryOp(op="NOT", operand=BinaryOp(op="WAS FOUND", left=filtered[0], right=NumberLiteral(value=1)))
+
+    def is_null_op(self, children):
+        filtered = _filter_keywords(children)
+        return BinaryOp(op="IS NULL", left=filtered[0], right=NumberLiteral(value=0))
+
+    def is_not_null_op(self, children):
+        filtered = _filter_keywords(children)
+        return UnaryOp(op="NOT", operand=BinaryOp(op="IS NULL", left=filtered[0], right=NumberLiteral(value=0)))
+
     def func_call(self, children):
         name = str(children[0])
         args_raw = children[1:]
@@ -111,6 +148,22 @@ class FFTransformer(Transformer):
         else:
             args = tuple(args_raw)
         return FunctionCall(name=name, args=args)
+
+    def method_call(self, children):
+        obj = str(children[0])
+        method = str(children[1])
+        args_raw = children[2:]
+        if len(args_raw) == 1 and isinstance(args_raw[0], list):
+            args = tuple(args_raw[0])
+        else:
+            args = tuple(args_raw)
+        return MethodCall(object_name=obj, method_name=method, args=args)
+
+    def array_access(self, children):
+        return ArrayAccess(name=str(children[0]), index=children[1])
+
+    def array_assign(self, children):
+        return ArrayAssignment(name=str(children[0]), index=children[1], value=children[2])
 
     def expr_list(self, children):
         return list(children)
@@ -165,9 +218,20 @@ class FFTransformer(Transformer):
         names = filtered[0] if filtered and isinstance(filtered[0], list) else [str(filtered[0])]
         return [VariableDecl(kind="input", var_name=n) for n in names]
 
+    def default_data_value_decl(self, children):
+        filtered = _filter_keywords(children)
+        name = str(filtered[0])
+        default_value = filtered[1] if len(filtered) > 1 else None
+        return VariableDecl(kind="default", var_name=name, default_value=default_value)
+
     def output_decl(self, children):
         filtered = _filter_keywords(children)
         return VariableDecl(kind="output", var_name=str(filtered[0]))
+
+    def outputs_decl(self, children):
+        filtered = _filter_keywords(children)
+        names = filtered[0] if filtered and isinstance(filtered[0], list) else [str(filtered[0])]
+        return [VariableDecl(kind="output", var_name=n) for n in names]
 
     def local_decl(self, children):
         filtered = _filter_keywords(children)
@@ -188,6 +252,10 @@ class FFTransformer(Transformer):
     def assignment(self, children):
         name, value = children
         return Assignment(var_name=str(name), value=value)
+
+    def quoted_assignment(self, children):
+        raw_name = str(children[0]).strip('"')
+        return Assignment(var_name=raw_name, value=children[1])
 
     def then_body(self, children):
         return list(children)
@@ -256,6 +324,40 @@ class FFTransformer(Transformer):
         filtered = _filter_keywords(children)
         # Can return multiple values; for now use first
         return ReturnStatement(value=filtered[0])
+
+    def empty_return(self, children):
+        return ReturnStatement(value=NumberLiteral(value=0))
+
+    def call_formula_full(self, children):
+        return CallFormulaStatement(formula_name="", params=())
+
+    def call_formula_args(self, children):
+        return children
+
+    def call_formula_arg(self, children):
+        return children
+
+    def bare_func_call(self, children):
+        name = str(children[0])
+        args_raw = children[1:]
+        if len(args_raw) == 1 and isinstance(args_raw[0], list):
+            args = tuple(args_raw[0])
+        else:
+            args = tuple(args_raw)
+        return Assignment(var_name=f"__{name}_result", value=FunctionCall(name=name, args=args))
+
+    def change_contexts(self, children):
+        return ChangeContextsStatement(assignments=())
+
+    def context_assignment(self, children):
+        return children
+
+    def execute_call(self, children):
+        filtered = _filter_keywords(children)
+        name = str(filtered[0]) if filtered else ""
+        if name.startswith("'"):
+            name = name[1:-1]
+        return ExecuteStatement(formula_name=name)
 
     # ── top-level ────────────────────────────────────────────────────────────
     def statement(self, children):

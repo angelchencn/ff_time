@@ -64,6 +64,20 @@ def _load_dbi_names() -> frozenset[str]:
         return frozenset()
 
 
+# Functions whose first argument is an identifier name (not a variable reference).
+# These should not trigger "undeclared variable" errors for their first argument.
+_CONTEXT_FUNCTIONS = frozenset({
+    "GET_CONTEXT", "SET_CONTEXT", "NEED_CONTEXT",
+    "SET_INPUT", "GET_OUTPUT", "GET_INPUT",
+})
+
+# Built-in system variables that do not need explicit declaration.
+_BUILTIN_VARIABLES = frozenset({
+    "SYSDATE",       # Oracle current date
+    "TRUE", "FALSE", # Boolean literals
+})
+
+
 def _collect_refs(node: Any, refs: set[str]) -> None:
     """Recursively collect all VariableRef names from an AST subtree."""
     if isinstance(node, VariableRef):
@@ -74,7 +88,12 @@ def _collect_refs(node: Any, refs: set[str]) -> None:
     elif isinstance(node, UnaryOp):
         _collect_refs(node.operand, refs)
     elif isinstance(node, FunctionCall):
-        for arg in node.args:
+        func_upper = node.name.upper()
+        for i, arg in enumerate(node.args):
+            # Skip the first argument of context/input/output functions —
+            # it is an identifier name, not a variable reference.
+            if i == 0 and func_upper in _CONTEXT_FUNCTIONS:
+                continue
             _collect_refs(arg, refs)
     elif isinstance(node, Assignment):
         _collect_refs(node.value, refs)
@@ -116,8 +135,8 @@ def _semantic_check(program: Program, dbi_names: frozenset[str]) -> list[Diagnos
     """Check for undeclared variable references and unassigned OUTPUT variables."""
     diagnostics: list[Diagnostic] = []
 
-    # Build the set of declared names: var decls, assignment LHS names, DBIs
-    declared: set[str] = set(dbi_names)
+    # Build the set of declared names: var decls, assignment LHS names, DBIs, builtins
+    declared: set[str] = set(dbi_names) | _BUILTIN_VARIABLES
     output_vars: set[str] = set()
 
     for stmt in program.statements:

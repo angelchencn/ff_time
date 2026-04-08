@@ -1,12 +1,43 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Input, Space, Typography } from 'antd';
+import { Button, Input, Select, Space, Typography } from 'antd';
 import { SendOutlined } from '@ant-design/icons';
 import { useChatStore } from '../../stores/chatStore';
 import { useEditorStore } from '../../stores/editorStore';
+import { useServerStore } from '../../stores/serverStore';
 import { streamSSE } from '../../services/sse';
 import { ChatMessage } from './ChatMessage';
+import { useFormulaTypes } from '../../hooks/useFormulaTypes';
 
 const { Text } = Typography;
+
+const STRING_KEYWORDS = new Set([
+  'NAME', 'TEXT', 'DESC', 'CODE', 'TYPE', 'STATUS', 'FLAG', 'MESSAGE',
+  'MSG', 'LABEL', 'CATEGORY', 'TITLE', 'MODE', 'REASON', 'COMMENT',
+  'NOTE', 'KEY', 'TAG', 'LEVEL', 'CLASS', 'GROUP', 'ROLE', 'UNIT',
+  'TASK', 'PROCESS', 'ACTION', 'METHOD', 'FORMAT', 'PATTERN',
+  'PREFIX', 'SUFFIX', 'STRING', 'CHAR', 'CURRENCY',
+]);
+
+const DATE_KEYWORDS = new Set([
+  'DATE', 'START', 'END', 'EFFECTIVE', 'EXPIRY', 'HIRE',
+  'TERMINATION', 'BIRTH',
+]);
+
+function fixDefaultTypes(code: string): string {
+  return code.split('\n').map((line) => {
+    const m = line.match(/^(\s*DEFAULT\s+FOR\s+)(\w+)(\s+IS\s+)(0(?:\.0+)?\s*)$/i);
+    if (!m) return line;
+    const [, prefix, varName, isPart] = m;
+    const parts = varName.toUpperCase().split('_');
+    if (parts.some((p) => STRING_KEYWORDS.has(p))) {
+      return `${prefix}${varName}${isPart}' '`;
+    }
+    if (parts.some((p) => DATE_KEYWORDS.has(p))) {
+      return `${prefix}${varName}${isPart}'01-JAN-0001'(DATE)`;
+    }
+    return line;
+  }).join('\n');
+}
 
 function extractCodeBlocks(text: string): string[] {
   // Match any fenced code block: ```lang\n...\n``` or ```\n...\n```
@@ -28,10 +59,12 @@ function extractCodeBlocks(text: string): string[] {
 }
 
 export function ChatPanel() {
-  const { messages, isStreaming, sessionId, addMessage, appendToLast, setStreaming, setSessionId } =
+  const { messages, isStreaming, sessionId, addMessage, appendToLast, replaceLastContent, setStreaming, setSessionId } =
     useChatStore();
-  const { code, setCode } = useEditorStore();
+  const { code, setCode, formulaType, setFormulaType } = useEditorStore();
+  const { current } = useServerStore();
   const [inputValue, setInputValue] = useState('');
+  const { formulaTypes } = useFormulaTypes();
   const listEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -52,13 +85,19 @@ export function ChatPanel() {
     const body: Record<string, unknown> = {
       message: text,
       code,
+      formula_type: formulaType,
     };
     if (sessionId) {
       body.session_id = sessionId;
     }
 
+    const authHeaders: Record<string, string> = {};
+    if (current.auth) {
+      authHeaders['Authorization'] = `Basic ${btoa(`${current.auth.username}:${current.auth.password}`)}`;
+    }
+
     abortRef.current = streamSSE(
-      '/api/chat',
+      `${current.baseUrl}${current.apiPrefix}/chat`,
       body,
       (token) => {
         appendToLast(token);
@@ -70,7 +109,7 @@ export function ChatPanel() {
         if (lastMsg?.role === 'assistant') {
           const blocks = extractCodeBlocks(lastMsg.content);
           if (blocks.length > 0) {
-            setCode(blocks[blocks.length - 1]);
+            setCode(fixDefaultTypes(blocks[blocks.length - 1]));
           }
         }
         // Generate a simple session id if we don't have one
@@ -81,7 +120,12 @@ export function ChatPanel() {
       (err) => {
         appendToLast(`\n[Error: ${err.message}]`);
         setStreaming(false);
-      }
+      },
+      (fullText) => {
+        // Backend sent a corrected version (e.g. fixed DEFAULT types)
+        replaceLastContent(fullText);
+      },
+      authHeaders
     );
   }
 
@@ -98,7 +142,7 @@ export function ChatPanel() {
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        backgroundColor: '#fafafa',
+        backgroundColor: 'var(--bg-base)',
       }}
     >
       {/* Message list */}
@@ -120,7 +164,7 @@ export function ChatPanel() {
               padding: 24,
             }}
           >
-            <Text style={{ color: '#999', fontSize: 13 }}>
+            <Text style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>
               Ask me to generate a Fast Formula.
               <br />
               For example: &ldquo;Write a formula to calculate overtime pay&rdquo;
@@ -133,7 +177,20 @@ export function ChatPanel() {
       </div>
 
       {/* Input area */}
-      <div style={{ padding: '12px 16px', borderTop: '1px solid #e0e0e0' }}>
+      <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border-default)' }}>
+        <div style={{ marginBottom: 8 }}>
+          <Select
+            value={formulaType}
+            onChange={setFormulaType}
+            style={{ width: '100%' }}
+            size="small"
+            options={formulaTypes.map((ft) => ({
+              value: ft.type_name,
+              label: ft.display_name,
+            }))}
+            placeholder="Select Formula Type"
+          />
+        </div>
         <Space.Compact style={{ width: '100%' }}>
           <Input.TextArea
             value={inputValue}
@@ -142,7 +199,7 @@ export function ChatPanel() {
             placeholder="Ask about Fast Formulas... (Enter to send, Shift+Enter for newline)"
             autoSize={{ minRows: 1, maxRows: 4 }}
             disabled={isStreaming}
-            style={{ backgroundColor: '#fff', borderColor: '#d9d9d9', color: '#1a1a1a' }}
+            style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-default)', color: 'var(--text-primary)' }}
           />
           <Button
             type="primary"

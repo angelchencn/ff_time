@@ -12,6 +12,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.models.base import get_session
 from app.models.chat_session import ChatSession
+from app.services.ai_service import fix_default_types
 
 router = APIRouter()
 
@@ -59,6 +60,13 @@ async def chat(
         for chunk in ai.stream_generate(req.message, req.formula_type, history=history, current_code=req.code):
             full_response += chunk
             yield {"data": json.dumps({"text": chunk})}
+
+        # Post-process: fix DEFAULT value types in the full response
+        fixed_response = fix_default_types(full_response)
+        if fixed_response != full_response:
+            # Send a replacement event so the frontend picks up the corrected code
+            yield {"data": json.dumps({"replace": fixed_response})}
+            full_response = fixed_response
 
         # Persist conversation turns after streaming completes
         updated_messages = list(history) + [

@@ -81,6 +81,42 @@ class ReturnStatement:
 
 
 @dataclass(frozen=True)
+class ArrayAccess:
+    name: str
+    index: Any
+
+
+@dataclass(frozen=True)
+class ArrayAssignment:
+    name: str
+    index: Any
+    value: Any
+
+
+@dataclass(frozen=True)
+class MethodCall:
+    object_name: str
+    method_name: str
+    args: tuple
+
+
+@dataclass(frozen=True)
+class CallFormulaStatement:
+    formula_name: str
+    params: tuple
+
+
+@dataclass(frozen=True)
+class ChangeContextsStatement:
+    assignments: tuple  # tuple of (name, value) pairs
+
+
+@dataclass(frozen=True)
+class ExecuteStatement:
+    formula_name: str
+
+
+@dataclass(frozen=True)
 class Program:
     statements: tuple
 

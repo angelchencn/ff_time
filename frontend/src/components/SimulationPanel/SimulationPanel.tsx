@@ -6,12 +6,14 @@ import { InputForm } from './InputForm';
 import { ExecutionTrace } from './ExecutionTrace';
 import { DBIPanel } from './DBIPanel';
 import { useEditorStore } from '../../stores/editorStore';
+import { useServerStore } from '../../stores/serverStore';
 import { streamSSE } from '../../services/sse';
 
 const { Text } = Typography;
 
 function ExplainPanel() {
   const { code } = useEditorStore();
+  const { current } = useServerStore();
   const [explanation, setExplanation] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -20,41 +22,49 @@ function ExplainPanel() {
     setExplanation('');
     setIsStreaming(true);
 
+    const authHeaders: Record<string, string> = {};
+    if (current.auth) {
+      authHeaders['Authorization'] = `Basic ${btoa(`${current.auth.username}:${current.auth.password}`)}`;
+    }
+
     abortRef.current = streamSSE(
-      '/api/explain',
+      `${current.baseUrl}${current.apiPrefix}/explain`,
       { code },
       (token) => setExplanation((prev) => prev + token),
       () => setIsStreaming(false),
       (err) => {
         setExplanation((prev) => prev + `\n[Error: ${err.message}]`);
         setIsStreaming(false);
-      }
+      },
+      undefined,
+      authHeaders
     );
   }
 
   return (
-    <div style={{ padding: 16 }}>
+    <div style={{ padding: 16, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Button
         type="default"
         icon={<BulbOutlined />}
         onClick={handleExplain}
         loading={isStreaming}
         block
-        style={{ marginBottom: 12 }}
+        style={{ marginBottom: 12, flexShrink: 0 }}
       >
         Explain Formula
       </Button>
       {explanation && (
         <div
           style={{
-            backgroundColor: '#f5f5f5',
-            borderRadius: 4,
+            backgroundColor: 'var(--bg-inset)',
+            border: '1px solid var(--border-default)',
+            borderRadius: 'var(--radius-md)',
             padding: 12,
-            maxHeight: 400,
+            flex: 1,
             overflowY: 'auto',
           }}
         >
-          <Text style={{ color: '#333', fontSize: 13, whiteSpace: 'pre-wrap' }}>
+          <Text style={{ color: 'var(--text-primary)', fontSize: 13, whiteSpace: 'pre-wrap' }}>
             {explanation}
           </Text>
         </div>
@@ -96,17 +106,30 @@ export function SimulationPanel() {
     <div
       style={{
         height: '100%',
-        backgroundColor: '#fafafa',
+        backgroundColor: 'var(--bg-surface)',
         display: 'flex',
         flexDirection: 'column',
+        borderLeft: '1px solid var(--border-default)',
       }}
     >
       <Tabs
         defaultActiveKey="validate"
         items={tabItems}
-        style={{ flex: 1 }}
-        tabBarStyle={{ paddingLeft: 16, borderBottomColor: '#e0e0e0' }}
+        style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+        tabBarStyle={{ paddingLeft: 16, flexShrink: 0 }}
+        className="simulation-tabs"
       />
+      <style>{`
+        .simulation-tabs .ant-tabs-content-holder {
+          flex: 1;
+          overflow: hidden;
+        }
+        .simulation-tabs .ant-tabs-content,
+        .simulation-tabs .ant-tabs-tabpane-active {
+          height: 100%;
+          overflow-y: auto;
+        }
+      `}</style>
     </div>
   );
 }

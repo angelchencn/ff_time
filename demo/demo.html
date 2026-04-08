@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="en" style="scroll-behavior: smooth;">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HCM Fast Formula Generator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    /* ── Warm ivory base ── */
+    --bg:        #f5f0eb;
+    --bg-card:   #faf8f5;
+    --bg-inset:  #eee8e0;
+    --border:    #d6cdc2;
+    --border-lt: #e8e0d6;
+
+    /* ── Text ── */
+    --ink:       #2c1810;
+    --ink-2:     #5c4a3e;
+    --ink-3:     #8a7868;
+
+    /* ── Copper / warm accent (Phase 1 — data) ── */
+    --copper:      #b8602a;
+    --copper-dark: #8c4520;
+    --copper-bg:   #fdf3ec;
+    --copper-bdr:  #e8c4a8;
+
+    /* ── Ocean teal (Phase 2 — processing) ── */
+    --ocean:      #1a7a6d;
+    --ocean-dark: #145c53;
+    --ocean-bg:   #eef8f6;
+    --ocean-bdr:  #a8d8cf;
+
+    /* ── Deep navy (Phase 3+4 — runtime & LLM) ── */
+    --navy:      #2b4a7c;
+    --navy-dark: #1d3557;
+    --navy-bg:   #edf2f9;
+    --navy-bdr:  #a8bdd4;
+
+    /* ── Result green ── */
+    --sage:      #3d7c4a;
+    --sage-dark: #2d5c38;
+    --sage-bg:   #f0f7f1;
+    --sage-bdr:  #b2d4b8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ── */
+  .hero {
+    text-align: center;
+    padding: 64px 20px 44px;
+    background: linear-gradient(180deg, #faf8f5 0%, var(--bg) 100%);
+    border-bottom: 1px solid var(--border-lt);
+  }
+  .hero h1 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 38px;
+    font-weight: 400;
+    color: var(--ink);
+    margin-bottom: 10px;
+    letter-spacing: -0.5px;
+  }
+  .hero .subtitle {
+    font-size: 16px;
+    color: var(--ink-3);
+    font-weight: 500;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+  .hero .highlight {
+    color: var(--navy);
+  }
+
+  /* ── Flow canvas ── */
+  .flow {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+    position: relative;
+  }
+
+  /* ── Flow connector (vertical line) ── */
+  .connector {
+    display: flex;
+    justify-content: center;
+    padding: 8px 0;
+  }
+  .connector .line {
+    width: 2px;
+    height: 48px;
+    position: relative;
+  }
+  .connector .line::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+  }
+  .line-copper { background: var(--copper); }
+  .line-copper::after { border-top: 7px solid var(--copper); }
+  .line-ocean { background: var(--ocean); }
+  .line-ocean::after { border-top: 7px solid var(--ocean); }
+  .line-navy { background: var(--navy); }
+  .line-navy::after { border-top: 7px solid var(--navy); }
+  .line-sage { background: var(--sage); }
+  .line-sage::after { border-top: 7px solid var(--sage); }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 32px;
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 1px 4px rgba(44,24,16,0.06);
+  }
+  .card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(44,24,16,0.08);
+  }
+  .card .step-num {
+    position: absolute;
+    top: -13px;
+    left: 28px;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .card h4 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 22px;
+    font-weight: 400;
+    margin-bottom: 10px;
+    letter-spacing: -0.3px;
+  }
+  .card .desc {
+    color: var(--ink-2);
+    font-size: 14px;
+    line-height: 1.75;
+  }
+
+  /* ── Stat boxes ── */
+  .stats {
+    display: flex;
+    gap: 14px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    flex: 1;
+    min-width: 140px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-lt);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+  }
+  .stat .num {
+    font-size: 26px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .stat .label {
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-top: 4px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Code block ── */
+  .code-block {
+    background: #1c2433;
+    border: 1px solid #2a3445;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.8;
+    overflow-x: auto;
+    color: #c8d0dc;
+  }
+  .code-block .kw { color: #d4a0e8; }
+  .code-block .fn { color: #6cb6e0; }
+  .code-block .str { color: #8ccda0; }
+  .code-block .num { color: #e8c47a; }
+  .code-block .cm { color: #6b7a8d; }
+
+  /* ── Split layout ── */
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-top: 8px;
+  }
+  .split-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    margin-top: 20px;
+  }
+
+  /* ── Merge indicator ── */
+  .merge {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 12px 0;
+    gap: 12px;
+  }
+  .merge .branch { width: 120px; height: 2px; border-radius: 1px; }
+  .merge .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── Tag pills ── */
+  .tags { display: flex; gap: 7px; margin-top: 14px; flex-wrap: wrap; }
+  .tag {
+    padding: 4px 11px;
+    border-radius: 5px;
+    font-size: 11.5px;
+    font-weight: 600;
+    border: 1px solid;
+  }
+  .tag-copper { color: var(--copper-dark); border-color: var(--copper-bdr); background: var(--copper-bg); }
+  .tag-ocean { color: var(--ocean-dark); border-color: var(--ocean-bdr); background: var(--ocean-bg); }
+  .tag-navy  { color: var(--navy-dark);  border-color: var(--navy-bdr);  background: var(--navy-bg); }
+  .tag-sage  { color: var(--sage-dark);  border-color: var(--sage-bdr);  background: var(--sage-bg); }
+
+  /* ── Color accents per phase ── */
+  .accent-copper { border-left: 4px solid var(--copper); }
+  .accent-copper .step-num { background: var(--copper); }
+  .accent-copper h4 { color: var(--copper-dark); }
+
+  .accent-ocean { border-left: 4px solid var(--ocean); }
+  .accent-ocean .step-num { background: var(--ocean); }
+  .accent-ocean h4 { color: var(--ocean-dark); }
+
+  .accent-navy { border-left: 4px solid var(--navy); }
+  .accent-navy .step-num { background: var(--navy); }
+  .accent-navy h4 { color: var(--navy-dark); }
+
+  .accent-sage { border-left: 4px solid var(--sage); }
+  .accent-sage .step-num { background: var(--sage); }
+  .accent-sage h4 { color: var(--sage-dark); }
+
+  /* ── Phase divider ── */
+  .phase-divider {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 48px 0 24px;
+  }
+  .phase-divider .line-h {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .phase-divider .label {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    padding: 6px 20px;
+    border-radius: 20px;
+    border: 1px solid;
+    white-space: nowrap;
+  }
+
+  /* ── Token breakdown table ── */
+  .token-table {
+    width: 100%;
+    margin-top: 16px;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .token-table th {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 2px solid var(--border);
+    color: var(--ink-3);
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+  .token-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-lt);
+    color: var(--ink-2);
+  }
+  .token-table tr:last-child td {
+    border-bottom: none;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .token-table .right { text-align: right; font-family: 'JetBrains Mono', monospace; }
+
+  /* ── Inner boxes ── */
+  .inner-box {
+    background: var(--bg-inset);
+    border: 1px solid var(--border-lt);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .inner-box .title {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 14px;
+    font-weight: 400;
+    margin-bottom: 8px;
+  }
+  .inner-box .text {
+    font-size: 12px;
+    color: var(--ink-2);
+    line-height: 1.65;
+  }
+
+  /* ── Sticky nav ── */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(250,248,245,0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 20px;
+  }
+  .nav a {
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 7px 18px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+    color: var(--ink-2);
+  }
+  .nav a:hover {
+    border-color: var(--border);
+    background: var(--bg-inset);
+  }
+  .nav a.nav-copper { color: var(--copper); }
+  .nav a.nav-copper:hover { background: var(--copper-bg); border-color: var(--copper-bdr); }
+  .nav a.nav-ocean { color: var(--ocean); }
+  .nav a.nav-ocean:hover { background: var(--ocean-bg); border-color: var(--ocean-bdr); }
+  .nav a.nav-navy { color: var(--navy); }
+  .nav a.nav-navy:hover { background: var(--navy-bg); border-color: var(--navy-bdr); }
+  .nav a.nav-sage { color: var(--sage); }
+  .nav a.nav-sage:hover { background: var(--sage-bg); border-color: var(--sage-bdr); }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    padding: 40px;
+    color: var(--ink-3);
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── Animated pulse for the LLM card ── */
+  @keyframes glow {
+    0%, 100% { box-shadow: 0 0 16px rgba(43,74,124,0.06), 0 1px 4px rgba(44,24,16,0.06); }
+    50% { box-shadow: 0 0 32px rgba(43,74,124,0.14), 0 1px 4px rgba(44,24,16,0.06); }
+  }
+  .glow { animation: glow 3s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ HERO ═══════════════════ -->
+<div class="hero">
+  <h1>AI-Powered Oracle HCM Fast Formula Generator</h1>
+  <div class="subtitle">
+    <span class="highlight">RAG + LLM Pipeline Architecture</span>
+  </div>
+</div>
+
+<!-- ═══════════════════ NAV ═══════════════════ -->
+<nav class="nav">
+  <a href="#phase1" class="nav-copper">Phase 1 — Data Source</a>
+  <a href="#phase2" class="nav-ocean">Phase 2 — Offline Processing</a>
+  <a href="#phase3" class="nav-navy">Phase 3 — Runtime</a>
+  <a href="#phase4" class="nav-sage">Phase 4 — Output</a>
+  <a href="#phase5" class="nav-navy">Sample Full Prompt</a>
+  <a href="#phase6" class="nav-ocean">Technical Diagram</a>
+</nav>
+
+<div class="flow">
+
+  <!-- ═══ PHASE 1: DATA SOURCE ═══ -->
+  <div class="phase-divider">
+    <div class="line-h"></div>
+    <div class="label" id="phase1" style="color: var(--copper-dark); border-color: var(--copper-bdr); background: var(--copper-bg); scroll-margin-top: 60px;">Phase 1 — Data Source</div>
+    <div class="line-h"></div>
+  </div>
+
+  <div class="card accent-copper">
+    <div class="step-num">1</div>
+    <h4>Oracle CDRM Fast Formulas</h4>
+    <div class="desc">
+      Production Fast Formulas extracted from Oracle HCM Cloud database
+      (<code style="color:var(--copper); background:var(--copper-bg); padding:1px 5px; border-radius:3px; font-size:13px;">FF_FORMULAS_VL</code> + <code style="color:var(--copper); background:var(--copper-bg); padding:1px 5px; border-radius:3px; font-size:13px;">FF_FORMULA_TYPES</code> tables).
+      These are real, battle-tested formulas covering payroll, time &amp; labor, benefits, and more.
+    </div>
+    <div class="stats">
+      <div class="stat">
+        <div class="num" style="color:var(--copper);">~39,000</div>
+        <div class="label">Total Formulas</div>
+      </div>
+      <div class="stat">
+        <div class="num" style="color:var(--copper);">123</div>
+        <div class="label">Formula Types</div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-copper">Oracle Payroll (26,864)</span>
+      <span class="tag tag-copper">Auto Indirect (4,369)</span>
+      <span class="tag tag-copper">Extract Record (2,961)</span>
+      <span class="tag tag-copper">WFM Time Calc Rules (37)</span>
+      <span class="tag tag-copper">WFM Time Entry Rules (21)</span>
+      <span class="tag tag-copper">+ 118 more types</span>
+    </div>
+  </div>
+
+  <div class="connector"><div class="line line-copper" style="height:56px;"></div></div>
+
+  <!-- ═══ PHASE 2: TWO PARALLEL PIPELINES ═══ -->
+  <div class="phase-divider">
+    <div class="line-h"></div>
+    <div class="label" id="phase2" style="color: var(--ocean-dark); border-color: var(--ocean-bdr); background: var(--ocean-bg); scroll-margin-top: 60px;">Phase 2 — Offline Processing (Build Time)</div>
+    <div class="line-h"></div>
+  </div>
+
+  <div class="split-3">
+    <div class="card accent-ocean">
+      <div class="step-num">2a</div>
+      <h4>Template Extraction</h4>
+      <div class="desc">
+        Analyze all 39K formulas per type. Extract common structure patterns,
+        naming conventions, and header blocks to create <strong>123 type-specific templates</strong>.
+      </div>
+      <div class="code-block" style="font-size:11.5px;">
+        <span class="cm">/* Template: Time Calc Rule */</span><br>
+        <span class="cm">/* ORA_WFM_TCR_&lt;DESC&gt;_AP */</span><br><br>
+        <span class="kw">DEFAULT FOR</span> measure <span class="kw">IS</span> <span class="str">EMPTY_NUMBER</span><br>
+        <span class="kw">INPUTS ARE</span> measure, StartTime<br>
+        <span class="cm">/* ... business logic ... */</span><br>
+        <span class="kw">RETURN</span> measure
+      </div>
+      <div class="tags">
+        <span class="tag tag-ocean">formula_type_templates.json</span>
+        <span class="tag tag-ocean">123 skeletons</span>
+      </div>
+    </div>
+
+    <div class="card accent-ocean">
+      <div class="step-num">2b</div>
+      <h4>RAG Embedding &amp; Import</h4>
+      <div class="desc">
+        Each formula is embedded into a 384-dim vector using
+        <strong>all-MiniLM-L6-v2</strong> and stored in ChromaDB for semantic search.
+      </div>
+      <div class="code-block" style="font-size:11.5px;">
+        <span class="fn">python -m</span> app.scripts.import_from_oracle<br><br>
+        <span class="cm"># For each formula:</span><br>
+        <span class="cm"># 1.</span> code &rarr; <span class="fn">SentenceTransformer</span><br>
+        &nbsp;&nbsp;&nbsp;&rarr; [<span class="num">0.12</span>, <span class="num">-0.34</span>, ...] <span class="cm">(384d)</span><br>
+        <span class="cm"># 2.</span> Store in <span class="fn">ChromaDB</span><br>
+        <span class="cm"># 3.</span> Build HNSW index
+      </div>
+      <div class="tags">
+        <span class="tag tag-ocean">ChromaDB</span>
+        <span class="tag tag-ocean">MiniLM-L6-v2</span>
+        <span class="tag tag-ocean">HNSW index</span>
+      </div>
+    </div>
+
+    <div class="card accent-ocean">
+      <div class="step-num">2c</div>
+      <h4>Sample Prompt Extraction</h4>
+      <div class="desc">
+        AI reads each formula's header comment and <code style="color:var(--ocean); background:var(--ocean-bg); padding:1px 4px; border-radius:3px; font-size:12px;">formula_text</code> to generate natural language descriptions as sample prompts per type.
+      </div>
+      <div class="code-block" style="font-size:11.5px;">
+        <span class="cm"># Extract from formula headers:</span><br>
+        <span class="fn">FF_FORMULAS_VL</span>.description<br>
+        <span class="fn">FF_FORMULAS_VL</span>.formula_text<br><br>
+        <span class="cm"># AI generates prompts:</span><br>
+        <span class="str">"Calculates pension deduction"</span><br>
+        <span class="str">"Overtime for hours &gt; 40"</span><br>
+        <span class="str">"Rollback all processes"</span><br>
+        <span class="str">"Bi-weekly schedule calc"</span><br>
+        <span class="cm">... up to 200 per type</span>
+      </div>
+      <div class="tags">
+        <span class="tag tag-ocean">formula_types_registry.json</span>
+        <span class="tag tag-ocean">~200 prompts/type</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="merge">
+    <div class="branch" style="background: linear-gradient(90deg, transparent, var(--ocean));"></div>
+    <div class="dot" style="background: var(--ocean);"></div>
+    <div class="branch" style="background: linear-gradient(90deg, var(--ocean), transparent);"></div>
+  </div>
+
+  <div class="card accent-ocean" style="border-left-color: var(--ocean-dark);">
+    <h4 style="color:var(--ocean-dark); font-size:18px;">Offline Artifacts Ready</h4>
+    <div class="split" style="margin-top:12px;">
+      <div class="stat">
+        <div class="num" style="color:var(--ocean);">~39K</div>
+        <div class="label">Vectors in ChromaDB</div>
+      </div>
+      <div class="stat">
+        <div class="num" style="color:var(--ocean);">123</div>
+        <div class="label">Type Templates</div>
+      </div>
+      <div class="stat">
+        <div class="num" style="color:var(--ocean);">~42K</div>
+        <div class="label">Database Items (DBI)</div>
+      </div>
+      <div class="stat">
+        <div class="num" style="color:var(--ocean);">~50ms</div>
+        <div class="label">Query Latency</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="connector"><div class="line line-navy" style="height:56px;"></div></div>
+
+  <!-- ═══ PHASE 3: USER REQUEST ═══ -->
+  <div class="phase-divider">
+    <div class="line-h"></div>
+    <div class="label" id="phase3" style="color: var(--navy-dark); border-color: var(--navy-bdr); background: var(--navy-bg); scroll-margin-top: 60px;">Phase 3 — Runtime (User Request)</div>
+    <div class="line-h"></div>
+  </div>
+
+  <div class="card accent-navy">
+    <div class="step-num">3</div>
+    <h4>User Input</h4>
+    <div class="desc">
+      User selects a formula type, optionally picks a sample description from real formulas, and types their requirement in the chat panel.
+    </div>
+    <div class="code-block">
+      <span class="fn">POST</span> /api/chat<br>
+      {<br>
+      &nbsp;&nbsp;<span class="str">"message"</span>: <span class="str">"Calculate overtime for hours &gt; 40 at 1.5x rate"</span>,<br>
+      &nbsp;&nbsp;<span class="str">"formula_type"</span>: <span class="str">"WFM_TIME_CALCULATION_RULES"</span>,<br>
+      &nbsp;&nbsp;<span class="str">"code"</span>: <span class="str">"&lt;current editor content&gt;"</span>,<br>
+      &nbsp;&nbsp;<span class="str">"session_id"</span>: <span class="str">"session-1711878400000"</span><br>
+      }
+    </div>
+  </div>
+
+  <div class="connector"><div class="line line-navy" style="height:40px;"></div></div>
+
+  <div class="card accent-navy">
+    <div class="step-num">4</div>
+    <h4>Parallel Retrieval</h4>
+    <div class="desc">Backend performs 3 lookups simultaneously to gather all context:</div>
+
+    <div class="split-3">
+      <div class="inner-box">
+        <div class="title" style="color:var(--navy);">RAG Search</div>
+        <div class="text">
+          Embed user message &rarr; 384-dim vector &rarr; cosine similarity search &rarr; return <strong style="color:var(--navy);">top-3</strong> most similar formulas from 39K
+        </div>
+        <div style="margin-top:10px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-3);">
+          similarity &gt; 0.6 threshold
+        </div>
+      </div>
+      <div class="inner-box">
+        <div class="title" style="color:var(--navy);">Template Lookup</div>
+        <div class="text">
+          Match formula_type &rarr; return skeleton code, naming convention (<code style="color:var(--navy); font-size:11px;">ORA_WFM_TCR_*_AP</code>), and header block structure
+        </div>
+      </div>
+      <div class="inner-box">
+        <div class="title" style="color:var(--navy);">Chat History</div>
+        <div class="text">
+          Load previous conversation turns from SQLite to support <strong style="color:var(--navy);">multi-turn</strong> refinement like "change threshold to 45 hours"
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="connector"><div class="line line-navy" style="height:40px;"></div></div>
+
+  <!-- ═══ PROMPT ASSEMBLY ═══ -->
+  <div class="card accent-navy">
+    <div class="step-num">5</div>
+    <h4>Prompt Assembly</h4>
+    <div class="desc">
+      All retrieved context is assembled into a single structured prompt for GPT 5.4:
+    </div>
+
+    <table class="token-table">
+      <thead>
+        <tr><th>Component</th><th>Source</th><th class="right">Tokens</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>System Prompt</td>
+          <td style="color:var(--ink-3);">Syntax rules, keywords, functions, output format</td>
+          <td class="right" style="color:var(--navy);">~3,000</td>
+        </tr>
+        <tr>
+          <td>RAG Examples</td>
+          <td style="color:var(--ink-3);">Top-3 similar formulas from ChromaDB</td>
+          <td class="right" style="color:var(--navy);">~2,000–6,000</td>
+        </tr>
+        <tr>
+          <td>Type Template</td>
+          <td style="color:var(--ink-3);">Skeleton + naming from formula_type_templates.json</td>
+          <td class="right" style="color:var(--navy);">~800–1,200</td>
+        </tr>
+        <tr>
+          <td>Chat History</td>
+          <td style="color:var(--ink-3);">Previous conversation turns from SQLite</td>
+          <td class="right" style="color:var(--navy);">0–4,000</td>
+        </tr>
+        <tr>
+          <td>Editor Code</td>
+          <td style="color:var(--ink-3);">Current code in Monaco Editor</td>
+          <td class="right" style="color:var(--navy);">0–2,000</td>
+        </tr>
+        <tr>
+          <td>User Request</td>
+          <td style="color:var(--ink-3);">Natural language requirement</td>
+          <td class="right" style="color:var(--navy);">~50–200</td>
+        </tr>
+        <tr>
+          <td><strong>Total Input</strong></td>
+          <td></td>
+          <td class="right"><strong>~6K–15K</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="margin-top:24px;">
+      <div style="font-family:'DM Serif Display',Georgia,serif; font-size:15px; color:var(--navy-dark); margin-bottom:12px;">Assembled Prompt Example</div>
+      <div class="code-block" style="font-size:11.5px; line-height:1.75; max-height:560px; overflow-y:auto;">
+<span class="cm">┌─── SYSTEM MESSAGE ──────────────────────────────────────┐</span><br>
+<br>
+You are an expert assistant for Oracle HCM Fast Formula.<br>
+<span class="kw">Rules:</span> Every formula begins with DEFAULT statements...<br>
+<span class="kw">Keywords:</span> DEFAULT, IF, THEN, ELSE, RETURN, WHILE, LOOP...<br>
+<span class="kw">Functions:</span> ROUND, SUBSTR, TO_DATE, GET_CONTEXT, SET_INPUT...<br>
+<span class="kw">Output:</span> Return only valid Fast Formula code with header block.<br>
+<br>
+<span class="cm">┌─── USER MESSAGE (assembled from 4 sources) ────────────┐</span><br>
+<br>
+<span class="cm" style="color:#e8c47a;">## ① RAG Examples</span> <span class="cm">(top-3 from ChromaDB, similarity &gt; 0.6)</span><br>
+<br>
+<span class="fn">/* Formula: OVERTIME_PAY (similarity: 0.82) */</span><br>
+<span class="kw">DEFAULT FOR</span> HOURS_WORKED <span class="kw">IS</span> <span class="num">0</span><br>
+<span class="kw">DEFAULT FOR</span> OVERTIME_THRESHOLD <span class="kw">IS</span> <span class="num">40</span><br>
+<span class="kw">INPUTS ARE</span> HOURS_WORKED<br>
+<span class="kw">IF</span> HOURS_WORKED &gt; OVERTIME_THRESHOLD <span class="kw">THEN</span><br>
+&nbsp;&nbsp;OVERTIME_HOURS = HOURS_WORKED - OVERTIME_THRESHOLD<br>
+&nbsp;&nbsp;OVERTIME_PAY = OVERTIME_HOURS * RATE * <span class="num">1.5</span><br>
+<span class="kw">END IF</span><br>
+<span class="kw">RETURN</span> OVERTIME_PAY<br>
+<br>
+<span class="fn">/* Formula: WEEKLY_HOURS_CAP (similarity: 0.71) */</span><br>
+<span class="cm">...</span><br>
+<br>
+<span class="cm" style="color:#e8c47a;">## ② Type Template</span> <span class="cm">(matched by formula_type)</span><br>
+<br>
+<span class="fn">Type:</span> Time Calculation Rule<br>
+<span class="fn">Naming:</span> ORA_WFM_TCR_&lt;DESCRIPTION&gt;_AP<br>
+<span class="fn">Skeleton:</span><br>
+<span class="kw">DEFAULT FOR</span> measure <span class="kw">IS</span> <span class="str">EMPTY_NUMBER_NUMBER</span><br>
+<span class="kw">INPUTS ARE</span> measure, StartTime, StopTime<br>
+<span class="cm">/* ... business logic ... */</span><br>
+<span class="kw">RETURN</span> measure<br>
+<br>
+<span class="cm" style="color:#e8c47a;">## ③ Chat History</span> <span class="cm">(previous turns from SQLite)</span><br>
+<br>
+<span class="fn">User:</span> <span class="str">"Calculate overtime for hours &gt; 40"</span><br>
+<span class="fn">Assistant:</span> <span class="str">"Here is a formula that calculates..."</span><br>
+<br>
+<span class="cm" style="color:#e8c47a;">## ④ Current Request</span><br>
+<br>
+<span class="fn">Formula type:</span> WFM_TIME_CALCULATION_RULES<br>
+<span class="fn">Editor code:</span> <span class="cm">(current content in Monaco Editor)</span><br>
+<span class="fn">Requirement:</span> <span class="str">"Calculate overtime for hours &gt; 40 at 1.5x rate"</span><br>
+<br>
+Generate a complete Fast Formula that satisfies the requirement.
+      </div>
+    </div>
+  </div>
+
+  <div class="connector"><div class="line line-navy" style="height:40px;"></div></div>
+
+  <!-- ═══ LLM GENERATION ═══ -->
+  <div class="card accent-navy glow">
+    <div class="step-num">6</div>
+    <h4>GPT 5.4 LLM Generation</h4>
+    <div class="desc">
+      Assembled prompt is sent to OpenAI API with streaming enabled. The LLM synthesizes all context into a complete, production-grade Fast Formula.
+    </div>
+    <div class="split" style="margin-top:16px;">
+      <div class="stat">
+        <div class="num" style="color:var(--navy);">GPT 5.4</div>
+        <div class="label">Model (generation / chat)</div>
+      </div>
+      <div class="stat">
+        <div class="num" style="color:var(--navy);">GPT 5.4 mini</div>
+        <div class="label">Model (completion)</div>
+      </div>
+      <div class="stat">
+        <div class="num" style="color:var(--navy);">8,888</div>
+        <div class="label">Max Output Tokens</div>
+      </div>
+      <div class="stat">
+        <div class="num" style="color:var(--navy);">SSE</div>
+        <div class="label">Streaming Protocol</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="connector"><div class="line line-sage" style="height:40px;"></div></div>
+
+  <!-- ═══ OUTPUT ═══ -->
+  <div class="phase-divider">
+    <div class="line-h"></div>
+    <div class="label" id="phase4" style="color: var(--sage-dark); border-color: var(--sage-bdr); background: var(--sage-bg); scroll-margin-top: 60px;">Phase 4 — Output &amp; Validation</div>
+    <div class="line-h"></div>
+  </div>
+
+  <div class="card accent-sage">
+    <div class="step-num">7</div>
+    <h4>Streaming Response &amp; Auto-Validation</h4>
+    <div class="desc">
+      Generated formula streams into the chat panel in real-time via SSE. Code blocks are auto-extracted and filled into Monaco Editor, which triggers the Lark parser for instant syntax validation.
+    </div>
+    <div class="split-3" style="margin-top: 16px;">
+      <div class="inner-box" style="text-align:center;">
+        <div style="font-size:26px; margin-bottom:6px;">💬</div>
+        <div class="title" style="color:var(--sage);">Chat Panel</div>
+        <div class="text">SSE chunks stream into chat bubble in real-time</div>
+      </div>
+      <div class="inner-box" style="text-align:center;">
+        <div style="font-size:26px; margin-bottom:6px;">📝</div>
+        <div class="title" style="color:var(--sage);">Monaco Editor</div>
+        <div class="text">Code auto-extracted and filled with syntax highlighting</div>
+      </div>
+      <div class="inner-box" style="text-align:center;">
+        <div style="font-size:26px; margin-bottom:6px;">✅</div>
+        <div class="title" style="color:var(--sage);">Lark Validator</div>
+        <div class="text">Syntax + semantic + business rule validation via grammar.lark</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="connector"><div class="line line-sage" style="height:40px;"></div></div>
+
+  <div class="card accent-sage" style="border-left-color: var(--sage-dark);">
+    <h4 style="color:var(--sage-dark); font-size:18px;">Generated Formula Example</h4>
+    <div class="code-block" style="font-size:12px; line-height:1.9;">
+      <span class="cm">/*****************************************************</span><br>
+      <span class="cm"> * Formula Name : ORA_WFM_TCR_OVERTIME_CALC_AP</span><br>
+      <span class="cm"> * Formula Type : Time Calculation Rule</span><br>
+      <span class="cm"> * Description  : Calculate overtime for hours &gt; 40</span><br>
+      <span class="cm"> *****************************************************/</span><br><br>
+      <span class="kw">DEFAULT FOR</span> ASG_HOURS_WORKED <span class="kw">IS</span> <span class="num">0</span><br>
+      <span class="kw">DEFAULT FOR</span> OVERTIME_THRESHOLD <span class="kw">IS</span> <span class="num">40</span><br>
+      <span class="kw">DEFAULT FOR</span> OVERTIME_RATE <span class="kw">IS</span> <span class="num">1.5</span><br><br>
+      <span class="kw">INPUTS ARE</span> ASG_HOURS_WORKED<br><br>
+      <span class="kw">IF</span> ASG_HOURS_WORKED &gt; OVERTIME_THRESHOLD <span class="kw">THEN</span><br>
+      &nbsp;&nbsp;l_overtime = ASG_HOURS_WORKED - OVERTIME_THRESHOLD<br>
+      &nbsp;&nbsp;l_pay = l_overtime * OVERTIME_RATE<br>
+      <span class="kw">ELSE</span><br>
+      &nbsp;&nbsp;l_pay = <span class="num">0</span><br>
+      <span class="kw">END IF</span><br><br>
+      <span class="kw">RETURN</span> l_pay
+    </div>
+  </div>
+
+  <div class="connector"><div class="line line-navy" style="height:56px;"></div></div>
+
+  <!-- ═══ PHASE 5: FULL PROMPT ═══ -->
+  <div class="phase-divider">
+    <div class="line-h"></div>
+    <div class="label" id="phase5" style="color: var(--navy-dark); border-color: var(--navy-bdr); background: var(--navy-bg); scroll-margin-top: 60px;">Sample Full Prompt</div>
+    <div class="line-h"></div>
+  </div>
+
+  <div class="card accent-navy">
+    <div class="step-num">8</div>
+    <h4>Full Prompt Example</h4>
+    <div class="desc">
+      Below is the <strong>complete, unabridged prompt</strong> sent to the LLM for a single generation request.
+      The example assumes the user selected <strong>Time Calculation Rule</strong> type and entered
+      <em>"Calculate overtime for hours over 40 per week"</em>. RAG returned 3 matching formulas from ChromaDB.
+    </div>
+
+    <!-- ── Part 1: System Message ── -->
+    <div style="margin-top:24px;">
+      <div style="font-family:'DM Serif Display',Georgia,serif; font-size:16px; color:var(--navy-dark); margin-bottom:4px;">Part 1: System Message</div>
+      <div style="font-size:12px; color:var(--ink-3); margin-bottom:12px;">Passed as the <code style="color:var(--navy); background:var(--navy-bg); padding:1px 5px; border-radius:3px; font-size:11px;">system</code> parameter — sets the LLM's role, rules, and output format (~1.5K tokens)</div>
+      <div class="code-block" style="font-size:11.5px; line-height:1.75; max-height:600px; overflow-y:auto;">
+<span class="cm">/* ═══════════════════════════════════════════════════════════ */</span><br>
+<span class="cm">/* SYSTEM MESSAGE (system parameter)                          */</span><br>
+<span class="cm">/* ═══════════════════════════════════════════════════════════ */</span><br>
+<br>
+You are an expert assistant for Oracle HCM Fast Formula &mdash; a domain-specific<br>
+language used to configure payroll, time, and absence rules.<br>
+<br>
+<span class="fn">## Fast Formula Syntax Rules</span><br>
+<br>
+- Every formula begins with optional DEFAULT statements and ends with a RETURN statement.<br>
+- Variables are untyped; type is inferred from context (number, text, date).<br>
+- Comments start with /* and end with */.<br>
+<br>
+<span class="fn">## Supported Keywords</span><br>
+<br>
+<span class="kw">DEFAULT</span>, <span class="kw">DEFAULT FOR</span>, <span class="kw">IS</span>, <span class="kw">IF</span>, <span class="kw">THEN</span>, <span class="kw">ELSE</span>, <span class="kw">ELSIF</span>, <span class="kw">END IF</span>, <span class="kw">RETURN</span>,<br>
+<span class="kw">WHILE</span>, <span class="kw">LOOP</span>, <span class="kw">END LOOP</span>, <span class="kw">AND</span>, <span class="kw">OR</span>, <span class="kw">NOT</span>, <span class="kw">WAS</span>, <span class="kw">WAS DEFAULTED</span>, <span class="kw">INPUTS ARE</span>,<br>
+<span class="kw">INPUT IS</span>, <span class="kw">OUTPUT IS</span>, <span class="kw">OUTPUTS ARE</span>, <span class="kw">ALIAS</span>, <span class="kw">AS</span>, <span class="kw">LOCAL</span>, <span class="kw">LIKE</span>, <span class="kw">NOT LIKE</span>, <span class="kw">EXIT</span><br>
+<br>
+<span class="fn">## Supported Built-in Functions</span><br>
+<br>
+<span class="fn">ADD_MONTHS</span>, <span class="fn">CEIL</span>, <span class="fn">FLOOR</span>, <span class="fn">ROUND</span>, <span class="fn">TRUNC</span>, <span class="fn">ABS</span>, <span class="fn">GREATEST</span>, <span class="fn">LEAST</span>,<br>
+<span class="fn">TO_CHAR</span>, <span class="fn">TO_DATE</span>, <span class="fn">TO_NUMBER</span>, <span class="fn">LENGTH</span>, <span class="fn">SUBSTR</span>, <span class="fn">INSTR</span>,<br>
+<span class="fn">GET_TABLE_VALUE</span>, <span class="fn">INITIALIZE_TABLE_SS</span>,<br>
+<span class="fn">DAYS_BETWEEN</span>, <span class="fn">MONTHS_BETWEEN</span>, <span class="fn">ADD_DAYS</span>, <span class="fn">ADD_YEARS</span>, <span class="fn">HOURS_BETWEEN</span>,<br>
+<span class="fn">UPPER</span>, <span class="fn">LOWER</span>, <span class="fn">REPLACE</span>, <span class="fn">TRIM</span>, <span class="fn">LPAD</span>, <span class="fn">RPAD</span>, <span class="fn">LTRIM</span>, <span class="fn">RTRIM</span>,<br>
+<span class="fn">GET_LOOKUP_MEANING</span>, <span class="fn">RAISE_ERROR</span>, <span class="fn">CALL_FORMULA</span>,<br>
+<span class="fn">PAY_INTERNAL_LOG_WRITE</span>, <span class="fn">PUT_MESSAGE</span>, <span class="fn">ISNULL</span>,<br>
+<span class="fn">SET_TEXT</span>, <span class="fn">SET_NUMBER</span>, <span class="fn">SET_DATE</span>, <span class="fn">GET_TEXT</span>, <span class="fn">GET_NUMBER</span>, <span class="fn">GET_DATE</span>,<br>
+<span class="fn">CALCULATE_HOURS_WORKED</span>, <span class="fn">GET_WORKING_DAYS</span><br>
+<br>
+<span class="fn">## Formula Types</span><br>
+<br>
+Oracle Payroll, Auto Indirect, Extract Record, Payroll Run Proration,<br>
+Element Skip, Extract Rule, Calculation Utility,<br>
+WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES,<br>
+WORKFORCE_MANAGEMENT_TIME_ENTRY_RULES,<br>
+WORKFORCE_MANAGEMENT_TIME_SUBMISSION_RULES,<br>
+WORKFORCE_MANAGEMENT_TIME_COMPLIANCE_RULES,<br>
+WORKFORCE_MANAGEMENT_TIME_DEVICE_RULES,<br>
+WORKFORCE_MANAGEMENT_TIME_ADVANCE_CATEGORY_RULES,<br>
+WORKFORCE_MANAGEMENT_SUBROUTINE,<br>
+WORKFORCE_MANAGEMENT_UTILITY,<br>
+Global Absence Accrual, Global Absence Plan Entitlement,<br>
+Global Absence Entry Validation, ACCRUAL<br>
+<br>
+<span class="fn">## Formula Structure Convention</span><br>
+<br>
+Every generated formula MUST follow the standard Oracle Fast Formula structure<br>
+used in production environments. This includes:<br>
+<br>
+<span class="fn">### 1. Header Comment Block (REQUIRED)</span><br>
+<br>
+Always generate a professional header comment block at the top:<br>
+<br>
+<span class="cm">/******************************************************************************</span><br>
+<span class="cm"> *</span><br>
+<span class="cm"> * Formula Name : &lt;FORMULA_NAME&gt;</span><br>
+<span class="cm"> *</span><br>
+<span class="cm"> * Formula Type : &lt;FORMULA_TYPE&gt;</span><br>
+<span class="cm"> *</span><br>
+<span class="cm"> * Description  : &lt;Brief description of what the formula does&gt;</span><br>
+<span class="cm"> *</span><br>
+<span class="cm"> * Change History</span><br>
+<span class="cm"> * --------------</span><br>
+<span class="cm"> *</span><br>
+<span class="cm"> *  Who             Ver    Date          Description</span><br>
+<span class="cm"> * ---------------  ----   -----------   --------------------------------</span><br>
+<span class="cm"> * Payroll Admin    1.0    &lt;YYYY/MM/DD&gt;  Created.</span><br>
+<span class="cm"> *</span><br>
+<span class="cm"> ******************************************************************************/</span><br>
+<br>
+<span class="fn">### 2. Formula Naming Convention</span><br>
+<br>
+Formula names follow the pattern: <span class="str">&lt;PREFIX&gt;_&lt;BUSINESS_DESCRIPTION&gt;_&lt;SUFFIX&gt;</span><br>
+<br>
+Common suffixes: <span class="str">_EARN</span>, <span class="str">_RESULTS</span>, <span class="str">_PRORATION</span>, <span class="str">_BASE</span>,<br>
+<span class="str">_CALCULATOR</span>, <span class="str">_DISTRIBUTION</span>, <span class="str">_DEDN</span>, <span class="str">_AUTO_INDIRECT</span><br>
+<br>
+Common prefixes: <span class="str">ORA_WFM_</span>, <span class="str">ORA_HRX_</span>, <span class="str">WFM_</span>, <span class="str">HRX_</span><br>
+Time rule subtypes: <span class="str">_TCR_</span>, <span class="str">_TER_</span>, <span class="str">_TSR_</span>, <span class="str">_TDR_</span><br>
+<br>
+<span class="fn">### 3. Formula Body Order (REQUIRED)</span><br>
+<br>
+Formulas MUST follow this strict ordering:<br>
+1. Header comment block<br>
+2. DEFAULT statements (with type annotations where needed)<br>
+3. INPUTS ARE statement<br>
+4. Variable assignments and business logic<br>
+5. Logging calls (PAY_INTERNAL_LOG_WRITE) at entry/exit<br>
+6. RETURN statement<br>
+<br>
+<span class="fn">### 4. End Marker</span><br>
+<br>
+Optionally end the formula with: <span class="cm">/* End Formula Text */</span><br>
+<br>
+<span class="fn">## Output Format</span><br>
+<br>
+- Return only valid Fast Formula code unless explicitly asked for an explanation.<br>
+- Use consistent 2-space indentation for nested blocks.<br>
+- Include DEFAULT statements for all input variables.<br>
+- End every formula with a RETURN statement.<br>
+- ALWAYS include the header comment block as described above.<br>
+<br>
+<span class="fn">## DEFAULT Value Type Rules</span><br>
+<br>
+Choose the correct DEFAULT value based on the variable name:<br>
+- Use string defaults (<span class="str">' '</span>) for: NAME, TEXT, DESC, CODE, TYPE, STATUS, FLAG,<br>
+&nbsp;&nbsp;MESSAGE, MSG, LABEL, CATEGORY, TITLE, MODE, REASON, COMMENT, NOTE, KEY...<br>
+- Use numeric defaults (<span class="num">0</span>) for: COUNT, TOTAL, AMOUNT, RATE, HOURS, DAYS,<br>
+&nbsp;&nbsp;SALARY, PAY, WAGE, BALANCE, QTY, NUMBER, PCT, PERCENT, FACTOR, LIMIT...<br>
+- Use date defaults (<span class="str">'01-JAN-0001'(DATE)</span>) for: DATE, START, END, EFFECTIVE,<br>
+&nbsp;&nbsp;EXPIRY, HIRE, TERMINATION, BIRTH...<br>
+      </div>
+    </div>
+
+    <!-- ── Part 2: User Message ── -->
+    <div style="margin-top:32px;">
+      <div style="font-family:'DM Serif Display',Georgia,serif; font-size:16px; color:var(--navy-dark); margin-bottom:4px;">Part 2: User Message</div>
+      <div style="font-size:12px; color:var(--ink-3); margin-bottom:12px;">Passed as the <code style="color:var(--navy); background:var(--navy-bg); padding:1px 5px; border-radius:3px; font-size:11px;">messages[].content</code> parameter — contains RAG results, template, and request (~4K&ndash;10K tokens)</div>
+      <div class="code-block" style="font-size:11.5px; line-height:1.75; max-height:800px; overflow-y:auto;">
+<span class="cm">/* ═══════════════════════════════════════════════════════════ */</span><br>
+<span class="cm">/* USER MESSAGE (messages parameter, role: "user")            */</span><br>
+<span class="cm">/* ═══════════════════════════════════════════════════════════ */</span><br>
+<br>
+<span class="fn" style="color:#e8c47a; font-size:13px;">## Relevant Example Formulas</span><br>
+<br>
+<span class="cm">/* use_case: overtime_calculation */</span><br>
+<span class="cm">/******************************************************************************</span><br>
+<span class="cm"> *</span><br>
+<span class="cm"> * Formula Name : ORA_WFM_TCR_WEEKLY_OT_AP</span><br>
+<span class="cm"> *</span><br>
+<span class="cm"> * Formula Type : Time Calculation Rule</span><br>
+<span class="cm"> *</span><br>
+<span class="cm"> * Description  : Calculates weekly overtime hours exceeding threshold</span><br>
+<span class="cm"> *</span><br>
+<span class="cm"> ******************************************************************************/</span><br>
+<br>
+<span class="kw">DEFAULT FOR</span> HWM_CTXARY_RECORD_POSITIONS  <span class="kw">IS</span>  <span class="str">EMPTY_TEXT_NUMBER</span><br>
+<span class="kw">DEFAULT FOR</span> HWM_CTXARY_HWM_MEASURE_DAY  <span class="kw">IS</span>  <span class="str">EMPTY_NUMBER_NUMBER</span><br>
+<span class="kw">DEFAULT FOR</span> measure                      <span class="kw">IS</span>  <span class="str">EMPTY_NUMBER_NUMBER</span><br>
+<span class="kw">DEFAULT FOR</span> StartTime                    <span class="kw">IS</span>  <span class="str">EMPTY_DATE_NUMBER</span><br>
+<span class="kw">DEFAULT FOR</span> StopTime                     <span class="kw">IS</span>  <span class="str">EMPTY_DATE_NUMBER</span><br>
+<br>
+<span class="kw">INPUTS ARE</span><br>
+&nbsp;&nbsp;HWM_CTXARY_RECORD_POSITIONS,<br>
+&nbsp;&nbsp;HWM_CTXARY_HWM_MEASURE_DAY,<br>
+&nbsp;&nbsp;measure,<br>
+&nbsp;&nbsp;StartTime,<br>
+&nbsp;&nbsp;StopTime<br>
+<br>
+ffs_id = <span class="fn">GET_CONTEXT</span>(<span class="str">HWM_FFS_ID</span>, <span class="num">0</span>)<br>
+rule_id = <span class="fn">GET_CONTEXT</span>(<span class="str">HWM_RULE_ID</span>, <span class="num">0</span>)<br>
+<br>
+l_log = <span class="fn">PAY_INTERNAL_LOG_WRITE</span>(<span class="str">'ORA_WFM_TCR_WEEKLY_OT_AP - Enter'</span>)<br>
+<br>
+l_threshold = <span class="num">40</span><br>
+<span class="kw">IF</span> total_hours &gt; l_threshold <span class="kw">THEN</span><br>
+(<br>
+&nbsp;&nbsp;overtime_hours = total_hours - l_threshold<br>
+&nbsp;&nbsp;regular_hours = l_threshold<br>
+)<br>
+<span class="kw">ELSE</span><br>
+(<br>
+&nbsp;&nbsp;overtime_hours = <span class="num">0</span><br>
+&nbsp;&nbsp;regular_hours = total_hours<br>
+)<br>
+<span class="kw">END IF</span><br>
+<br>
+measure = overtime_hours<br>
+<br>
+l_log = <span class="fn">PAY_INTERNAL_LOG_WRITE</span>(<span class="str">'ORA_WFM_TCR_WEEKLY_OT_AP - Exit'</span>)<br>
+<br>
+<span class="kw">RETURN</span> measure<br>
+<span class="cm">/* End Formula Text */</span><br>
+<br>
+<span class="cm">/* use_case: shift_differential */</span><br>
+<span class="cm">/******************************************************************************</span><br>
+<span class="cm"> * Formula Name : ORA_WFM_TCR_SHIFT_DIFF_AP</span><br>
+<span class="cm"> * Formula Type : Time Calculation Rule</span><br>
+<span class="cm"> * Description  : Apply shift differential for evening/night shifts</span><br>
+<span class="cm"> ******************************************************************************/</span><br>
+<br>
+<span class="kw">DEFAULT FOR</span> measure <span class="kw">IS</span> <span class="str">EMPTY_NUMBER_NUMBER</span><br>
+<span class="kw">DEFAULT FOR</span> StartTime <span class="kw">IS</span> <span class="str">EMPTY_DATE_NUMBER</span><br>
+<span class="kw">DEFAULT FOR</span> StopTime <span class="kw">IS</span> <span class="str">EMPTY_DATE_NUMBER</span><br>
+<span class="kw">INPUTS ARE</span> measure, StartTime, StopTime<br>
+<span class="cm">/* ... shift differential logic ... */</span><br>
+<span class="kw">RETURN</span> measure<br>
+<br>
+<span class="cm">/* use_case: daily_hours_cap */</span><br>
+<span class="cm">/******************************************************************************</span><br>
+<span class="cm"> * Formula Name : ORA_WFM_TCR_DAILY_CAP_AP</span><br>
+<span class="cm"> * Formula Type : Time Calculation Rule</span><br>
+<span class="cm"> * Description  : Cap daily hours at maximum allowed threshold</span><br>
+<span class="cm"> ******************************************************************************/</span><br>
+<br>
+<span class="kw">DEFAULT FOR</span> measure <span class="kw">IS</span> <span class="str">EMPTY_NUMBER_NUMBER</span><br>
+<span class="kw">INPUTS ARE</span> measure, StartTime, StopTime<br>
+<span class="cm">/* ... daily cap logic ... */</span><br>
+<span class="kw">RETURN</span> measure<br>
+<br>
+<br>
+<span class="fn" style="color:#e8c47a; font-size:13px;">## Formula Type Template</span><br>
+<br>
+<strong style="color:#c8d0dc;">Type:</strong> Time Calculation Rule<br>
+<strong style="color:#c8d0dc;">Naming convention:</strong> <span class="str">ORA_WFM_TCR_&lt;BUSINESS_DESCRIPTION&gt;_AP</span><br>
+&nbsp;&nbsp;(e.g. ORA_WFM_TCR_OVERTIME_THRESHOLD_AP)<br>
+<br>
+<strong style="color:#c8d0dc;">### Skeleton</strong><br>
+<span class="cm">/******************************************************************************</span><br>
+<span class="cm"> *</span><br>
+<span class="cm"> * Formula Name : {formula_name}</span><br>
+<span class="cm"> *</span><br>
+<span class="cm"> * Formula Type : Time Calculation Rule</span><br>
+<span class="cm"> *</span><br>
+<span class="cm"> * Description  : {description}</span><br>
+<span class="cm"> *</span><br>
+<span class="cm"> * Change History</span><br>
+<span class="cm"> * --------------</span><br>
+<span class="cm"> *  Who             Ver    Date          Description</span><br>
+<span class="cm"> * ---------------  ----   -----------   --------------------------------</span><br>
+<span class="cm"> * Payroll Admin    1.0    2026/04/01    Created.</span><br>
+<span class="cm"> *</span><br>
+<span class="cm"> ******************************************************************************/</span><br>
+<br>
+<span class="cm">/* Array-based defaults for time card processing */</span><br>
+<span class="kw">DEFAULT FOR</span> HWM_CTXARY_RECORD_POSITIONS  <span class="kw">IS</span>  <span class="str">EMPTY_TEXT_NUMBER</span><br>
+<span class="kw">DEFAULT FOR</span> HWM_CTXARY_HWM_MEASURE_DAY  <span class="kw">IS</span>  <span class="str">EMPTY_NUMBER_NUMBER</span><br>
+<span class="kw">DEFAULT FOR</span> measure                      <span class="kw">IS</span>  <span class="str">EMPTY_NUMBER_NUMBER</span><br>
+<span class="kw">DEFAULT FOR</span> StartTime                    <span class="kw">IS</span>  <span class="str">EMPTY_DATE_NUMBER</span><br>
+<span class="kw">DEFAULT FOR</span> StopTime                     <span class="kw">IS</span>  <span class="str">EMPTY_DATE_NUMBER</span><br>
+<br>
+<span class="kw">INPUTS ARE</span><br>
+&nbsp;&nbsp;HWM_CTXARY_RECORD_POSITIONS,<br>
+&nbsp;&nbsp;HWM_CTXARY_HWM_MEASURE_DAY,<br>
+&nbsp;&nbsp;measure,<br>
+&nbsp;&nbsp;StartTime,<br>
+&nbsp;&nbsp;StopTime<br>
+<br>
+<span class="cm">/* Required context lookups */</span><br>
+ffs_id = <span class="fn">GET_CONTEXT</span>(<span class="str">HWM_FFS_ID</span>, <span class="num">0</span>)<br>
+rule_id = <span class="fn">GET_CONTEXT</span>(<span class="str">HWM_RULE_ID</span>, <span class="num">0</span>)<br>
+<br>
+l_log = <span class="fn">PAY_INTERNAL_LOG_WRITE</span>(<span class="str">'{formula_name} - Enter'</span>)<br>
+<br>
+<span class="cm">/* ---- Business logic here ---- */</span><br>
+<br>
+l_log = <span class="fn">PAY_INTERNAL_LOG_WRITE</span>(<span class="str">'{formula_name} - Exit'</span>)<br>
+<br>
+<span class="kw">RETURN</span> measure<br>
+<span class="cm">/* End Formula Text */</span><br>
+<br>
+<strong style="color:#c8d0dc;">### Example Pattern</strong><br>
+<span class="cm">/* Threshold-based overtime: hours above threshold get overtime pay type */</span><br>
+<span class="kw">IF</span> total_hours &gt; l_threshold <span class="kw">THEN</span><br>
+(<br>
+&nbsp;&nbsp;overtime_hours = total_hours - l_threshold<br>
+&nbsp;&nbsp;regular_hours = l_threshold<br>
+)<br>
+<span class="kw">ELSE</span><br>
+(<br>
+&nbsp;&nbsp;overtime_hours = <span class="num">0</span><br>
+&nbsp;&nbsp;regular_hours = total_hours<br>
+)<br>
+<br>
+Use this skeleton as the structural foundation. Replace the placeholder<br>
+business logic section with the actual implementation. Keep the header,<br>
+DEFAULT/INPUTS, logging, and RETURN structure intact.<br>
+<br>
+<br>
+<span class="fn" style="color:#e8c47a; font-size:13px;">## Request</span><br>
+<br>
+Formula type: <span class="str">WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES</span><br>
+<br>
+Requirement: <span class="str">Calculate overtime for hours over 40 per week</span><br>
+<br>
+Generate a complete Fast Formula that satisfies the requirement.<br>
+Follow the skeleton template above exactly &mdash; fill in the formula name,<br>
+description, author, date, and replace the business logic placeholder.<br>
+Derive a proper formula name following the naming convention shown.<br>
+      </div>
+    </div>
+
+    <!-- ── Token Summary ── -->
+    <div style="margin-top:24px;">
+      <table class="token-table">
+        <thead>
+          <tr><th>Component</th><th>Role</th><th class="right">Est. Tokens</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>System Prompt</td>
+            <td style="color:var(--ink-3);">system</td>
+            <td class="right" style="color:var(--navy);">~1,500</td>
+          </tr>
+          <tr>
+            <td>RAG Examples (3 formulas)</td>
+            <td style="color:var(--ink-3);">user &rarr; ## Relevant Example Formulas</td>
+            <td class="right" style="color:var(--navy);">~3,000&ndash;8,000</td>
+          </tr>
+          <tr>
+            <td>Type Template + Skeleton</td>
+            <td style="color:var(--ink-3);">user &rarr; ## Formula Type Template</td>
+            <td class="right" style="color:var(--navy);">~500&ndash;1,000</td>
+          </tr>
+          <tr>
+            <td>Chat History (if multi-turn)</td>
+            <td style="color:var(--ink-3);">prior messages[]</td>
+            <td class="right" style="color:var(--navy);">0&ndash;4,000</td>
+          </tr>
+          <tr>
+            <td>Editor Code (if modifying)</td>
+            <td style="color:var(--ink-3);">user &rarr; ## Current Formula in Editor</td>
+            <td class="right" style="color:var(--navy);">0&ndash;2,000</td>
+          </tr>
+          <tr>
+            <td>Request + Instructions</td>
+            <td style="color:var(--ink-3);">user &rarr; ## Request</td>
+            <td class="right" style="color:var(--navy);">~100&ndash;200</td>
+          </tr>
+          <tr>
+            <td><strong>Total Input</strong></td>
+            <td></td>
+            <td class="right"><strong>~5K&ndash;15K</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── Key Insight Boxes ── -->
+    <div class="split" style="margin-top:20px;">
+      <div class="inner-box">
+        <div class="title" style="color:var(--navy);">System vs User Split</div>
+        <div class="text">
+          <strong>System message</strong> is static &mdash; same for every request. Contains language rules, keywords, functions, and output format.<br><br>
+          <strong>User message</strong> is dynamic &mdash; assembled per-request from RAG results, matched template, editor state, and the user's requirement.
+        </div>
+      </div>
+      <div class="inner-box">
+        <div class="title" style="color:var(--navy);">Template + RAG Complementarity</div>
+        <div class="text">
+          <strong>Template</strong> guarantees structural correctness &mdash; right naming convention, right DEFAULT variables, right RETURN signature for the formula type.<br><br>
+          <strong>RAG examples</strong> provide business logic reference &mdash; real-world patterns for the specific use case from 39K production formulas.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PHASE 6: TECHNICAL DIAGRAM ═══ -->
+  <div class="phase-divider">
+    <div class="line-h"></div>
+    <div class="label" id="phase6" style="color: var(--ocean-dark); border-color: var(--ocean-bdr); background: var(--ocean-bg); scroll-margin-top: 60px;">Technical Diagram</div>
+    <div class="line-h"></div>
+  </div>
+
+  <div class="card accent-ocean">
+    <h2 style="font-family: 'DM Serif Display', Georgia, serif; font-size: 24px; font-weight: 400; color: var(--ink); margin-bottom: 8px;">
+      End-to-End Technical Flow
+    </h2>
+    <div class="description" style="color: var(--ink-3); font-size: 14px; margin-bottom: 24px;">
+      System architecture from user request to Fast Formula output &mdash; Frontend, Jersey REST, AI providers, and parser/validator layers.
+    </div>
+
+    <div style="overflow-x: auto; padding: 8px; background: var(--bg-inset); border-radius: 8px; border: 1px solid var(--border-lt);">
+      <svg viewBox="0 0 1040 700" xmlns="http://www.w3.org/2000/svg" style="width: 100%; min-width: 960px; height: auto; display: block;">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#5c4a3e"/>
+          </marker>
+          <marker id="arrCopper" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#b8602a"/>
+          </marker>
+          <marker id="arrOcean" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#1a7a6d"/>
+          </marker>
+          <marker id="arrNavy" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#2b4a7c"/>
+          </marker>
+          <marker id="arrSage" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#3d7c4a"/>
+          </marker>
+        </defs>
+
+        <style>
+          .lbl  { font: 600 13px 'DM Sans', sans-serif; fill: #2c1810; }
+          .sub  { font: 500 10px 'JetBrains Mono', monospace; fill: #5c4a3e; }
+          .tier { font: 600 11px 'DM Sans', sans-serif; fill: #8a7868; text-transform: uppercase; letter-spacing: 1.5px; }
+        </style>
+
+        <!-- ── Tier labels (left gutter) ── -->
+        <text x="16" y="60"  class="tier">Client</text>
+        <text x="16" y="180" class="tier">API Layer</text>
+        <text x="16" y="330" class="tier">Service</text>
+        <text x="16" y="480" class="tier">Provider</text>
+        <text x="16" y="620" class="tier">External</text>
+
+        <!-- ────────────── CLIENT TIER ────────────── -->
+        <!-- React Frontend (Phase 1 demo) -->
+        <rect x="90" y="20" width="220" height="90" rx="8"
+              fill="#fdf3ec" stroke="#b8602a" stroke-width="2"/>
+        <text x="200" y="42" text-anchor="middle" class="sub" style="font-size:9px; font-weight:700; letter-spacing:1px; fill:#b8602a;">PHASE 1 (DEMO)</text>
+        <text x="200" y="62" text-anchor="middle" class="lbl">React Frontend</text>
+        <text x="200" y="80" text-anchor="middle" class="sub">Monaco Editor + Chat</text>
+        <text x="200" y="96" text-anchor="middle" class="sub">ServerStore (switch)</text>
+
+        <!-- Redwood UI (Phase 2) -->
+        <rect x="325" y="20" width="220" height="90" rx="8"
+              fill="#eef8f6" stroke="#1a7a6d" stroke-width="2"/>
+        <text x="435" y="42" text-anchor="middle" class="sub" style="font-size:9px; font-weight:700; letter-spacing:1px; fill:#1a7a6d;">PHASE 2 (TARGET)</text>
+        <text x="435" y="62" text-anchor="middle" class="lbl">Redwood UI</text>
+        <text x="435" y="80" text-anchor="middle" class="sub">Oracle Fusion native</text>
+        <text x="435" y="96" text-anchor="middle" class="sub">JET / Redwood components</text>
+
+        <!-- Fusion AI Agent Studio (Phase 2) -->
+        <rect x="560" y="20" width="230" height="90" rx="8"
+              fill="#eef8f6" stroke="#1a7a6d" stroke-width="2"/>
+        <text x="675" y="42" text-anchor="middle" class="sub" style="font-size:9px; font-weight:700; letter-spacing:1px; fill:#1a7a6d;">PHASE 2 (TARGET)</text>
+        <text x="675" y="62" text-anchor="middle" class="lbl">Fusion AI Agent Studio</text>
+        <text x="675" y="80" text-anchor="middle" class="sub">Agent-driven chat &amp; tools</text>
+        <text x="675" y="96" text-anchor="middle" class="sub">invokes REST endpoints</text>
+
+        <!-- Server Switcher label -->
+        <rect x="810" y="40" width="180" height="50" rx="20"
+              fill="#faf8f5" stroke="#d6cdc2" stroke-width="1" stroke-dasharray="4 2"/>
+        <text x="900" y="60" text-anchor="middle" class="sub" style="font-size:11px; font-weight:600;">Server Dropdown</text>
+        <text x="900" y="75" text-anchor="middle" class="sub" style="font-size:9px;">Payroll VP | Local Dev</text>
+
+        <!-- Arrow: React → API -->
+        <line x1="200" y1="110" x2="200" y2="140" stroke="#b8602a" stroke-width="2" marker-end="url(#arrCopper)"/>
+
+        <!-- Arrow: Redwood → API -->
+        <line x1="435" y1="110" x2="435" y2="140" stroke="#1a7a6d" stroke-width="2" marker-end="url(#arrOcean)"/>
+        <text x="450" y="128" class="sub" style="font-size:10px;">HTTPS + Basic Auth</text>
+
+        <!-- Arrow: Fusion AI Agent Studio → API -->
+        <line x1="675" y1="110" x2="675" y2="140" stroke="#1a7a6d" stroke-width="2" marker-end="url(#arrOcean)"/>
+
+        <!-- ────────────── API LAYER ────────────── -->
+        <rect x="90" y="145" width="910" height="90" rx="8"
+              fill="#edf2f9" stroke="#2b4a7c" stroke-width="2"/>
+        <text x="545" y="170" text-anchor="middle" class="lbl">FastFormulaResource  @Path("/11.13.18.05/fastFormulaAssistants")</text>
+        <text x="545" y="190" text-anchor="middle" class="sub">Jersey 2.41 JAX-RS  &middot;  javax.ws.rs  &middot;  StreamingOutput (SSE compat)</text>
+
+        <!-- Endpoints row -->
+        <text x="165" y="218" text-anchor="middle" class="sub" style="font-size:10px;">/chat</text>
+        <text x="245" y="218" text-anchor="middle" class="sub" style="font-size:10px;">/explain</text>
+        <text x="330" y="218" text-anchor="middle" class="sub" style="font-size:10px;">/validate</text>
+        <text x="415" y="218" text-anchor="middle" class="sub" style="font-size:10px;">/simulate</text>
+        <text x="500" y="218" text-anchor="middle" class="sub" style="font-size:10px;">/complete</text>
+        <text x="575" y="218" text-anchor="middle" class="sub" style="font-size:10px;">/dbi</text>
+        <text x="645" y="218" text-anchor="middle" class="sub" style="font-size:10px;">/formulas</text>
+        <text x="735" y="218" text-anchor="middle" class="sub" style="font-size:10px;">/formula-types</text>
+        <text x="845" y="218" text-anchor="middle" class="sub" style="font-size:10px;">/custom-formulas</text>
+        <text x="940" y="218" text-anchor="middle" class="sub" style="font-size:10px;">/debug</text>
+
+        <!-- Arrow API → Service (LLM path) -->
+        <line x1="230" y1="237" x2="230" y2="295" stroke="#2b4a7c" stroke-width="2" marker-end="url(#arrNavy)"/>
+        <text x="245" y="270" class="sub" style="font-size:10px;">LLM path</text>
+
+        <!-- Arrow API → Service (parse path) -->
+        <line x1="755" y1="237" x2="755" y2="295" stroke="#2b4a7c" stroke-width="2" marker-end="url(#arrNavy)"/>
+        <text x="770" y="270" class="sub" style="font-size:10px;">Parser path</text>
+
+        <!-- ────────────── SERVICE LAYER ────────────── -->
+        <!-- AiService -->
+        <rect x="110" y="300" width="240" height="90" rx="8"
+              fill="#eef8f6" stroke="#1a7a6d" stroke-width="2"/>
+        <text x="230" y="325" text-anchor="middle" class="lbl">AiService</text>
+        <text x="230" y="343" text-anchor="middle" class="sub">buildGenerationPrompt()</text>
+        <text x="230" y="358" text-anchor="middle" class="sub">System §0-§19 + RAG + Template</text>
+        <text x="230" y="377" text-anchor="middle" class="sub">+ CustomRule (append)</text>
+
+        <!-- RagService pill -->
+        <rect x="385" y="278" width="165" height="68" rx="8"
+              fill="#eef8f6" stroke="#1a7a6d" stroke-width="1.5"/>
+        <text x="468" y="295" text-anchor="middle" class="sub" style="font-weight:600;">RagService</text>
+        <text x="468" y="310" text-anchor="middle" class="sub" style="font-size:9px; font-style:italic; fill:#b8602a;">P1: RAG with Vector DB</text>
+        <text x="468" y="324" text-anchor="middle" class="sub" style="font-size:9px; font-style:italic; fill:#1a7a6d;">P2: BOSS+RODS hybrid</text>
+        <text x="468" y="338" text-anchor="middle" class="sub" style="font-size:9px; font-style:italic; fill:#1a7a6d;">returns top(n) matches</text>
+
+        <!-- FormulaTypesService pill -->
+        <rect x="385" y="366" width="165" height="56" rx="8"
+              fill="#eef8f6" stroke="#1a7a6d" stroke-width="1.5"/>
+        <text x="468" y="383" text-anchor="middle" class="sub" style="font-weight:600;">Templates</text>
+        <text x="468" y="398" text-anchor="middle" class="sub" style="font-size:9px; font-style:italic; fill:#1a7a6d;">P2: user-maintained table</text>
+        <text x="468" y="412" text-anchor="middle" class="sub" style="font-size:9px; font-style:italic; fill:#1a7a6d;">+ additional rule → prompt</text>
+
+        <!-- AiService → Rag/Templates -->
+        <line x1="350" y1="320" x2="385" y2="312" stroke="#1a7a6d" stroke-width="1.5"/>
+        <line x1="350" y1="370" x2="385" y2="394" stroke="#1a7a6d" stroke-width="1.5"/>
+
+        <!-- Parser/Validator/Simulator -->
+        <rect x="590" y="300" width="330" height="90" rx="8"
+              fill="#eef8f6" stroke="#1a7a6d" stroke-width="2"/>
+        <text x="755" y="325" text-anchor="middle" class="lbl">ValidatorService &middot; SimulatorService</text>
+        <text x="755" y="345" text-anchor="middle" class="sub">Tokenizer → FFParser (recursive descent)</text>
+        <text x="755" y="362" text-anchor="middle" class="sub">→ AstNodes → Interpreter</text>
+        <text x="755" y="378" text-anchor="middle" class="sub">3-layer validation (syntax/semantic/rules)</text>
+
+        <!-- Arrow AiService → Provider -->
+        <line x1="230" y1="392" x2="230" y2="445" stroke="#1a7a6d" stroke-width="2" marker-end="url(#arrOcean)"/>
+        <text x="243" y="420" class="sub" style="font-size:10px;">messages</text>
+
+        <!-- Parser/Validator → RETURN (self-contained, no external call) -->
+        <line x1="755" y1="392" x2="755" y2="580" stroke="#3d7c4a" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arrSage)"/>
+        <text x="770" y="480" class="sub" style="font-size:10px;">No LLM call</text>
+
+        <!-- ────────────── PROVIDER LAYER ────────────── -->
+        <!-- LlmProvider interface -->
+        <rect x="130" y="450" width="600" height="80" rx="8"
+              fill="#faf8f5" stroke="#5c4a3e" stroke-width="1.5" stroke-dasharray="5 3"/>
+        <text x="430" y="474" text-anchor="middle" class="lbl">interface LlmProvider</text>
+        <text x="430" y="490" text-anchor="middle" class="sub">streamChat() / complete() / isAvailable()</text>
+
+        <!-- FusionAiProvider -->
+        <rect x="150" y="500" width="220" height="24" rx="4"
+              fill="#edf2f9" stroke="#2b4a7c" stroke-width="1.5"/>
+        <text x="260" y="516" text-anchor="middle" class="sub" style="font-weight:600; fill:#2b4a7c;">FusionAiProvider (default)</text>
+
+        <!-- OpenAiProvider (P1 demo, will be removed) -->
+        <rect x="390" y="500" width="200" height="24" rx="4"
+              fill="#fdf3ec" stroke="#b8602a" stroke-width="1.5" stroke-dasharray="4 2" opacity="0.75"/>
+        <text x="490" y="516" text-anchor="middle" class="sub" style="font-weight:600; fill:#b8602a;">OpenAiProvider (P1 demo)</text>
+
+        <!-- Arrow Fusion Provider → Fusion AI -->
+        <line x1="260" y1="530" x2="260" y2="595" stroke="#2b4a7c" stroke-width="2" marker-end="url(#arrNavy)"/>
+        <text x="275" y="570" class="sub" style="font-size:10px;">OAuth2 token</text>
+
+        <!-- Arrow OpenAI Provider → OpenAI (dashed — P1 demo only) -->
+        <line x1="490" y1="530" x2="490" y2="595" stroke="#b8602a" stroke-width="2" stroke-dasharray="4 2" opacity="0.75" marker-end="url(#arrCopper)"/>
+        <text x="505" y="570" class="sub" style="font-size:10px;">Bearer + SSE</text>
+
+        <!-- ────────────── EXTERNAL TIER ────────────── -->
+        <!-- Fusion AI -->
+        <rect x="130" y="600" width="260" height="70" rx="8"
+              fill="#edf2f9" stroke="#2b4a7c" stroke-width="2"/>
+        <text x="260" y="620" text-anchor="middle" class="lbl">Fusion AI Apps</text>
+        <text x="260" y="638" text-anchor="middle" class="sub">ai-common/llm/rest/v2/completion</text>
+        <text x="260" y="656" text-anchor="middle" class="sub" style="font-size:9px; font-style:italic; fill:#2b4a7c;">Register usecase in Prompt Lab</text>
+
+        <!-- OpenAI (P1 demo, will be removed) -->
+        <rect x="410" y="600" width="220" height="70" rx="8"
+              fill="#fdf3ec" stroke="#b8602a" stroke-width="2" stroke-dasharray="6 3" opacity="0.75"/>
+        <text x="520" y="620" text-anchor="middle" class="lbl">OpenAI GPT-5.4</text>
+        <text x="520" y="638" text-anchor="middle" class="sub">api.openai.com/v1/chat/completions</text>
+        <text x="520" y="656" text-anchor="middle" class="sub" style="font-size:9px; font-style:italic; fill:#b8602a;">Phase 1 demo &mdash; will be removed</text>
+
+        <!-- Parser output terminus -->
+        <rect x="650" y="600" width="250" height="70" rx="8"
+              fill="#f0f7f1" stroke="#3d7c4a" stroke-width="2"/>
+        <text x="775" y="625" text-anchor="middle" class="lbl">Fast Formula Result</text>
+        <text x="775" y="648" text-anchor="middle" class="sub">diagnostics / trace / output_data</text>
+
+        <!-- Response flow back to client (curved arrow) -->
+        <path d="M 260,600 Q 60,500 60,80 Q 60,55 85,55"
+              fill="none" stroke="#3d7c4a" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrSage)"/>
+        <text x="36" y="350" class="sub" style="font-size:10px; font-weight:600; fill:#3d7c4a;" transform="rotate(-90 36 350)">streaming response (SSE)</text>
+      </svg>
+    </div>
+
+  </div>
+
+</div>
+
+<div class="footer">
+  FF Time Demo &middot; RAG + LLM Pipeline &middot; April 2026
+</div>
+
+</body>
+</html>

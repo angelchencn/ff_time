@@ -14,6 +14,7 @@ interface ChatState {
   setSessionId: (id: string | null) => void;
   addMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => string;
   appendToLast: (text: string) => void;
+  replaceLastContent: (content: string) => void;
   setStreaming: (isStreaming: boolean) => void;
   clearMessages: () => void;
 }
@@ -43,6 +44,17 @@ export const useChatStore = create<ChatState>((set) => ({
       const updated = state.messages.map((msg, idx) => {
         if (idx === state.messages.length - 1) {
           return { ...msg, content: msg.content + text };
+        }
+        return msg;
+      });
+      return { messages: updated };
+    }),
+  replaceLastContent: (content) =>
+    set((state) => {
+      if (state.messages.length === 0) return state;
+      const updated = state.messages.map((msg, idx) => {
+        if (idx === state.messages.length - 1) {
+          return { ...msg, content };
         }
         return msg;
       });
