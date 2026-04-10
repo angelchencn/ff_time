@@ -24,7 +24,7 @@ import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 
 public class ConnectionHelper {
-    
+
     ProxyInfo proxyInfo;
 
     public ConnectionHelper() {
@@ -44,24 +44,34 @@ public class ConnectionHelper {
                 }
             }
         }
-        logInfo("proxyInfo::" + proxyInfo + ", proxyHost::" + System.getProperty("http.proxyHost") + ", proxyUser::" +
-                System.getProperty("http.proxyUser") + ", proxyPassword::" + System.getProperty("http.proxyPassword") +
-                ", http.proxyPort::" + System.getProperty("http.proxyPort") + ", http.nonProxyHost::" +
-                System.getProperty("http.nonProxyHosts"));
+        // FINER not INFO — contains proxy credentials; keep out of
+        // default log level on shared pods.
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(ConnectionHelper.class,
+                    "proxyInfo::" + proxyInfo + ", proxyHost::" + System.getProperty("http.proxyHost")
+                    + ", proxyUser::" + System.getProperty("http.proxyUser")
+                    + ", http.proxyPort::" + System.getProperty("http.proxyPort")
+                    + ", http.nonProxyHost::" + System.getProperty("http.nonProxyHosts"),
+                    AppsLogger.FINER);
+        }
     }
-    
+
     private HttpPost buildPostMethod(String pRestURL, String pAuthentificationToken) {
-        logDebug("Method Start: buildPostMethod");
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this, "Method Start: buildPostMethod", AppsLogger.FINER);
+        }
         HttpPost postRequest = new HttpPost(pRestURL);
         postRequest.setHeader("Authorization", "Bearer"+ " " + pAuthentificationToken);
         postRequest.setHeader("x-li-forma", "json");
         postRequest.setHeader("Content-Type", "application/json");
         postRequest.setHeader("Accept", "application/json");
-        logDebug("Method End: buildPostMethod");
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this, "Method End: buildPostMethod", AppsLogger.FINER);
+        }
         return postRequest;
     }
-    
-    
+
+
     /**
      * Does the value match the pattern? The pattern may:
      * <ul>
@@ -78,7 +88,9 @@ public class ConnectionHelper {
      */
     private boolean isHostPatternMatch(String pattern, String host) {
         boolean matches = false;
-        logDebug("isHostPatternMatch starts pattern::" + pattern + ", host::" + host);
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this, "isHostPatternMatch starts pattern::" + pattern + ", host::" + host, AppsLogger.FINER);
+        }
         pattern = pattern.toLowerCase().trim();
         host = host.toLowerCase().trim();
 
@@ -99,18 +111,22 @@ public class ConnectionHelper {
         } else {
             matches = host.equals(pattern);
         }
-        logDebug("isHostPatternMatch ends matches::" + matches);
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this, "isHostPatternMatch ends matches::" + matches, AppsLogger.FINER);
+        }
         return matches;
     }
 
-    
+
 
     /**
      * isNonProxyHost - finds if the url has a non proxy host
      */
     private boolean isNonProxyHost(String hostUrl) {
         boolean isNonProxyHost = false;
-        logDebug("isNonProxyHost starts hostUrl::" + hostUrl);
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this, "isNonProxyHost starts hostUrl::" + hostUrl, AppsLogger.FINER);
+        }
         String nonProxyHosts = System.getProperty("http.nonProxyHosts");
 
         if (nonProxyHosts != null && !"".equals(nonProxyHosts)) {
@@ -125,7 +141,9 @@ public class ConnectionHelper {
             }
             // Look for a match in the nonProxyHosts string
             String[] tmp = nonProxyHosts.split("\\|");
-            logDebug("isNonProxyHost nonProxyHosts::" + nonProxyHosts + ", tmp[] ::" + tmp);
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(this, "isNonProxyHost nonProxyHosts::" + nonProxyHosts + ", tmp[] ::" + tmp, AppsLogger.FINER);
+            }
             for (int i = 0; i < tmp.length; i++) {
                 String pattern = tmp[i];
                 if (isHostPatternMatch(pattern, host)) {
@@ -134,10 +152,12 @@ public class ConnectionHelper {
                 }
             }
         }
-        logDebug("isNonProxyHost ends isNonProxyHost::" + isNonProxyHost);
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this, "isNonProxyHost ends isNonProxyHost::" + isNonProxyHost, AppsLogger.FINER);
+        }
         return isNonProxyHost;
     }
-    
+
     /**
      * This methods return HttpClient with proxy settings if any otherwise
      * returns back default HttpClient passed.
@@ -146,13 +166,19 @@ public class ConnectionHelper {
      * @return
      */
     private CloseableHttpClient updateProxy(String pRestURL) {
-        logDebug("Method Start: updateProxy");
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this, "Method Start: updateProxy", AppsLogger.FINER);
+        }
         CloseableHttpClient httpClient = null;
         HttpHost proxy;
         if (proxyInfo != null && !isNonProxyHost(pRestURL)) {
-            logDebug("Proxy is enabled . Setting Proxy");
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(this, "Proxy is enabled . Setting Proxy", AppsLogger.FINER);
+            }
             if (proxyInfo.getUsername() != null) {
-                logDebug("Setting Proxy Credentials.");
+                if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                    AppsLogger.write(this, "Setting Proxy Credentials.", AppsLogger.FINER);
+                }
                 proxy = new HttpHost(proxyInfo.getHost(), proxyInfo.getPort());
                 Credentials credentials = new UsernamePasswordCredentials(proxyInfo.getUsername(), proxyInfo.getPassword().toCharArray());
                 AuthScope authScope = new AuthScope(proxyInfo.getHost(), proxyInfo.getPort());
@@ -163,9 +189,13 @@ public class ConnectionHelper {
                                         .setDefaultCredentialsProvider(provider)
                                         .build();
 
-                logDebug("Setting Proxy Credentials Done.");
+                if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                    AppsLogger.write(this, "Setting Proxy Credentials Done.", AppsLogger.FINER);
+                }
             }
-            logDebug("Setting Proxy Done");
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(this, "Setting Proxy Done", AppsLogger.FINER);
+            }
         }
 
         if (httpClient == null) {
@@ -174,116 +204,106 @@ public class ConnectionHelper {
                                           .build();
         }
 
-        logDebug("Method End: updateProxy");
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this, "Method End: updateProxy", AppsLogger.FINER);
+        }
         return httpClient;
     }
 
 
-    
+
     /**
      * doPost
      * @param pRestURL
      * @param pJsonContent
      * @param authenticationToken
      * @return Object
-     * 
+     *
      */
     public Object doPost(String pRestURL, String pJsonContent, String authenticationToken) throws Exception {
-        logDebug("Method Start: doPost");
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this, "Method Start: doPost", AppsLogger.FINER);
+        }
         HttpPost postRequest = null;
         CloseableHttpClient httpClient = null;
         try {
-            
+
 
             postRequest = buildPostMethod(pRestURL, authenticationToken);
             StringEntity requestEntity =
                 new StringEntity(pJsonContent, ContentType.APPLICATION_JSON, "UTF-8", false);
             postRequest.setEntity(requestEntity);
-            logDebug("doPost: updating proxy");
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(this, "doPost: updating proxy", AppsLogger.FINER);
+            }
             httpClient = updateProxy(pRestURL);
-            
+
             long time1 = System.currentTimeMillis();
             HttpResponse response = httpClient.execute(postRequest);
-            logDebug("Total time to get AI suggestions: " + (System.currentTimeMillis() - time1));
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(this, "Total time to get AI suggestions: " + (System.currentTimeMillis() - time1), AppsLogger.FINER);
+            }
             int responseStatus = response.getCode();
             ByteArrayOutputStream bos=new ByteArrayOutputStream();
             ((ClassicHttpResponse) response).getEntity().writeTo(bos);
             String stringUsingnewcode=bos.toString(StandardCharsets.UTF_8.name());
             String responseAsString=stringUsingnewcode;
            // String responseAsString = EntityUtils.toString(((ClassicHttpResponse) response).getEntity(), "UTF-8");
-            
-            logDebug("String from response after custom code=   "+ stringUsingnewcode+"\n");
+
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(this, "String from response after custom code=   " + stringUsingnewcode + "\n", AppsLogger.FINER);
+            }
            // logDebug("String from response using existing code=   "+ responseAsString+"\n");
-            
-            
-            logDebug("Response Status: " + responseStatus);
+
+
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(this, "Response Status: " + responseStatus, AppsLogger.FINER);
+            }
             if (HttpStatus.SC_OK != responseStatus) {
-                logError("ConnectionHelper.doPost StateCode: " + responseStatus + 
-                         " | StatusText: " + response.getReasonPhrase() + 
-                         "\nResponse Body: " + responseAsString);
-                /*CAUTION: Do not change the format of the RuntimeException constructor string as integrators are  
+                // WARNING not SEVERE — this is NOT inside a catch block.
+                // PSR rejects SEVERE here.
+                if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                    AppsLogger.write(this,
+                            "ConnectionHelper.doPost StateCode: " + responseStatus
+                            + " | StatusText: " + response.getReasonPhrase()
+                            + "\nResponse Body: " + responseAsString,
+                            AppsLogger.WARNING);
+                }
+                /*CAUTION: Do not change the format of the RuntimeException constructor string as integrators are
                  relying on this format to process for error code and error message.*/
-                throw new RuntimeException("ConnectionHelper.doPost StateCode: " + responseStatus + 
-                         " | StatusText: " + response.getReasonPhrase() + 
+                throw new RuntimeException("ConnectionHelper.doPost StateCode: " + responseStatus +
+                         " | StatusText: " + response.getReasonPhrase() +
                          "\nResponse Body: " + responseAsString);
             }
-            logDebug("Method Just Before End: ConnectionHelper.doPost");
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(this, "Method Just Before End: ConnectionHelper.doPost", AppsLogger.FINER);
+            }
             return responseAsString;
 
 //        } catch (ParseException e) {
-//            logException(e);
+//            AppsLogger.write(this, e, AppsLogger.SEVERE);
 //            throw new RuntimeException(e);
         } catch (IOException e) {
-            logException(e);
+            // SEVERE inside catch — inline so PSR sees the catch frame.
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
             throw new RuntimeException(e);
         } finally {
             closeHttpClient(httpClient);
-            logDebug("Method End: doPost");
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(this, "Method End: doPost", AppsLogger.FINER);
+            }
         }
     }
-    
+
 
     private void closeHttpClient(CloseableHttpClient httpClient) {
         if (httpClient != null) {
             try {
                 httpClient.close();
             } catch (Exception e) {
-                logException(e);
+                // SEVERE inside catch — inline so PSR sees the catch frame.
+                AppsLogger.write(this, e, AppsLogger.SEVERE);
             }
-        }
-    }
-
-    
-    private void logDebug(String pMessage) {
-        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-            AppsLogger.write(this, pMessage, AppsLogger.FINER);
-        }
-    }
-
-    private static void logInfo(String pMessage) {
-        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
-            AppsLogger.write(ConnectionHelper.class, pMessage, AppsLogger.INFO);
-        }
-    }
-
-    // WARNING-level helpers — PSR's java-appslogger-severe-level rule rejects
-    // AppsLogger.SEVERE outside catch blocks, and static analysis can't tell
-    // that these helpers are only called from catch contexts. If you genuinely
-    // need SEVERE for a caught Throwable, inline the AppsLogger.write call
-    // inside the catch block instead of going through this helper.
-
-    private void logError(String pMessage) {
-        if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-            AppsLogger.write(this, pMessage, AppsLogger.WARNING);
-        }
-    }
-
-    private void logException(Exception pException) {
-        String shortStackTrace = pException.getMessage();
-        String fullStackTrace = ExceptionUtils.getStackTrace(pException);
-        if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-            AppsLogger.write(this, shortStackTrace, AppsLogger.WARNING);
-            AppsLogger.write(this, fullStackTrace, AppsLogger.WARNING);
         }
     }
 

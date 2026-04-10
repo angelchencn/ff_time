@@ -138,24 +138,58 @@ public class OpenAiProvider implements LlmProvider {
         }
     }
 
+    /**
+     * Non-streaming chat completion. Used by {@code AiService.chatOnce()}
+     * for the {@code /chat/sync} endpoint.
+     *
+     * <p>This <em>must</em> use {@link #CHAT_MODEL}, not the smaller
+     * {@code COMPLETION_MODEL}. Earlier versions of this class hard-coded
+     * the cheaper completion model here, which silently downgraded every
+     * sync chat call to {@code gpt-5.4-mini} — wrong model for multi-turn
+     * conversations. Code-autocomplete callers (Monaco inline suggestions)
+     * route through {@link #autocomplete} instead, which is the only place
+     * the smaller model is allowed.</p>
+     */
     @Override
     public String complete(List<Map<String, String>> messages, int maxTokens) {
+        return callChatCompletion(messages, maxTokens, CHAT_MODEL, "complete");
+    }
+
+    /**
+     * Short, low-latency completion for editor inline suggestions. Uses the
+     * cheaper / faster {@link #COMPLETION_MODEL} (gpt-5.4-mini) which is the
+     * appropriate trade-off for tab-tab-tab autocomplete where latency
+     * matters more than depth-of-reasoning.
+     */
+    @Override
+    public String autocomplete(List<Map<String, String>> messages, int maxTokens) {
+        return callChatCompletion(messages, maxTokens, COMPLETION_MODEL, "autocomplete");
+    }
+
+    /**
+     * Shared HTTP path for both {@link #complete} and {@link #autocomplete}.
+     * The only thing that varies is the model name and the debug-log
+     * endpoint label.
+     */
+    private String callChatCompletion(List<Map<String, String>> messages, int maxTokens,
+                                      String model, String endpointLabel) {
         String sysPrompt = messages.stream()
                 .filter(m -> "system".equals(m.get("role")))
                 .map(m -> m.get("content"))
                 .findFirst().orElse("");
-        LlmDebugLog.getInstance().record(COMPLETION_MODEL, maxTokens, sysPrompt, messages,
-                "complete", "code completion");
+        LlmDebugLog.getInstance().record(model, maxTokens, sysPrompt, messages,
+                endpointLabel, "");
 
         try {
             if (AppsLogger.isEnabled(AppsLogger.INFO)) {
                 AppsLogger.write(this,
-                        "[OpenAI] complete: model=" + COMPLETION_MODEL
-                                + " maxTokens=" + maxTokens,
+                        "[OpenAI] " + endpointLabel + ": model=" + model
+                                + " maxTokens=" + maxTokens
+                                + " messages=" + messages.size(),
                         AppsLogger.INFO);
             }
             String body = MAPPER.writeValueAsString(Map.of(
-                    "model", COMPLETION_MODEL,
+                    "model", model,
                     "max_completion_tokens", maxTokens,
                     "messages", messages
             ));
@@ -171,14 +205,14 @@ public class OpenAiProvider implements LlmProvider {
                     HttpResponse.BodyHandlers.ofString());
             if (AppsLogger.isEnabled(AppsLogger.FINER)) {
                 AppsLogger.write(this,
-                        "[OpenAI] complete status=" + response.statusCode(),
+                        "[OpenAI] " + endpointLabel + " status=" + response.statusCode(),
                         AppsLogger.FINER);
             }
             JsonNode json = MAPPER.readTree(response.body());
             return json.at("/choices/0/message/content").asText("").trim();
         } catch (Exception e) {
-            // SEVERE inside catch — completion failure is rare in practice,
-            // and when it does happen we want to know why.
+            // SEVERE inside catch — chat/autocomplete failure is rare in
+            // practice, and when it does happen we want to know why.
             AppsLogger.write(this, e, AppsLogger.SEVERE);
             return "";
         }

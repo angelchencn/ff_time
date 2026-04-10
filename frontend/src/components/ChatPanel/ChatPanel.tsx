@@ -109,7 +109,9 @@ export function ChatPanel() {
         if (lastMsg?.role === 'assistant') {
           const blocks = extractCodeBlocks(lastMsg.content);
           if (blocks.length > 0) {
-            setCode(fixDefaultTypes(blocks[blocks.length - 1]));
+            // Programmatic write — keep isDirty=false (see EditorWithChat
+            // for the full reasoning).
+            setCode(fixDefaultTypes(blocks[blocks.length - 1]), false);
           }
         }
         // Generate a simple session id if we don't have one

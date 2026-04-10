@@ -111,21 +111,20 @@ export function EditorWithChat() {
     addMessage({ role: 'assistant', content: '' });
     setStreaming(true);
 
-    // Request body shape:
-    //   message          — the user's chat text
-    //   editor_code      — current Monaco editor content (renamed from `code`
-    //                      to disambiguate from `template_code`)
-    //   formula_type     — type_name from the Type dropdown
-    //   session_id       — for multi-turn chat history
-    //   template_code    — TEMPLATE_CODE business key of the picked sample.
-    //                      Server looks it up in FF_FORMULA_TEMPLATES and
-    //                      fetches FORMULA_TEXT + ADDITIONAL_PROMPT_TEXT
-    //                      itself, so we don't ship the CLOBs over the wire.
+    // Follow-up turns always ship editor_code (it IS the conversation
+    // state — backend doesn't replay history). First turn only ships it
+    // when the user actually typed something (isDirty).
+    const isFollowUp = !!sessionId;
+    const isDirty = useEditorStore.getState().isDirty;
+    const shouldShipEditorCode = code && (isFollowUp || isDirty);
+
     const body: Record<string, unknown> = {
       message: text,
-      editor_code: code,
       formula_type: formulaType,
     };
+    if (shouldShipEditorCode) {
+      body.editor_code = code;
+    }
     if (sessionId) body.session_id = sessionId;
     if (selectedTemplateCodeKey) body.template_code = selectedTemplateCodeKey;
     setSelectedSampleId(null);
@@ -145,11 +144,17 @@ export function EditorWithChat() {
         const lastMsg = useChatStore.getState().messages.slice(-1)[0];
         if (lastMsg?.role === 'assistant') {
           const blocks = extractCodeBlocks(lastMsg.content);
-          if (blocks.length > 0) setCode(blocks[blocks.length - 1]);
+          if (blocks.length > 0) {
+            setCode(blocks[blocks.length - 1], false);
+          }
         }
-        if (!useChatStore.getState().sessionId) {
-          setSessionId(`session-${Date.now()}`);
-        }
+        // Note: session_id is no longer fabricated client-side here. The
+        // backend hands it back as the very first SSE frame and we store it
+        // via the onSessionId callback below — that path is the only
+        // authoritative source. The previous `session-${Date.now()}`
+        // fallback created an orphan session every time the first turn
+        // ran and silently dropped that turn's history from subsequent
+        // calls.
       },
       (err) => {
         appendToLast(`\n[Error: ${err.message}]`);
@@ -158,7 +163,16 @@ export function EditorWithChat() {
       (fullText) => {
         replaceLastContent(fullText);
       },
-      authHeaders
+      authHeaders,
+      (sid) => {
+        // First SSE frame from the server: the authoritative session id
+        // for this conversation. Persist it so subsequent /chat calls
+        // can reuse the same id and the server can keep accumulating
+        // history under it.
+        if (sid && sid !== useChatStore.getState().sessionId) {
+          setSessionId(sid);
+        }
+      }
     );
   }
 
@@ -382,8 +396,11 @@ export function EditorWithChat() {
               // any previously generated formula from the editor — the user
               // is about to ask for a fresh generation, and leaving stale code
               // around causes it to be sent back in the next /chat call as the
-              // "Current Formula in Editor" reference.
-              setCode('');
+              // "Current Formula in Editor" reference. Programmatic clear, so
+              // markDirty=false: an empty buffer with isDirty=true would also
+              // get filtered out by handleSend (`if (isDirty && code)`), but
+              // keeping the flag accurate matches the rest of the codebase.
+              setCode('', false);
               if (val != null) {
                 const picked = dbTemplates.find((t) => t.template_id === val);
                 if (picked) {

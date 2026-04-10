@@ -24,18 +24,63 @@ public class AiService {
     private static final int MAX_TOKENS_CHAT = 10240;
     private static final int MAX_TOKENS_COMPLETION = 512;
 
+    /**
+     * Fully-qualified name of {@code FusionAiProvider}, loaded via
+     * reflection so this class can compile even when the FusionAiProvider
+     * source file is excluded from the build (the {@code local-dev} Maven
+     * profile excludes it because the version that lives in the Fusion
+     * ADE workspace pulls in TopologyManager / OAuth2 / WSM jars that we
+     * don't have on a developer laptop).
+     */
+    private static final String FUSION_PROVIDER_CLASS =
+            "oracle.apps.hcm.formulas.core.jersey.service.FusionAiProvider";
+
     private final LlmProvider provider;
     private final RagService ragService = new RagService();
 
     public AiService() {
         this.provider = isFusionProviderActive()
-                ? new FusionAiProvider()
+                ? loadFusionProviderOrFallback()
                 : new OpenAiProvider();
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
             AppsLogger.write(AiService.class,
                     "AiService initialized with provider: " + provider.name()
                             + " (available=" + provider.isAvailable() + ")",
                     AppsLogger.INFO);
+        }
+    }
+
+    /**
+     * Try to construct {@code FusionAiProvider} reflectively. If the class
+     * isn't on the classpath (because the local-dev Maven profile excluded
+     * it from compilation) we silently fall back to {@link OpenAiProvider}
+     * — the developer is running outside Fusion anyway, so a Fusion-only
+     * provider would not work even if it compiled.
+     *
+     * <p>This mirrors the pattern in {@code DbConfig} which loads ADF BC
+     * classes the same way: source-level compatibility with both build
+     * profiles, runtime detection of which path is actually available.</p>
+     */
+    private static LlmProvider loadFusionProviderOrFallback() {
+        try {
+            Class<?> cls = Class.forName(FUSION_PROVIDER_CLASS);
+            return (LlmProvider) cls.getDeclaredConstructor().newInstance();
+        } catch (ClassNotFoundException cnfe) {
+            // Local-dev build: FusionAiProvider was deliberately excluded.
+            // Fall back to OpenAi without raising — this is normal.
+            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                AppsLogger.write(AiService.class,
+                        FUSION_PROVIDER_CLASS + " not on classpath (local-dev build); "
+                                + "falling back to OpenAiProvider",
+                        AppsLogger.INFO);
+            }
+            return new OpenAiProvider();
+        } catch (ReflectiveOperationException roe) {
+            // Class is on the classpath but failed to instantiate — that's
+            // a real bug, not a missing-by-design exclusion. SEVERE inside
+            // catch.
+            AppsLogger.write(AiService.class, roe, AppsLogger.SEVERE);
+            return new OpenAiProvider();
         }
     }
 
@@ -147,13 +192,49 @@ public class AiService {
      * Assemble the message array passed to the LLM for a chat/generation
      * request. Shared between streaming and non-streaming variants so both
      * produce identical prompts for the same inputs.
+     *
+     * <h3>First-turn vs follow-up prompt</h3>
+     *
+     * <p>The first turn in a session pays the full prompt-construction cost:
+     * reference formula, RAG examples, formula-type contract, generation
+     * instructions. The LLM uses all of that to produce its initial answer.
+     * That answer is what populates the Monaco editor on the frontend.</p>
+     *
+     * <p>On a follow-up turn the LLM only needs three things:</p>
+     * <ul>
+     *   <li>the {@code system} prompt + {@code customRule} — re-sent every
+     *       call (LLM API is stateless), this is the persona/rules</li>
+     *   <li>the <em>current</em> shape of the formula — which the user
+     *       always has in front of them in Monaco, shipped to us as
+     *       {@code editorCode}</li>
+     *   <li>the new request the user typed — {@code message}</li>
+     * </ul>
+     *
+     * <p><b>We deliberately do <em>not</em> replay {@code history} to the
+     * LLM on follow-up turns.</b> The previous user/assistant exchange is
+     * not needed: {@code editorCode} is the source of truth for the
+     * formula state (it's either what the assistant just generated, or
+     * the user's hand-edited version of it). Skipping history makes each
+     * follow-up call O(1) in token cost instead of O(N turns), and
+     * eliminates a class of bugs where the LLM saw an old version of the
+     * formula in history alongside the current version in the new user
+     * message and got confused about which one to modify.</p>
+     *
+     * <p>{@code history} is still maintained server-side by
+     * {@code ChatSessionStore} — we just don't ship it to the model. We
+     * use {@code history.isEmpty()} as the "is this the first turn"
+     * signal, nothing more.</p>
      */
     private List<Map<String, String>> buildChatMessages(
             String message, String editorCode, String formulaType,
             List<Map<String, String>> history,
             String customSampleCode, String customRule) {
 
-        String userPrompt = buildGenerationPrompt(message, formulaType, editorCode, customSampleCode);
+        boolean isFirstTurn = history.isEmpty();
+
+        String userPrompt = isFirstTurn
+                ? buildGenerationPrompt(message, formulaType, editorCode, customSampleCode)
+                : buildFollowUpPrompt(message, editorCode);
 
         String sysPrompt = SYSTEM_PROMPT;
         if (customRule != null && !customRule.isBlank()) {
@@ -162,9 +243,30 @@ public class AiService {
 
         List<Map<String, String>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", sysPrompt));
-        messages.addAll(history);
         messages.add(Map.of("role", "user", "content", userPrompt));
         return messages;
+    }
+
+    /**
+     * Build the user message for a follow-up turn. Just the current
+     * editor state plus the new request — no reference formula, no RAG,
+     * no generation instructions. The LLM already knows it's a Fast
+     * Formula generator (system prompt) and now sees the formula it's
+     * supposed to modify (editorCode) plus what to do with it (message).
+     */
+    private String buildFollowUpPrompt(String message, String editorCode) {
+        boolean hasEditorCode = editorCode != null && !editorCode.isBlank();
+        if (!hasEditorCode) {
+            // Defensive: the frontend should always ship editor_code on
+            // follow-up turns. If it didn't (curl user, edge case),
+            // degrade to "just the message" rather than fail.
+            return message;
+        }
+        return "## Current Formula\n\n```\n" + editorCode + "\n```\n\n"
+                + "Modify the formula above according to the request below. "
+                + "Return ONLY the complete updated formula — no markdown fences, "
+                + "no explanation.\n\n"
+                + "Request: " + message;
     }
 
     // ── Complete ────────────────────────────────────────────────────────────
@@ -193,7 +295,9 @@ public class AiService {
                 Map.of("role", "user", "content", prompt)
         );
 
-        return provider.complete(messages, MAX_TOKENS_COMPLETION);
+        // Use autocomplete (cheaper / faster model on providers that have
+        // one) — this is editor inline-completion, not a multi-turn chat.
+        return provider.autocomplete(messages, MAX_TOKENS_COMPLETION);
     }
 
     // ── Streaming Explain ───────────────────────────────────────────────────

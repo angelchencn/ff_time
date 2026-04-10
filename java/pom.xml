@@ -164,6 +164,16 @@
                                 <!-- Imports oracle.adf.share.* + commons-lang3 — not
                                      resolvable outside WebLogic / ADE. -->
                                 <exclude>oracle/apps/hcm/formulas/core/jersey/util/FastFormulaResourceUtil.java</exclude>
+                                <!-- The Fusion-side version of this file pulls in
+                                     TopologyManager, OAuth2 (oracle.wsm.*),
+                                     PolicySetFeature, and the internal AIApps
+                                     ConnectionHelper — none of which are on the
+                                     local Maven classpath. AiService loads it
+                                     reflectively (loadFusionProviderOrFallback)
+                                     and falls back to OpenAiProvider when the
+                                     class is missing, so excluding the source
+                                     here is safe. -->
+                                <exclude>oracle/apps/hcm/formulas/core/jersey/service/FusionAiProvider.java</exclude>
                             </excludes>
                         </configuration>
                     </plugin>

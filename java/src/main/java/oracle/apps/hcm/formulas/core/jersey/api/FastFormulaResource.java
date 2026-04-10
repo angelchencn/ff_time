@@ -113,10 +113,20 @@ public class FastFormulaResource {
 
         final String sid = sessionId;
         final String csc = customSampleCode;
-        final String cr = templateRule;
+        final String cr = resolveEffectiveRule(sessionId, templateRule);
 
         StreamingOutput stream = new StreamingOutput() {
             public void write(OutputStream out) throws IOException {
+                // Session id frame — first SSE event so the client knows
+                // which id to reuse on subsequent turns.
+                try {
+                    String sessionFrame = "data: {\"session_id\":\"" + escapeJson(sid) + "\"}\n\n";
+                    out.write(sessionFrame.getBytes(StandardCharsets.UTF_8));
+                    out.flush();
+                } catch (IOException e) {
+                    // client disconnected before we could even start
+                }
+
                 StringBuilder fullResponse = new StringBuilder();
 
                 aiService.streamChat(message, editorCode, formulaType, history, csc, cr, new java.util.function.Consumer<String>() {
@@ -229,7 +239,8 @@ public class FastFormulaResource {
         List<Map<String, String>> history = new ArrayList<>(sessionStore.getHistory(sessionId));
 
         String rawResponse = aiService.chatOnce(
-                message, editorCode, formulaType, history, customSampleCode, templateRule);
+                message, editorCode, formulaType, history, customSampleCode,
+                resolveEffectiveRule(sessionId, templateRule));
 
         // Mirror streaming's post-process: fix DEFAULT value types.
         String finalResponse = AiService.fixDefaultTypes(rawResponse);
@@ -611,6 +622,12 @@ public class FastFormulaResource {
             AppsLogger.write(this, e, AppsLogger.SEVERE);
             return templateDbError(e);
         }
+    }
+
+    /** Persist incoming rule (if any) and return the effective rule for this session. */
+    private String resolveEffectiveRule(String sessionId, String templateRule) {
+        sessionStore.setCustomRule(sessionId, templateRule);
+        return sessionStore.getCustomRule(sessionId);
     }
 
     private static Response templateDbError(SQLException e) {

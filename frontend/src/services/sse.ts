@@ -1,3 +1,19 @@
+/**
+ * Streaming SSE client used by the chat / explain endpoints.
+ *
+ * Frame shapes the backend may send (one JSON object per `data:` line):
+ *   { session_id: "..." }   — first frame from /chat, hand-off of the
+ *                             server-allocated chat session id. Tell the
+ *                             store via onSessionId so subsequent turns
+ *                             can reuse the same id and the server can
+ *                             keep accumulating history under it.
+ *   { text: "..." }         — token to append to the current assistant
+ *                             message
+ *   { content: "..." }      — alias for text used by some endpoints
+ *   { replace: "..." }      — full-text replacement (e.g. after a
+ *                             post-processor like fixDefaultTypes runs)
+ *   "[DONE]" or event: done — terminator
+ */
 export function streamSSE(
   url: string,
   body: Record<string, unknown>,
@@ -5,7 +21,8 @@ export function streamSSE(
   onDone: () => void,
   onError: (error: Error) => void,
   onReplace?: (fullText: string) => void,
-  extraHeaders?: Record<string, string>
+  extraHeaders?: Record<string, string>,
+  onSessionId?: (sessionId: string) => void
 ): AbortController {
   const controller = new AbortController();
 
@@ -57,8 +74,17 @@ export function streamSSE(
               continue;
             }
             try {
-              const parsed = JSON.parse(dataStr) as { text?: string; content?: string; replace?: string };
-              if (parsed.replace && onReplace) {
+              const parsed = JSON.parse(dataStr) as {
+                text?: string;
+                content?: string;
+                replace?: string;
+                session_id?: string;
+              };
+              if (parsed.session_id && onSessionId) {
+                // Server-allocated session id frame — hand it off and
+                // continue reading. There's no token to forward here.
+                onSessionId(parsed.session_id);
+              } else if (parsed.replace && onReplace) {
                 onReplace(parsed.replace);
               } else {
                 const text = parsed.text ?? parsed.content ?? '';
