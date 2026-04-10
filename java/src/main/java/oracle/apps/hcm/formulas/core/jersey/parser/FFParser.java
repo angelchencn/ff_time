@@ -1,5 +1,6 @@
 package oracle.apps.hcm.formulas.core.jersey.parser;
 
+import oracle.apps.fnd.applcore.log.AppsLogger;
 import oracle.apps.hcm.formulas.core.jersey.parser.AstNodes.*;
 import oracle.apps.hcm.formulas.core.jersey.parser.Tokenizer.Token;
 import oracle.apps.hcm.formulas.core.jersey.parser.Tokenizer.TokenType;
@@ -87,6 +88,11 @@ public class FFParser {
      * @return ParseResult with program (if successful) and any diagnostics
      */
     public static ParseResult parse(String code) {
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(FFParser.class,
+                    "parse: codeLen=" + (code == null ? 0 : code.length()),
+                    AppsLogger.FINER);
+        }
         var tokenizer = new Tokenizer(code);
         var tokens = tokenizer.tokenize();
         var diagnostics = new ArrayList<Diagnostic>();
@@ -97,6 +103,11 @@ public class FFParser {
         }
 
         if (!diagnostics.isEmpty()) {
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(FFParser.class,
+                        "parse: tokenizer produced " + diagnostics.size() + " errors",
+                        AppsLogger.WARNING);
+            }
             return new ParseResult(null, diagnostics);
         }
 
@@ -104,13 +115,38 @@ public class FFParser {
         try {
             var program = parser.parseProgram();
             if (!diagnostics.isEmpty()) {
+                if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                    AppsLogger.write(FFParser.class,
+                            "parse: completed with " + diagnostics.size() + " diagnostics",
+                            AppsLogger.WARNING);
+                }
                 return new ParseResult(null, diagnostics);
+            }
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(FFParser.class,
+                        "parse: success, program has " + program.statements().size() + " stmts",
+                        AppsLogger.FINER);
             }
             return new ParseResult(program, List.of());
         } catch (ParseError e) {
+            // ParseError is the parser's internal control-flow signal — it
+            // already carries line/col, so this is a normal validation
+            // failure rather than a programmer bug. Stays at WARNING.
             if (diagnostics.isEmpty()) {
                 diagnostics.add(new Diagnostic(e.line, e.col, "error", e.getMessage()));
             }
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(FFParser.class,
+                        "parse: ParseError at " + e.line + ":" + e.col + " — " + e.getMessage(),
+                        AppsLogger.WARNING);
+            }
+            return new ParseResult(null, diagnostics);
+        } catch (Exception e) {
+            // SEVERE inside catch — anything that isn't a ParseError leaking
+            // out of parseProgram() is a parser bug; we want a stack trace.
+            AppsLogger.write(FFParser.class, e, AppsLogger.SEVERE);
+            diagnostics.add(new Diagnostic(1, 1, "error",
+                    "Internal parser error: " + e.getMessage()));
             return new ParseResult(null, diagnostics);
         }
     }

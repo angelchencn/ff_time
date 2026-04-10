@@ -1,5 +1,7 @@
 package oracle.apps.hcm.formulas.core.jersey.service;
 
+import oracle.apps.fnd.applcore.log.AppsLogger;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -31,6 +33,11 @@ public class FormulaService {
     public Map<String, Object> create(Map<String, Object> request) {
         String id = UUID.randomUUID().toString();
         String now = Instant.now().toString();
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(this,
+                    "create: id=" + id + " name=" + request.get("name"),
+                    AppsLogger.INFO);
+        }
 
         var formula = new LinkedHashMap<String, Object>();
         formula.put("id", id);
@@ -50,8 +57,19 @@ public class FormulaService {
     }
 
     public Map<String, Object> update(String id, Map<String, Object> updates) {
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(this,
+                    "update: id=" + id + " keys=" + updates.keySet(),
+                    AppsLogger.INFO);
+        }
         var existing = store.get(id);
-        if (existing == null) return null;
+        if (existing == null) {
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "update: id=" + id + " not in store", AppsLogger.WARNING);
+            }
+            return null;
+        }
 
         var updated = new LinkedHashMap<>(existing);
         for (var entry : updates.entrySet()) {

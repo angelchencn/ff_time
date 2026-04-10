@@ -3,6 +3,8 @@ package oracle.apps.hcm.formulas.core.jersey.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import oracle.apps.fnd.applcore.log.AppsLogger;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.URI;
@@ -12,15 +14,12 @@ import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * OpenAI GPT API provider — SSE streaming + synchronous completion.
  */
 public class OpenAiProvider implements LlmProvider {
 
-    private static final Logger LOG = Logger.getLogger(OpenAiProvider.class.getName());
     private static final String API_URL = "https://api.openai.com/v1/chat/completions";
     private static final String CHAT_MODEL = "gpt-5.4";
     private static final String COMPLETION_MODEL = "gpt-5.4-mini";
@@ -31,6 +30,13 @@ public class OpenAiProvider implements LlmProvider {
 
     public OpenAiProvider() {
         this.apiKey = System.getenv("OPENAI_API_KEY");
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(this,
+                    "OpenAiProvider initialized: apiKey "
+                            + (apiKey == null || apiKey.isBlank() ? "MISSING" : "present")
+                            + " chatModel=" + CHAT_MODEL,
+                    AppsLogger.INFO);
+        }
     }
 
     @Override
@@ -53,7 +59,12 @@ public class OpenAiProvider implements LlmProvider {
         LlmDebugLog.getInstance().record(CHAT_MODEL, maxTokens, sysPrompt, messages, "stream", "");
 
         try {
-            LOG.info("[OpenAI] Calling " + API_URL + " model=" + CHAT_MODEL);
+            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                AppsLogger.write(this,
+                        "[OpenAI] Calling " + API_URL + " model=" + CHAT_MODEL
+                                + " maxTokens=" + maxTokens + " messages=" + messages.size(),
+                        AppsLogger.INFO);
+            }
 
             String body = MAPPER.writeValueAsString(Map.of(
                     "model", CHAT_MODEL,
@@ -71,19 +82,28 @@ public class OpenAiProvider implements LlmProvider {
 
             HttpResponse<java.io.InputStream> response = HTTP_CLIENT.send(request,
                     HttpResponse.BodyHandlers.ofInputStream());
-            LOG.info("[OpenAI] Response status: " + response.statusCode());
+            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                AppsLogger.write(this,
+                        "[OpenAI] Response status: " + response.statusCode(),
+                        AppsLogger.INFO);
+            }
 
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(response.body()), 1)) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     if (line.contains("\"error\"")) {
-                        LOG.warning("[OpenAI] API Error: " + line);
+                        if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                            AppsLogger.write(this, "[OpenAI] API Error: " + line, AppsLogger.WARNING);
+                        }
                         try {
                             JsonNode err = MAPPER.readTree(line);
                             String msg = err.at("/error/message").asText(line);
                             tokenCallback.accept("API Error: " + msg);
                         } catch (Exception e2) {
+                            // SEVERE inside catch — error envelope itself
+                            // didn't parse, fall back to raw line.
+                            AppsLogger.write(this, e2, AppsLogger.SEVERE);
                             tokenCallback.accept("API Error: " + line);
                         }
                         return;
@@ -99,13 +119,21 @@ public class OpenAiProvider implements LlmProvider {
                         if (!content.isEmpty()) {
                             tokenCallback.accept(content);
                         }
-                    } catch (Exception ignored) {
-                        // skip malformed SSE lines
+                    } catch (Exception e3) {
+                        // FINER — malformed SSE chunk is common when the
+                        // upstream cuts a multi-byte boundary; don't escalate.
+                        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                            AppsLogger.write(this,
+                                    "[OpenAI] skipping malformed SSE line: " + data,
+                                    AppsLogger.FINER);
+                        }
                     }
                 }
             }
         } catch (Exception e) {
-            LOG.log(Level.SEVERE, "[OpenAI] Exception: " + e.getMessage(), e);
+            // SEVERE inside catch — full exception path failure (network,
+            // HTTP, OOM). Worth a stack trace so ops can diagnose.
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
             tokenCallback.accept("Error: " + e.getMessage());
         }
     }
@@ -120,6 +148,12 @@ public class OpenAiProvider implements LlmProvider {
                 "complete", "code completion");
 
         try {
+            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                AppsLogger.write(this,
+                        "[OpenAI] complete: model=" + COMPLETION_MODEL
+                                + " maxTokens=" + maxTokens,
+                        AppsLogger.INFO);
+            }
             String body = MAPPER.writeValueAsString(Map.of(
                     "model", COMPLETION_MODEL,
                     "max_completion_tokens", maxTokens,
@@ -135,10 +169,17 @@ public class OpenAiProvider implements LlmProvider {
 
             HttpResponse<String> response = HTTP_CLIENT.send(request,
                     HttpResponse.BodyHandlers.ofString());
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(this,
+                        "[OpenAI] complete status=" + response.statusCode(),
+                        AppsLogger.FINER);
+            }
             JsonNode json = MAPPER.readTree(response.body());
             return json.at("/choices/0/message/content").asText("").trim();
         } catch (Exception e) {
-            LOG.log(Level.WARNING, "[OpenAI] Complete failed: " + e.getMessage(), e);
+            // SEVERE inside catch — completion failure is rare in practice,
+            // and when it does happen we want to know why.
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
             return "";
         }
     }
@@ -154,10 +195,22 @@ public class OpenAiProvider implements LlmProvider {
                 URI uri = URI.create(proxyHost);
                 java.net.ProxySelector proxy = java.net.ProxySelector.of(
                         new java.net.InetSocketAddress(uri.getHost(), uri.getPort()));
+                if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                    AppsLogger.write(OpenAiProvider.class,
+                            "HTTP client configured with proxy " + proxyHost,
+                            AppsLogger.INFO);
+                }
                 return HttpClient.newBuilder().proxy(proxy).build();
             } catch (Exception e) {
-                LOG.log(Level.WARNING, "Failed to configure proxy: " + proxyHost, e);
+                // SEVERE inside catch — bad proxy config is a startup
+                // problem worth raising loudly; falling back to no proxy
+                // can mask the misconfiguration.
+                AppsLogger.write(OpenAiProvider.class, e, AppsLogger.SEVERE);
             }
+        }
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(OpenAiProvider.class,
+                    "HTTP client configured without proxy", AppsLogger.INFO);
         }
         return HttpClient.newHttpClient();
     }

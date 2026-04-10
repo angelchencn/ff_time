@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import oracle.apps.fnd.applcore.log.AppsLogger;
+
 import java.io.File;
 import java.io.InputStream;
 import java.net.URI;
@@ -42,15 +44,33 @@ public class RagService {
      */
     public List<Map<String, Object>> query(String queryText, int topK) {
         if (queryText == null || queryText.isBlank()) return List.of();
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this,
+                    "query: textLen=" + queryText.length() + " topK=" + topK,
+                    AppsLogger.FINER);
+        }
 
         // Try ChromaDB first
         if (isChromaAvailable()) {
             var results = queryChroma(queryText, topK);
-            if (!results.isEmpty()) return results;
+            if (!results.isEmpty()) {
+                if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                    AppsLogger.write(this,
+                            "query: ChromaDB returned " + results.size() + " results",
+                            AppsLogger.FINER);
+                }
+                return results;
+            }
         }
 
         // Fallback: keyword search on exported formulas
-        return keywordSearch(queryText, topK);
+        var results = keywordSearch(queryText, topK);
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this,
+                    "query: keyword fallback returned " + results.size() + " results",
+                    AppsLogger.FINER);
+        }
+        return results;
     }
 
     // ── ChromaDB HTTP API ───────────────────────────────────────────────────
@@ -64,10 +84,30 @@ public class RagService {
             var resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString());
             if (resp.statusCode() == 200) {
                 chromaAvailable = true;
+                if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                    AppsLogger.write(this,
+                            "ChromaDB heartbeat OK at " + CHROMA_BASE, AppsLogger.INFO);
+                }
                 resolveCollectionId();
                 return true;
             }
-        } catch (Exception ignored) {}
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "ChromaDB heartbeat returned " + resp.statusCode()
+                                + " — falling back to keyword search",
+                        AppsLogger.WARNING);
+            }
+        } catch (Exception e) {
+            // INFO not WARNING — Chroma being absent is the common case for
+            // local dev / Fusion deployment, so don't spam the log; just
+            // record once at info level so ops can see what mode we're in.
+            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                AppsLogger.write(this,
+                        "ChromaDB heartbeat failed (" + e.getMessage()
+                                + ") — keyword search will be used",
+                        AppsLogger.INFO);
+            }
+        }
         chromaAvailable = false;
         return false;
     }
@@ -82,10 +122,25 @@ public class RagService {
             for (JsonNode c : collections) {
                 if (COLLECTION_NAME.equals(c.path("name").asText())) {
                     collectionId = c.path("id").asText();
+                    if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                        AppsLogger.write(this,
+                                "Resolved Chroma collection '" + COLLECTION_NAME
+                                        + "' → " + collectionId,
+                                AppsLogger.INFO);
+                    }
                     return;
                 }
             }
-        } catch (Exception ignored) {}
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "Chroma collection '" + COLLECTION_NAME + "' not found",
+                        AppsLogger.WARNING);
+            }
+        } catch (Exception e) {
+            // SEVERE inside catch — Chroma is up but we couldn't list its
+            // collections, which is unexpected and worth a stack trace.
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
+        }
     }
 
     private List<Map<String, Object>> queryChroma(String queryText, int topK) {
@@ -127,6 +182,10 @@ public class RagService {
             }
             return results;
         } catch (Exception e) {
+            // SEVERE inside catch — query failure on a known-good collection
+            // means the embedding model died or the network blew up; both
+            // worth a stack trace.
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
             return List.of();
         }
     }
@@ -141,8 +200,16 @@ public class RagService {
         if (is != null) {
             try {
                 formulaIndex = MAPPER.readValue(is, new TypeReference<>() {});
+                if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                    AppsLogger.write(this,
+                            "Loaded rag_formulas.json from classpath ("
+                                    + formulaIndex.size() + " formulas)",
+                            AppsLogger.INFO);
+                }
                 return;
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                AppsLogger.write(this, e, AppsLogger.SEVERE);
+            }
         }
 
         // Try file paths
@@ -156,11 +223,24 @@ public class RagService {
             if (file.exists()) {
                 try {
                     formulaIndex = MAPPER.readValue(file, new TypeReference<>() {});
+                    if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                        AppsLogger.write(this,
+                                "Loaded rag_formulas.json from " + path
+                                        + " (" + formulaIndex.size() + " formulas)",
+                                AppsLogger.INFO);
+                    }
                     return;
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    AppsLogger.write(this, e, AppsLogger.SEVERE);
+                }
             }
         }
 
+        if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+            AppsLogger.write(this,
+                    "rag_formulas.json not found on classpath or filesystem; RAG keyword search disabled",
+                    AppsLogger.WARNING);
+        }
         formulaIndex = List.of();
     }
 

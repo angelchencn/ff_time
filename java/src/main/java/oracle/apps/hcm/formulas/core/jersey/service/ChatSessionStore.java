@@ -1,5 +1,7 @@
 package oracle.apps.hcm.formulas.core.jersey.service;
 
+import oracle.apps.fnd.applcore.log.AppsLogger;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -19,10 +21,16 @@ public class ChatSessionStore {
     private final Map<String, List<Map<String, String>>> sessions = new ConcurrentHashMap<>();
 
     public String getOrCreateSession(String sessionId) {
-        if (sessionId == null || sessionId.isBlank()) {
+        boolean fresh = sessionId == null || sessionId.isBlank();
+        if (fresh) {
             sessionId = UUID.randomUUID().toString();
         }
-        sessions.putIfAbsent(sessionId, new ArrayList<>());
+        boolean created = sessions.putIfAbsent(sessionId, new ArrayList<>()) == null;
+        if (created && AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(this,
+                    "New chat session: " + sessionId + (fresh ? " (auto-allocated)" : ""),
+                    AppsLogger.INFO);
+        }
         return sessionId;
     }
 
@@ -31,6 +39,12 @@ public class ChatSessionStore {
     }
 
     public void addTurn(String sessionId, String role, String content) {
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this,
+                    "addTurn: session=" + sessionId + " role=" + role
+                            + " contentLen=" + (content == null ? 0 : content.length()),
+                    AppsLogger.FINER);
+        }
         sessions.computeIfAbsent(sessionId, k -> new ArrayList<>())
                 .add(Map.of("role", role, "content", content));
     }

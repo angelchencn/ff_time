@@ -3,6 +3,8 @@ package oracle.apps.hcm.formulas.core.jersey.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import oracle.apps.fnd.applcore.log.AppsLogger;
+
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -10,8 +12,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 // TODO: uncomment in Fusion environment
 // import oracle.apps.fnd.applcore.log.AppsLogger;
@@ -39,7 +39,6 @@ import java.util.logging.Logger;
  */
 public class FusionAiProvider implements LlmProvider {
 
-    private static final Logger LOG = Logger.getLogger(FusionAiProvider.class.getName());
     private static final String COMPLETION_PATH = "ai-common/llm/rest/v2/completion";
     private static final String USECASE = "HCM_FAST_FORMULA";
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -59,10 +58,21 @@ public class FusionAiProvider implements LlmProvider {
     @Override
     public void streamChat(List<Map<String, String>> messages, int maxTokens,
                            Consumer<String> tokenCallback) {
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this,
+                    "streamChat (delegating to complete): messages=" + messages.size()
+                            + " maxTokens=" + maxTokens,
+                    AppsLogger.FINER);
+        }
         String response = complete(messages, maxTokens);
         if (response != null && !response.isEmpty()) {
             tokenCallback.accept(response);
         } else {
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "Fusion AI returned empty response for streamChat",
+                        AppsLogger.WARNING);
+            }
             tokenCallback.accept("Error: Fusion AI returned empty response.");
         }
     }
@@ -91,7 +101,17 @@ public class FusionAiProvider implements LlmProvider {
 
             String jsonPayload = MAPPER.writeValueAsString(requestBody);
 
-            LOG.info("[FusionAI] Calling ai-common/llm/rest/v2/completion");
+            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                AppsLogger.write(this,
+                        "[FusionAI] Calling " + COMPLETION_PATH
+                                + " messages=" + messages.size()
+                                + " maxTokens=" + maxTokens,
+                        AppsLogger.INFO);
+            }
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(this,
+                        "[FusionAI] payload=" + jsonPayload, AppsLogger.FINER);
+            }
             String sysPrompt = "";
             String userPrompt = "";
             for (Map<String, String> msg : messages) {
@@ -116,7 +136,9 @@ public class FusionAiProvider implements LlmProvider {
             return callDebugEndpoint(jsonPayload);
 
         } catch (Exception e) {
-            LOG.log(Level.SEVERE, "[FusionAI] Exception: " + e.getMessage(), e);
+            // SEVERE inside catch — Fusion AI call failure means the user
+            // gets nothing, ops needs the stack trace.
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
             return null;
         }
     }
@@ -362,10 +384,22 @@ public class FusionAiProvider implements LlmProvider {
             if (json.has("generatedText")) {
                 return json.get("generatedText").asText("");
             }
-            LOG.info("[FusionAI] Unknown response format, returning raw body");
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "[FusionAI] Unknown response format, returning raw body",
+                        AppsLogger.WARNING);
+            }
             return responseBody;
         } catch (Exception e) {
-            LOG.log(Level.WARNING, "[FusionAI] Failed to parse response JSON", e);
+            // SEVERE inside catch — JSON parse failure means the upstream
+            // returned something unexpected; raw body is logged at FINER for
+            // diagnosis.
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(this,
+                        "[FusionAI] raw body that failed to parse:\n" + responseBody,
+                        AppsLogger.FINER);
+            }
             return responseBody;
         }
     }
@@ -377,7 +411,11 @@ public class FusionAiProvider implements LlmProvider {
     private String callDebugEndpoint(String jsonPayload) {
         String debugUrl = System.getenv("FUSION_AI_DEBUG_URL");
         if (debugUrl == null || debugUrl.isBlank()) {
-            LOG.warning("[FusionAI] Neither Fusion environment nor FUSION_AI_DEBUG_URL available");
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "[FusionAI] Neither Fusion environment nor FUSION_AI_DEBUG_URL available",
+                        AppsLogger.WARNING);
+            }
             return null;
         }
 
@@ -386,7 +424,10 @@ public class FusionAiProvider implements LlmProvider {
                 debugUrl = debugUrl + "/";
             }
             String fullUrl = debugUrl + COMPLETION_PATH;
-            LOG.info("[FusionAI] Debug mode: calling " + fullUrl);
+            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                AppsLogger.write(this,
+                        "[FusionAI] Debug mode: calling " + fullUrl, AppsLogger.INFO);
+            }
 
             String user = System.getenv("FUSION_AI_DEBUG_USER");
             String pass = System.getenv("FUSION_AI_DEBUG_PASS");
@@ -411,16 +452,25 @@ public class FusionAiProvider implements LlmProvider {
                     .send(requestBuilder.build(), java.net.http.HttpResponse.BodyHandlers.ofString());
 
             int status = response.statusCode();
-            LOG.info("[FusionAI] Debug response status: " + status);
+            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                AppsLogger.write(this,
+                        "[FusionAI] Debug response status: " + status, AppsLogger.INFO);
+            }
 
             if (status == 200) {
                 return extractResponse(response.body());
             } else {
-                LOG.warning("[FusionAI] Debug error: " + status + " body: " + response.body());
+                if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                    AppsLogger.write(this,
+                            "[FusionAI] Debug error: " + status + " body: " + response.body(),
+                            AppsLogger.WARNING);
+                }
                 return null;
             }
         } catch (Exception e) {
-            LOG.log(Level.SEVERE, "[FusionAI] Debug endpoint exception: " + e.getMessage(), e);
+            // SEVERE inside catch — debug endpoint failure is non-recoverable
+            // for the request, log everything we have.
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
             return null;
         }
     }

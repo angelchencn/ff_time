@@ -1,11 +1,12 @@
 package oracle.apps.hcm.formulas.core.jersey.service;
 
+import oracle.apps.fnd.applcore.log.AppsLogger;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -20,7 +21,6 @@ import java.util.regex.Pattern;
  */
 public class AiService {
 
-    private static final Logger LOG = Logger.getLogger(AiService.class.getName());
     private static final int MAX_TOKENS_CHAT = 10240;
     private static final int MAX_TOKENS_COMPLETION = 512;
 
@@ -31,8 +31,12 @@ public class AiService {
         this.provider = isFusionProviderActive()
                 ? new FusionAiProvider()
                 : new OpenAiProvider();
-        LOG.info("AiService initialized with provider: " + provider.name()
-                + " (available=" + provider.isAvailable() + ")");
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(AiService.class,
+                    "AiService initialized with provider: " + provider.name()
+                            + " (available=" + provider.isAvailable() + ")",
+                    AppsLogger.INFO);
+        }
     }
 
     /** Constructor for testing — inject a custom provider. */
@@ -72,7 +76,21 @@ public class AiService {
                            String customSampleCode,
                            String customRule,
                            Consumer<String> tokenCallback) {
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this,
+                    "streamChat: provider=" + provider.name()
+                            + " formulaType=" + formulaType
+                            + " historyTurns=" + history.size()
+                            + " hasSample=" + (customSampleCode != null)
+                            + " hasRule=" + (customRule != null && !customRule.isBlank()),
+                    AppsLogger.FINER);
+        }
         if (!provider.isAvailable()) {
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "streamChat aborted: provider " + provider.name() + " not available",
+                        AppsLogger.WARNING);
+            }
             tokenCallback.accept("Error: " + provider.name() + " is not available.");
             return;
         }
@@ -99,12 +117,29 @@ public class AiService {
                            List<Map<String, String>> history,
                            String customSampleCode,
                            String customRule) {
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this,
+                    "chatOnce: provider=" + provider.name()
+                            + " formulaType=" + formulaType
+                            + " historyTurns=" + history.size(),
+                    AppsLogger.FINER);
+        }
         if (!provider.isAvailable()) {
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "chatOnce aborted: provider " + provider.name() + " not available",
+                        AppsLogger.WARNING);
+            }
             return "Error: " + provider.name() + " is not available.";
         }
         List<Map<String, String>> messages = buildChatMessages(
                 message, editorCode, formulaType, history, customSampleCode, customRule);
         String response = provider.complete(messages, MAX_TOKENS_CHAT);
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this,
+                    "chatOnce returned " + (response == null ? 0 : response.length()) + " chars",
+                    AppsLogger.FINER);
+        }
         return response == null ? "" : response;
     }
 
@@ -135,7 +170,19 @@ public class AiService {
     // ── Complete ────────────────────────────────────────────────────────────
 
     public String complete(String code, int cursorLine) {
-        if (!provider.isAvailable()) return "";
+        if (!provider.isAvailable()) {
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "complete aborted: provider " + provider.name() + " not available",
+                        AppsLogger.WARNING);
+            }
+            return "";
+        }
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this,
+                    "complete: codeLen=" + code.length() + " line=" + cursorLine,
+                    AppsLogger.FINER);
+        }
 
         String prompt = "## Current Formula (cursor at line " + cursorLine + ")\n\n```\n" + code
                 + "\n```\n\nProvide the most likely next tokens to complete this formula. "
@@ -152,7 +199,17 @@ public class AiService {
     // ── Streaming Explain ───────────────────────────────────────────────────
 
     public void streamExplain(String code, Consumer<String> tokenCallback) {
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this,
+                    "streamExplain: codeLen=" + (code == null ? 0 : code.length()),
+                    AppsLogger.FINER);
+        }
         if (!provider.isAvailable()) {
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "streamExplain aborted: provider " + provider.name() + " not available",
+                        AppsLogger.WARNING);
+            }
             tokenCallback.accept("Error: " + provider.name() + " is not available.");
             return;
         }

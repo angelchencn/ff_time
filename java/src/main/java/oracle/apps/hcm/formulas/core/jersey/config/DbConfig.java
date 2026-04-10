@@ -10,9 +10,8 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
+import oracle.apps.fnd.applcore.log.AppsLogger;
 import oracle.apps.hcm.formulas.core.jersey.service.AiService;
 
 /**
@@ -57,8 +56,6 @@ import oracle.apps.hcm.formulas.core.jersey.service.AiService;
  */
 public class DbConfig {
 
-    private static final Logger LOG = Logger.getLogger(DbConfig.class.getName());
-
     // ?? Local-dev path (DriverManager) ??????????????????????????????????????
     private static final String URL      = System.getenv("FF_DB_URL");
     private static final String USER     = System.getenv("FF_DB_USER");
@@ -90,7 +87,13 @@ public class DbConfig {
      * {@code close()} on the underlying physical connection.</p>
      */
     public static Connection getConnection() throws SQLException {
-        if (AiService.isFusionProviderActive()) {
+        boolean fusion = AiService.isFusionProviderActive();
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(DbConfig.class,
+                    "getConnection() entry: mode=" + (fusion ? "ADF-BC" : "DriverManager"),
+                    AppsLogger.FINER);
+        }
+        if (fusion) {
             return openAdfBcConnection();
         }
         return openLocalDriverManagerConnection();
@@ -102,12 +105,29 @@ public class DbConfig {
 
     private static Connection openLocalDriverManagerConnection() throws SQLException {
         if (URL == null || URL.isBlank()) {
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(DbConfig.class,
+                        "FF_DB_URL not set — local-dev path cannot open a JDBC connection",
+                        AppsLogger.WARNING);
+            }
             throw new SQLException(
                     "Local-dev JDBC path selected (LLM_PROVIDER=openai) but "
                   + "FF_DB_URL is not set. Set FF_DB_URL / FF_DB_USER / FF_DB_PASSWORD "
                   + "to point at a reachable Oracle instance.");
         }
-        return DriverManager.getConnection(URL, USER, PASSWORD);
+        try {
+            Connection c = DriverManager.getConnection(URL, USER, PASSWORD);
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(DbConfig.class,
+                        "DriverManager connection opened: " + URL, AppsLogger.FINER);
+            }
+            return c;
+        } catch (SQLException e) {
+            // SEVERE inside catch — DB unavailable is a hard failure callers
+            // need to see prominently in the log.
+            AppsLogger.write(DbConfig.class, e, AppsLogger.SEVERE);
+            throw e;
+        }
     }
 
     // ????????????????????????????????????????????????????????????????????????
@@ -115,6 +135,11 @@ public class DbConfig {
     // ????????????????????????????????????????????????????????????????????????
 
     private static Connection openAdfBcConnection() throws SQLException {
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(DbConfig.class,
+                    "openAdfBcConnection: definition=" + AM_DEFINITION
+                            + " config=" + AM_CONFIG, AppsLogger.FINER);
+        }
         Object am = null;
         try {
             Class<?> configClass = loadConfigClass();
@@ -144,11 +169,19 @@ public class DbConfig {
                 throw new SQLException("DBTransaction.getJdbcConnection() returned null");
             }
 
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(DbConfig.class,
+                        "ADF BC AM checked out OK; wrapping connection", AppsLogger.FINER);
+            }
             // Wrap so caller's close() releases the AM back to the pool
             // instead of tearing down the underlying physical connection.
             return wrapAmBoundConnection(real, am);
 
         } catch (ClassNotFoundException cnfe) {
+            // SEVERE in catch — happens if a developer accidentally points the
+            // local-dev path at this branch. The AppsLogger stub will dump it
+            // to stdout, the real Fusion AppsLogger will route it to ODL.
+            AppsLogger.write(DbConfig.class, cnfe, AppsLogger.SEVERE);
             throw new SQLException(
                     "ADF BC framework not on classpath (" + ADF_CONFIG_CLASS + "). "
                   + "This path is meant for Fusion central deployment. "
@@ -158,11 +191,13 @@ public class DbConfig {
         } catch (InvocationTargetException ite) {
             if (am != null) releaseAmSilently(am);
             Throwable cause = ite.getCause() != null ? ite.getCause() : ite;
+            AppsLogger.write(DbConfig.class, ite, AppsLogger.SEVERE);
             throw new SQLException(
                     "ADF BC AM setup failed for definition '" + AM_DEFINITION
                   + "' (config '" + AM_CONFIG + "'): " + cause.getMessage(), cause);
         } catch (Exception e) {
             if (am != null) releaseAmSilently(am);
+            AppsLogger.write(DbConfig.class, e, AppsLogger.SEVERE);
             throw new SQLException(
                     "Unexpected error obtaining ADF BC AM connection for '"
                   + AM_DEFINITION + "': " + e.getMessage(), e);
@@ -247,7 +282,10 @@ public class DbConfig {
         try {
             releaseAm(am);
         } catch (Throwable t) {
-            LOG.log(Level.WARNING, "Best-effort AM release failed", t);
+            // SEVERE inside catch — best-effort release failures are rare but
+            // important to surface because they can leak AM instances over
+            // time. Don't rethrow.
+            AppsLogger.write(DbConfig.class, t, AppsLogger.SEVERE);
         }
     }
 

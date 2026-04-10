@@ -1,5 +1,7 @@
 package oracle.apps.hcm.formulas.core.jersey.parser;
 
+import oracle.apps.fnd.applcore.log.AppsLogger;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -170,6 +172,10 @@ public final class Tokenizer {
     // ── Public API ─────────────────────────────────────────────────────────
 
     public List<Token> tokenize() {
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this,
+                    "tokenize: sourceLen=" + length, AppsLogger.FINER);
+        }
         List<Token> tokens = new ArrayList<>();
         while (pos < length) {
             skipWhitespaceAndComments();
@@ -180,6 +186,15 @@ public final class Tokenizer {
             }
         }
         tokens.add(new Token(TokenType.EOF, "", line, col));
+        if (!errors.isEmpty() && AppsLogger.isEnabled(AppsLogger.WARNING)) {
+            AppsLogger.write(this,
+                    "tokenize: completed with " + errors.size() + " lex errors",
+                    AppsLogger.WARNING);
+        } else if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this,
+                    "tokenize: produced " + tokens.size() + " tokens",
+                    AppsLogger.FINER);
+        }
         return tokens;
     }
 

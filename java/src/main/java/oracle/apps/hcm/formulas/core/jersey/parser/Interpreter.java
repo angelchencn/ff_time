@@ -1,5 +1,6 @@
 package oracle.apps.hcm.formulas.core.jersey.parser;
 
+import oracle.apps.fnd.applcore.log.AppsLogger;
 import oracle.apps.hcm.formulas.core.jersey.parser.AstNodes.*;
 
 import java.time.LocalDate;
@@ -53,12 +54,24 @@ public class Interpreter {
     // ── Public entry point ──────────────────────────────────────────────────
 
     public Map<String, Object> run(Program program) {
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this,
+                    "run: stmtCount=" + program.statements().size()
+                            + " inputKeys=" + inputKeys,
+                    AppsLogger.FINER);
+        }
         try {
             for (AstNodes stmt : program.statements()) {
                 execStatement(stmt);
             }
         } catch (ReturnSignal ignored) {
-            // RETURN control flow
+            // RETURN control flow — normal exit path, intentionally silent.
+        } catch (SimulationError simErr) {
+            // SEVERE inside catch — re-thrown to caller (SimulatorService),
+            // but we want a stack trace at this layer too because the caller
+            // only logs the message.
+            AppsLogger.write(this, simErr, AppsLogger.SEVERE);
+            throw simErr;
         }
 
         Set<String> excluded = new HashSet<>(inputKeys);
@@ -74,6 +87,12 @@ public class Interpreter {
                 result.put(entry.getKey(),
                         v instanceof LocalDate ? ((LocalDate) v).format(DateTimeFormatter.ofPattern("d-MMM-yyyy")) : v);
             }
+        }
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this,
+                    "run: completed, output keys=" + result.keySet()
+                            + " trace=" + trace.size(),
+                    AppsLogger.FINER);
         }
         return result;
     }

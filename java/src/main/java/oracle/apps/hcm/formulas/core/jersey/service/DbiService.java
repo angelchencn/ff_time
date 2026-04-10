@@ -3,6 +3,8 @@ package oracle.apps.hcm.formulas.core.jersey.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import oracle.apps.fnd.applcore.log.AppsLogger;
+
 import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -30,8 +32,16 @@ public class DbiService {
             if (is != null) {
                 try {
                     cachedDbis = MAPPER.readValue(is, new TypeReference<>() {});
+                    if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                        AppsLogger.write(this,
+                                "Loaded DBI registry from classpath " + resource
+                                        + " (" + cachedDbis.size() + " entries)",
+                                AppsLogger.INFO);
+                    }
                     return cachedDbis;
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    AppsLogger.write(this, e, AppsLogger.SEVERE);
+                }
             }
         }
 
@@ -50,11 +60,24 @@ public class DbiService {
             if (file.exists()) {
                 try {
                     cachedDbis = MAPPER.readValue(file, new TypeReference<>() {});
+                    if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                        AppsLogger.write(this,
+                                "Loaded DBI registry from filesystem " + path
+                                        + " (" + cachedDbis.size() + " entries)",
+                                AppsLogger.INFO);
+                    }
                     return cachedDbis;
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    AppsLogger.write(this, e, AppsLogger.SEVERE);
+                }
             }
         }
 
+        if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+            AppsLogger.write(this,
+                    "DBI registry not found on classpath or filesystem; returning empty list",
+                    AppsLogger.WARNING);
+        }
         cachedDbis = List.of();
         return cachedDbis;
     }

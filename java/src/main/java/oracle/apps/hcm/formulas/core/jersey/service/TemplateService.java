@@ -1,5 +1,6 @@
 package oracle.apps.hcm.formulas.core.jersey.service;
 
+import oracle.apps.fnd.applcore.log.AppsLogger;
 import oracle.apps.hcm.formulas.core.jersey.config.DbConfig;
 
 import java.io.Reader;
@@ -12,8 +13,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * JDBC-backed CRUD service for the {@code FF_FORMULA_TEMPLATES} family of tables.
@@ -29,8 +28,6 @@ import java.util.logging.Logger;
  * belong to the built-in Custom Formula category with no FK to a real type.</p>
  */
 public class TemplateService {
-
-    private static final Logger LOG = Logger.getLogger(TemplateService.class.getName());
 
     /** Sentinel type-name used by the UI for the built-in "Custom Formula" bucket. */
     public static final String CUSTOM_TYPE = "Custom";
@@ -53,6 +50,12 @@ public class TemplateService {
      */
     public List<Map<String, Object>> listByFormulaType(String formulaTypeName,
                                                        boolean includeInactive) throws SQLException {
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this,
+                    "listByFormulaType: name=" + formulaTypeName
+                            + " includeInactive=" + includeInactive,
+                    AppsLogger.FINER);
+        }
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT v.TEMPLATE_ID, v.FORMULA_TYPE_ID, v.TEMPLATE_CODE, ")
            .append("       v.FORMULA_TEXT, v.ADDITIONAL_PROMPT_TEXT, v.SOURCE_TYPE, ")
@@ -86,8 +89,19 @@ public class TemplateService {
                 while (rs.next()) {
                     out.add(rowToMap(rs));
                 }
+                if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                    AppsLogger.write(this,
+                            "listByFormulaType returned " + out.size() + " rows",
+                            AppsLogger.FINER);
+                }
                 return out;
             }
+        } catch (SQLException e) {
+            // SEVERE inside catch — DB query failures bubble up to the REST
+            // layer, but we want a stack trace at this layer too because the
+            // resource catch only logs the chained exception cause.
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
+            throw e;
         }
     }
 
@@ -98,6 +112,9 @@ public class TemplateService {
 
     /** Fetch a single template by id; returns {@code null} when the row does not exist. */
     public Map<String, Object> findById(long templateId) throws SQLException {
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this, "findById: " + templateId, AppsLogger.FINER);
+        }
         return findByColumn("TEMPLATE_ID = ?", ps -> ps.setLong(1, templateId));
     }
 
@@ -110,6 +127,9 @@ public class TemplateService {
      */
     public Map<String, Object> findByTemplateCode(String templateCode) throws SQLException {
         if (templateCode == null || templateCode.isBlank()) return null;
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this, "findByTemplateCode: " + templateCode, AppsLogger.FINER);
+        }
         return findByColumn("TEMPLATE_CODE = ?", ps -> ps.setString(1, templateCode));
     }
 
@@ -132,6 +152,9 @@ public class TemplateService {
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rowToMap(rs) : null;
             }
+        } catch (SQLException e) {
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
+            throw e;
         }
     }
 
@@ -147,6 +170,13 @@ public class TemplateService {
      * {@code TEMPLATE_ID} is allocated from {@code FUSION.S_ROW_ID_SEQ.NEXTVAL}.
      */
     public Map<String, Object> create(Map<String, Object> req) throws SQLException {
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(this,
+                    "create: name=" + req.get("name")
+                            + " formula_type=" + req.get("formula_type")
+                            + " template_code=" + req.get("template_code"),
+                    AppsLogger.INFO);
+        }
         String name = str(req.get("name"), "Untitled Template");
         String description = str(req.get("description"), "");
         String code = str(req.get("code"), "");
@@ -168,12 +198,18 @@ public class TemplateService {
                 insertTl(conn, templateId, name, description, createdBy);
 
                 conn.commit();
+                if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                    AppsLogger.write(this,
+                            "create committed: template_id=" + templateId,
+                            AppsLogger.INFO);
+                }
                 Map<String, Object> created = findById(templateId);
                 if (created == null) {
                     throw new SQLException("Template insert succeeded but row not found, id=" + templateId);
                 }
                 return created;
             } catch (SQLException e) {
+                AppsLogger.write(this, e, AppsLogger.SEVERE);
                 conn.rollback();
                 throw e;
             }
@@ -186,11 +222,21 @@ public class TemplateService {
      * TL rows for optimistic-locking purposes.
      */
     public Map<String, Object> update(long templateId, Map<String, Object> updates) throws SQLException {
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(this,
+                    "update: template_id=" + templateId + " keys=" + updates.keySet(),
+                    AppsLogger.INFO);
+        }
         try (Connection conn = DbConfig.getConnection()) {
             conn.setAutoCommit(false);
             try {
                 Map<String, Object> existing = findById(templateId);
                 if (existing == null) {
+                    if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                        AppsLogger.write(this,
+                                "update: template_id=" + templateId + " not found",
+                                AppsLogger.WARNING);
+                    }
                     return null;
                 }
 
@@ -199,8 +245,14 @@ public class TemplateService {
                 updateTl(conn, templateId, updates, lastUpdatedBy);
 
                 conn.commit();
+                if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                    AppsLogger.write(this,
+                            "update committed: template_id=" + templateId,
+                            AppsLogger.INFO);
+                }
                 return findById(templateId);
             } catch (SQLException e) {
+                AppsLogger.write(this, e, AppsLogger.SEVERE);
                 conn.rollback();
                 throw e;
             }
@@ -209,6 +261,9 @@ public class TemplateService {
 
     /** Hard-delete the template and its TL rows. Returns true when a row was removed. */
     public boolean delete(long templateId) throws SQLException {
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(this, "delete: template_id=" + templateId, AppsLogger.INFO);
+        }
         try (Connection conn = DbConfig.getConnection()) {
             conn.setAutoCommit(false);
             try {
@@ -224,8 +279,15 @@ public class TemplateService {
                     removed = ps.executeUpdate();
                 }
                 conn.commit();
+                if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                    AppsLogger.write(this,
+                            "delete committed: template_id=" + templateId
+                                    + " removed=" + removed,
+                            AppsLogger.INFO);
+                }
                 return removed > 0;
             } catch (SQLException e) {
+                AppsLogger.write(this, e, AppsLogger.SEVERE);
                 conn.rollback();
                 throw e;
             }
@@ -267,7 +329,12 @@ public class TemplateService {
                 }
             }
         }
-        LOG.warning("Unknown formula type name '" + formulaTypeName + "' — inserting template with NULL FORMULA_TYPE_ID");
+        if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+            AppsLogger.write(TemplateService.class,
+                    "Unknown formula type name '" + formulaTypeName
+                            + "' — inserting template with NULL FORMULA_TYPE_ID",
+                    AppsLogger.WARNING);
+        }
         return null;
     }
 
@@ -466,7 +533,10 @@ public class TemplateService {
             }
             return sb.toString();
         } catch (java.io.IOException e) {
-            LOG.log(Level.WARNING, "Failed to read CLOB column " + column, e);
+            // SEVERE inside catch — CLOB read failure is unusual and worth a
+            // full stack trace; the caller still gets a null and degrades
+            // gracefully so end users don't see a 500.
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
             return null;
         }
     }

@@ -1,5 +1,6 @@
 package oracle.apps.hcm.formulas.core.jersey.service;
 
+import oracle.apps.fnd.applcore.log.AppsLogger;
 import oracle.apps.hcm.formulas.core.jersey.parser.*;
 import oracle.apps.hcm.formulas.core.jersey.parser.AstNodes.*;
 
@@ -47,6 +48,12 @@ public class ValidatorService {
     }
 
     public Map<String, Object> validate(String code) {
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(this,
+                    "validate: codeLen=" + (code == null ? 0 : code.length()),
+                    AppsLogger.INFO);
+        }
+
         var diagnostics = new ArrayList<Map<String, Object>>();
 
         // Layer 1 — syntax
@@ -58,6 +65,11 @@ public class ValidatorService {
         }
 
         if (parseResult.program() == null) {
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "validate aborted at syntax layer with " + diagnostics.size() + " diagnostics",
+                        AppsLogger.WARNING);
+            }
             return Map.of("valid", false, "diagnostics", diagnostics);
         }
 
@@ -71,6 +83,12 @@ public class ValidatorService {
 
         boolean hasError = diagnostics.stream()
                 .anyMatch(d -> "error".equals(d.get("severity")));
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(this,
+                    "validate complete: valid=" + (!hasError)
+                            + " diagnostics=" + diagnostics.size(),
+                    AppsLogger.INFO);
+        }
         return Map.of("valid", !hasError, "diagnostics", diagnostics);
     }
 
