@@ -1,0 +1,72 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<!-- $Header: fusionapps/hcm/components/hcmPayroll/formulas/core/dbSchema/database/fusionDB/FUSION/FF_FORMULA_TEMPLATES_TL_VPD.policy ff_time/1 2026/04/08 00:00:00 alex Exp $ -->
+<!-- adxml:    <src_file bootstrap="~BOOTSTRAP" version="~VERSION" -->
+<!-- adxml:       translation_level="~TRANS_LEVEL" techstack_level="~TXK_LEVEL" -->
+<!-- adxml:       verticalisation_level="~VERT_LEVEL" custom_level="~CUST_LEVEL" -->
+<!-- adxml:       language="~LANG" needs_translation="~TRANSLATION" ship="~SHIP" -->
+<!-- adxml:       localization="~LOCALIZATION" object_type="~OBJECT_TYPE"> -->
+<!-- adxml:     <abstract_file te="~PROD" subdir="~PATH" file_basename="~BASENAME" file_type="~FILE_TYPE"/> -->
+<!-- adxml:     <metadata> -->
+<!-- adxml:       <action identifier="POLICY" category="DD_POLICIES" portion="D" online_category="N"> -->
+<!-- adxml:         <apply_action> -->
+<!-- adxml:           <action_details name="java"> -->
+<!-- adxml:             <invoking_exec> -->
+<!-- adxml:               <executable file_basename="oracle.apps.fnd.applxdf.comp.XdfSchemaDeploy" file_type="class"/> -->
+<!-- adxml:             </invoking_exec> -->
+<!-- adxml:             <args>owner_un=#un:fusion# apps_un=#un:fusion# -->
+<!-- adxml:                      jdbc_protocol=#jdbc_protocol# jdbc_db_addr=#jdbc_db_addr# xdf_mode=policy -->
+<!-- adxml:                      xdf_file_name=#fullpath:~PROD:~PATH:~FILE#  -->
+<!-- adxml:             </args> -->
+<!-- adxml:           </action_details> -->
+<!-- adxml:         </apply_action> -->
+<!-- adxml:         <analysis_action> -->
+<!-- adxml:           <default_action/> -->
+<!-- adxml:         </analysis_action> -->
+<!-- adxml:         <ahead_of_time_run_conditions> -->
+<!-- adxml:           <check_file check="Y"/> -->
+<!-- adxml:         </ahead_of_time_run_conditions> -->
+<!-- adxml:       </action> -->
+<!-- adxml:     </metadata> -->
+<!-- adxml:   </src_file> -->
+<!--
+Primary Object's Schema : FUSION
+Primary Object Name     : FF_FORMULA_TEMPLATES_TL.HCM_STATIC_VPD_EID_POLICY
+Primary Object Type     : RLS_POLICY
+Dependent Objects' Information : None
+-->
+<RLS_POLICY xmlns="http://xmlns.oracle.com/ku" version="1.0">
+   <SCHEMA>FUSION</SCHEMA>
+   <NAME>FF_FORMULA_TEMPLATES_TL</NAME>
+   <POLICY_GROUP>SYS_DEFAULT</POLICY_GROUP>
+   <POLICY_NAME>HCM_STATIC_VPD_EID_POLICY</POLICY_NAME>
+   <FUNCTION_SCHEMA>FUSION</FUNCTION_SCHEMA>
+   <POLICY_FUNCTION>HRC_SESSION_UTIL.GET_STATIC_EID_PRED</POLICY_FUNCTION>
+   <STATEMENT_TYPE_LIST>
+      <STATEMENT_TYPE_LIST_ENTRY>
+         <NAME>DELETE</NAME>
+      </STATEMENT_TYPE_LIST_ENTRY>
+      <STATEMENT_TYPE_LIST_ENTRY>
+         <NAME>UPDATE</NAME>
+      </STATEMENT_TYPE_LIST_ENTRY>
+      <STATEMENT_TYPE_LIST_ENTRY>
+         <NAME>INSERT</NAME>
+      </STATEMENT_TYPE_LIST_ENTRY>
+      <STATEMENT_TYPE_LIST_ENTRY>
+         <NAME>SELECT</NAME>
+      </STATEMENT_TYPE_LIST_ENTRY>
+   </STATEMENT_TYPE_LIST>
+   <UPDATE_CHECK>Y</UPDATE_CHECK>
+   <ENABLE>Y</ENABLE>
+   <STATIC_POLICY>Y</STATIC_POLICY>
+   <POLICY_TYPE>dbms_rls.SHARED_STATIC</POLICY_TYPE>
+   <LONG_PREDICATE>N</LONG_PREDICATE>
+   <CUSTOMER_AREA>
+      <UDP_LIST>
+         <UDP_LIST_ITEM>
+            <NAME/>
+            <VALUE/>
+         </UDP_LIST_ITEM>
+      </UDP_LIST>
+   </CUSTOMER_AREA>
+</RLS_POLICY>
+

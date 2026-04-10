@@ -1,6 +1,5 @@
 package oracle.apps.hcm.formulas.core.jersey.service;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -14,10 +13,10 @@ import java.util.regex.Pattern;
  * AI service with pluggable LLM backend.
  *
  * Provider selection (via LLM_PROVIDER env var):
- *   - "openai"  → OpenAI GPT-5.4 (default)
- *   - "fusion"  → Oracle Fusion Completions API
+ *   - unset / anything else → Oracle Fusion Completions API (default)
+ *   - "openai"              → OpenAI GPT-5.4
  *
- * Prompt building, RAG, templates, and post-processing are provider-independent.
+ * Prompt building, RAG, and post-processing are provider-independent.
  */
 public class AiService {
 
@@ -26,17 +25,12 @@ public class AiService {
     private static final int MAX_TOKENS_COMPLETION = 512;
 
     private final LlmProvider provider;
-    private final FormulaTypesService templateService = new FormulaTypesService();
     private final RagService ragService = new RagService();
 
     public AiService() {
-        String providerName = System.getenv("LLM_PROVIDER");
-        if ("openai".equalsIgnoreCase(providerName)) {
-            this.provider = new OpenAiProvider();
-        } else {
-            // Default: Fusion
-            this.provider = new FusionAiProvider();
-        }
+        this.provider = isFusionProviderActive()
+                ? new FusionAiProvider()
+                : new OpenAiProvider();
         LOG.info("AiService initialized with provider: " + provider.name()
                 + " (available=" + provider.isAvailable() + ")");
     }
@@ -46,9 +40,34 @@ public class AiService {
         this.provider = provider;
     }
 
-    // ── Streaming Chat ──────────────────────────────────────────────────────
+    /**
+     * Single source of truth for "are we running in a Fusion central
+     * environment?". Reads {@code LLM_PROVIDER} env var:
+     *
+     *   - unset / anything but "openai" → Fusion (default)
+     *   - "openai" (case-insensitive)   → OpenAI (local dev)
+     *
+     * Used by this class's no-arg constructor AND by {@code DbConfig} to
+     * decide whether to open a JDBC connection via ADF BC ApplicationModule
+     * (Fusion path) or via the plain DriverManager + FF_DB_URL env vars
+     * (local dev path). Keeping the check static + public means the two
+     * layers always agree on the runtime mode.
+     */
+    public static boolean isFusionProviderActive() {
+        String providerName = System.getenv("LLM_PROVIDER");
+        return !"openai".equalsIgnoreCase(providerName);
+    }
 
-    public void streamChat(String message, String code, String formulaType,
+    // ── Chat ────────────────────────────────────────────────────────────────
+    //
+    // Two variants share the same prompt-building logic:
+    //   streamChat(...)  — server-sent events, tokens pushed via a callback
+    //   chatOnce(...)    — blocking, returns the full text at once
+    //
+    // Both delegate to buildChatMessages() so the system prompt, history,
+    // reference formula, and custom rule are assembled identically.
+
+    public void streamChat(String message, String editorCode, String formulaType,
                            List<Map<String, String>> history,
                            String customSampleCode,
                            String customRule,
@@ -57,10 +76,50 @@ public class AiService {
             tokenCallback.accept("Error: " + provider.name() + " is not available.");
             return;
         }
+        List<Map<String, String>> messages = buildChatMessages(
+                message, editorCode, formulaType, history, customSampleCode, customRule);
+        provider.streamChat(messages, MAX_TOKENS_CHAT, tokenCallback);
+    }
 
-        String userPrompt = buildGenerationPrompt(message, formulaType, code, customSampleCode);
+    /** Convenience overload without history/custom sample/rule */
+    public void streamChat(String message, String editorCode, String formulaType,
+                           Consumer<String> tokenCallback) {
+        streamChat(message, editorCode, formulaType, List.of(), null, null, tokenCallback);
+    }
 
-        // Build system prompt, append custom rule if provided
+    /**
+     * Blocking counterpart of {@link #streamChat} — sends the same prompt to
+     * the LLM and waits for the entire response before returning it as a
+     * single string. Useful for clients that would rather poll than parse SSE.
+     *
+     * Returns a short error string (never null) when the provider is
+     * unavailable so callers can forward it straight to the user.
+     */
+    public String chatOnce(String message, String editorCode, String formulaType,
+                           List<Map<String, String>> history,
+                           String customSampleCode,
+                           String customRule) {
+        if (!provider.isAvailable()) {
+            return "Error: " + provider.name() + " is not available.";
+        }
+        List<Map<String, String>> messages = buildChatMessages(
+                message, editorCode, formulaType, history, customSampleCode, customRule);
+        String response = provider.complete(messages, MAX_TOKENS_CHAT);
+        return response == null ? "" : response;
+    }
+
+    /**
+     * Assemble the message array passed to the LLM for a chat/generation
+     * request. Shared between streaming and non-streaming variants so both
+     * produce identical prompts for the same inputs.
+     */
+    private List<Map<String, String>> buildChatMessages(
+            String message, String editorCode, String formulaType,
+            List<Map<String, String>> history,
+            String customSampleCode, String customRule) {
+
+        String userPrompt = buildGenerationPrompt(message, formulaType, editorCode, customSampleCode);
+
         String sysPrompt = SYSTEM_PROMPT;
         if (customRule != null && !customRule.isBlank()) {
             sysPrompt = sysPrompt + "\n\n## 19. Custom Rule\n\n" + customRule;
@@ -70,14 +129,7 @@ public class AiService {
         messages.add(Map.of("role", "system", "content", sysPrompt));
         messages.addAll(history);
         messages.add(Map.of("role", "user", "content", userPrompt));
-
-        provider.streamChat(messages, MAX_TOKENS_CHAT, tokenCallback);
-    }
-
-    /** Convenience overload without history/custom sample/rule */
-    public void streamChat(String message, String code, String formulaType,
-                           Consumer<String> tokenCallback) {
-        streamChat(message, code, formulaType, List.of(), null, null, tokenCallback);
+        return messages;
     }
 
     // ── Complete ────────────────────────────────────────────────────────────
@@ -115,13 +167,13 @@ public class AiService {
 
     // ── Prompt Builders ─────────────────────────────────────────────────────
 
-    private String buildGenerationPrompt(String message, String formulaType, String currentCode) {
-        return buildGenerationPrompt(message, formulaType, currentCode, null);
+    private String buildGenerationPrompt(String message, String formulaType, String editorCode) {
+        return buildGenerationPrompt(message, formulaType, editorCode, null);
     }
 
     @SuppressWarnings("unchecked")
     private String buildGenerationPrompt(String message, String formulaType,
-                                          String currentCode, String customSampleCode) {
+                                          String editorCode, String customSampleCode) {
         List<String> sections = new ArrayList<>();
 
         if (customSampleCode != null && !customSampleCode.isBlank()) {
@@ -143,29 +195,14 @@ public class AiService {
             }
         }
 
-        boolean hasCode = currentCode != null && !currentCode.isBlank();
-        if (hasCode) {
-            sections.add("## Current Formula in Editor\n\n```\n" + currentCode + "\n```\n\n"
+        boolean hasEditorCode = editorCode != null && !editorCode.isBlank();
+        if (hasEditorCode) {
+            sections.add("## Current Formula in Editor\n\n```\n" + editorCode + "\n```\n\n"
                     + "The user wants to modify this existing formula. "
                     + "Output the complete updated formula incorporating the requested change.");
         }
 
-        // Skip formula type template for Custom formulas — the reference formula is the template
         boolean isCustom = customSampleCode != null;
-        Map<String, Object> template = isCustom ? null : templateService.getTemplate(formulaType);
-        if (template != null) {
-            String skeleton = ((String) template.getOrDefault("skeleton", ""))
-                    .replace("{date_today}", LocalDate.now().toString());
-            String exampleSnippet = (String) template.getOrDefault("example_snippet", "");
-            sections.add("## Formula Type Template\n\n"
-                    + "**Type:** " + template.get("display_name") + "\n"
-                    + "**Naming convention:** " + template.getOrDefault("naming_pattern", "") + "\n\n"
-                    + "### Skeleton\n```\n" + skeleton + "\n```\n\n"
-                    + (exampleSnippet.isEmpty() ? "" : "### Example Pattern\n```\n" + exampleSnippet + "\n```\n\n")
-                    + "Use this skeleton as the structural foundation. "
-                    + "Replace the placeholder business logic section with the actual implementation. "
-                    + "Keep the header, DEFAULT/INPUTS, logging, and RETURN structure intact.");
-        }
 
         if (isCustom) {
             sections.add("## Request\n\n"
@@ -178,14 +215,13 @@ public class AiService {
             sections.add("## Request\n\nFormula type: " + formulaType + "\n\nRequirement: " + message);
         }
 
-        if (hasCode) {
+        if (hasEditorCode) {
             sections.add("Return the complete modified formula. Do not explain the changes unless asked. "
                     + "Preserve the header comment block if one exists, updating the Change History.");
         } else {
             sections.add("Generate a complete Fast Formula that satisfies the requirement. "
-                    + "Follow the skeleton template above exactly — fill in the formula name, "
-                    + "description, author, date, and replace the business logic placeholder. "
-                    + "Derive a proper formula name following the naming convention shown.\n\n"
+                    + "Derive a proper formula name following Oracle Fast Formula naming conventions "
+                    + "for the given formula type.\n\n"
                     + "CRITICAL REQUIREMENTS:\n"
                     + "1. MUST include a professional header comment block\n"
                     + "2. Include DEFAULT FOR statements for input variables that need fallback values\n"

@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { EditorWithChat } from '../Editor/EditorWithChat';
 import { SimulationPanel } from '../SimulationPanel/SimulationPanel';
-import { CustomFormulasPanel } from '../CustomFormulas/CustomFormulasPanel';
+import { TemplatesPanel } from '../Templates/TemplatesPanel';
 import { Toolbar } from './Toolbar';
 import { StatusBar } from './StatusBar';
 import { useValidation } from '../../hooks/useValidation';
@@ -69,13 +69,13 @@ export function AppLayout() {
   useValidation();
 
   const [rightWidth, setRightWidth] = useState(360);
-  const [showCustomFormulas, setShowCustomFormulas] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const handleRightDrag = useCallback((dx: number) => {
     setRightWidth((w) => Math.max(240, Math.min(600, w - dx)));
   }, []);
 
-  if (showCustomFormulas) {
+  if (showTemplates) {
     return (
       <div
         style={{
@@ -86,7 +86,7 @@ export function AppLayout() {
           overflow: 'hidden',
         }}
       >
-        <CustomFormulasPanel onBack={() => setShowCustomFormulas(false)} />
+        <TemplatesPanel onBack={() => setShowTemplates(false)} />
         <StatusBar />
       </div>
     );
@@ -102,7 +102,7 @@ export function AppLayout() {
         overflow: 'hidden',
       }}
     >
-      <Toolbar onManageCustom={() => setShowCustomFormulas(true)} />
+      <Toolbar onManageTemplates={() => setShowTemplates(true)} />
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Left: Editor + Chat input */}

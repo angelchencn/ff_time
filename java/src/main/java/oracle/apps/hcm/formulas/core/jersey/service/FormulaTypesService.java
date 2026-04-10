@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,70 +19,24 @@ public class FormulaTypesService {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private List<Map<String, Object>> cachedTypes;
-    private Map<String, Map<String, Object>> cachedTemplates;
 
     public List<Map<String, Object>> listAll() {
         if (cachedTypes == null) {
             cachedTypes = new ArrayList<>(loadJsonList("oracle/apps/hcm/formulas/core/jersey/data/formula_types_registry.json"));
-            cachedTypes.add(0, CustomFormulaService.getInstance().getTypeInfo());
+            // The built-in "Custom Formula" bucket is injected at position 0
+            // so it's always first in the UI dropdowns. Its samples now come
+            // from the FF_FORMULA_TEMPLATES DB table (rows with
+            // FORMULA_TYPE_ID IS NULL) via TemplateService, so we hardcode
+            // an empty sample_prompts list here — the frontend sample picker
+            // reads from /api/templates, not from this registry.
+            Map<String, Object> custom = new LinkedHashMap<>();
+            custom.put("type_name", "Custom");
+            custom.put("display_name", "Custom Formula");
+            custom.put("formula_count", 0);
+            custom.put("sample_prompts", List.of());
+            cachedTypes.add(0, custom);
         }
         return cachedTypes;
-    }
-
-    public Map<String, Object> getTemplate(String typeName) {
-        if (cachedTemplates == null) {
-            cachedTemplates = loadTemplates();
-            cachedTemplates.put("Custom", Map.of(
-                    "type_name", "Custom",
-                    "display_name", "Custom Formulas",
-                    "naming_pattern", "CUSTOM_<BUSINESS_DESCRIPTION>  (e.g. CUSTOM_OVERTIME_PAY_CALC)",
-                    "skeleton", CUSTOM_SKELETON,
-                    "example_snippet", ""
-            ));
-        }
-        return cachedTemplates.get(typeName);
-    }
-
-    private static final String CUSTOM_SKELETON = """
-/******************************************************************************
- *
- * Formula Name : {formula_name}
- *
- * Formula Type : Custom
- *
- * Description  : {description}
- *
- * Change History
- * --------------
- *
- *  Who             Ver    Date          Description
- * ---------------  ----   -----------   --------------------------------
- * Payroll Admin    1.0    {date_today}  Created.
- *
- ******************************************************************************/
-
-/* DEFAULT and INPUTS declarations here */
-
-l_log = PAY_INTERNAL_LOG_WRITE('{formula_name} - Enter')
-
-/* ---- Business logic here ---- */
-
-l_log = PAY_INTERNAL_LOG_WRITE('{formula_name} - Exit')
-
-RETURN /* return variables here */
-
-/* End Formula Text */
-""";
-
-    private Map<String, Map<String, Object>> loadTemplates() {
-        var raw = loadJsonMap("oracle/apps/hcm/formulas/core/jersey/data/formula_type_templates.json");
-        var result = new HashMap<String, Map<String, Object>>();
-        for (var entry : raw.entrySet()) {
-            var tmpl = new HashMap<>(entry.getValue());
-            tmpl.putIfAbsent("type_name", entry.getKey());
-            result.put(entry.getKey(), tmpl);
-        }
-        return result;
     }
 
     // ── JSON loading: classpath first, then filesystem fallback ──────────────
@@ -107,26 +61,5 @@ RETURN /* return variables here */
             }
         }
         return List.of();
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Map<String, Object>> loadJsonMap(String classpathResource) {
-        // Classpath
-        InputStream is = getClass().getClassLoader().getResourceAsStream(classpathResource);
-        if (is != null) {
-            try { return MAPPER.readValue(is, new TypeReference<>() {}); }
-            catch (Exception ignored) {}
-        }
-        // Filesystem fallback
-        for (String base : List.of("src/main/resources/", "../java/src/main/resources/", "../backend/data/", "backend/data/")) {
-            String path = classpathResource.startsWith("data/") ? base + classpathResource.substring(5) : base + classpathResource;
-            if (base.contains("resources")) path = base + classpathResource;
-            var file = new File(path);
-            if (file.exists()) {
-                try { return MAPPER.readValue(file, new TypeReference<>() {}); }
-                catch (Exception ignored) {}
-            }
-        }
-        return Map.of();
     }
 }

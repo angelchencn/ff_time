@@ -886,16 +886,29 @@ public class FFParser {
         Token nameToken = advance();
         String name = nameToken.text();
 
-        // NAME '.' NAME '(' → method call
+        // NAME '.' NAME ['(' args ')'] → method call OR collection attribute
+        //
+        // Both forms are valid in Oracle Fast Formula / PL/SQL context:
+        //   arr.COUNT              — parameterless attribute on a PL/SQL collection
+        //   arr.FIRST              — same, returns first index
+        //   arr.EXISTS(i)          — method with a single arg
+        //   arr.DELETE(i, j)       — method with multiple args
+        //
+        // The AST collapses both into a single MethodCall node with an empty
+        // args list for the bare-attribute case; the interpreter treats them
+        // uniformly (traces the call and returns 0), so an empty-args
+        // MethodCall is safe to construct here.
         if (check(TokenType.DOT)) {
             advance();
             String method = expectName();
-            expect(TokenType.LPAREN);
             List<AstNodes> args = List.of();
-            if (!check(TokenType.RPAREN)) {
-                args = parseExprList();
+            if (check(TokenType.LPAREN)) {
+                advance();
+                if (!check(TokenType.RPAREN)) {
+                    args = parseExprList();
+                }
+                expect(TokenType.RPAREN);
             }
-            expect(TokenType.RPAREN);
             return new MethodCall(name, method, args);
         }
 

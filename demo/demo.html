@@ -411,6 +411,7 @@
   <a href="#phase4" class="nav-sage">Phase 4 — Output</a>
   <a href="#phase5" class="nav-navy">Sample Full Prompt</a>
   <a href="#phase6" class="nav-ocean">Technical Diagram</a>
+  <a href="#schema" class="nav-copper">Template Schema</a>
 </nav>
 
 <div class="flow">
@@ -1391,6 +1392,155 @@ Derive a proper formula name following the naming convention shown.<br>
       </svg>
     </div>
 
+  </div>
+
+  <div class="connector"><div class="line line-copper" style="height:56px;"></div></div>
+
+  <!-- ═══ TEMPLATE SCHEMA ═══ -->
+  <div class="phase-divider">
+    <div class="line-h"></div>
+    <div class="label" id="schema" style="color: var(--copper-dark); border-color: var(--copper-bdr); background: var(--copper-bg); scroll-margin-top: 60px;">Template Schema — FF_FORMULA_TEMPLATES</div>
+    <div class="line-h"></div>
+  </div>
+
+  <div class="card accent-copper">
+    <h4>New Fusion Schema for AI-Assisted Template Authoring</h4>
+    <div class="desc">
+      A new seed-data-enabled MLS table set that stores both <strong>Oracle-delivered seeded templates</strong> and <strong>user-saved templates</strong>. Each row carries the Fast Formula starter code, an optional <em>prompt overlay</em> appended to the AI system prompt at generation time, and a semantic-search flag controlling RAG participation. Follows the Fusion HCM standard composite XML format (same as <code style="color:var(--copper); background:var(--copper-bg); padding:1px 5px; border-radius:3px; font-size:13px;">pay_generic_ana_types</code>).
+    </div>
+
+    <div class="split-3" style="margin-top:18px;">
+      <div class="inner-box">
+        <div class="title" style="color:var(--copper);">ff_formula_templates</div>
+        <div class="text" style="font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.7;">
+          <strong>Base table — 20 columns</strong><br>
+          Business keys, CLOBs, flags, WHO, Fusion SDF columns.<br><br>
+          File: <code style="color:var(--copper); background:var(--copper-bg); padding:1px 4px; border-radius:3px;">ff_formula_templates.table</code>
+        </div>
+      </div>
+      <div class="inner-box">
+        <div class="title" style="color:var(--copper);">ff_formula_templates_tl</div>
+        <div class="text" style="font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.7;">
+          <strong>Translation — 15 columns</strong><br>
+          Per-language <code>NAME</code> + <code>DESCRIPTION</code> (<code>translateFlag=Y</code>). PK <code>(TEMPLATE_ID, LANGUAGE)</code>.<br><br>
+          File: <code style="color:var(--copper); background:var(--copper-bg); padding:1px 4px; border-radius:3px;">ff_formula_templates_tl.table</code>
+        </div>
+      </div>
+      <div class="inner-box">
+        <div class="title" style="color:var(--copper);">FF_FORMULA_TEMPLATES_VL</div>
+        <div class="text" style="font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.7;">
+          <strong>View</strong><br>
+          Joins base + <code>_TL</code> filtered on <code>USERENV('LANG')</code>. Source of ADF VOs and REST queries.<br><br>
+          File: <code style="color:var(--copper); background:var(--copper-bg); padding:1px 4px; border-radius:3px;">FF_FORMULA_TEMPLATES_VL.view</code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="connector"><div class="line line-copper" style="height:40px;"></div></div>
+
+  <div class="card accent-copper" style="border-left-color: var(--copper-dark);">
+    <h4 style="color:var(--copper-dark); font-size:18px;">Base Table Columns (20)</h4>
+    <div class="desc" style="margin-bottom:14px;">
+      Grouped by concern. Seeded rows come from the Fusion Seed Data Framework; user-saved rows come from the REST API.
+    </div>
+
+    <table class="token-table" style="font-size:12px;">
+      <thead>
+        <tr>
+          <th style="width:28%;">Column</th>
+          <th style="width:22%;">Type</th>
+          <th style="width:10%;">Null</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>TEMPLATE_ID</code></td><td>NUMBER(18,0)</td><td>NOT NULL</td><td>PK, from sequence <code>FF_FORMULA_TEMPLATES_S</code></td></tr>
+        <tr><td><code>FORMULA_TYPE_ID</code></td><td>NUMBER(18,0)</td><td>NULL</td><td>FK → <code>FF_FORMULA_TYPES</code>. NULL = built-in Custom type</td></tr>
+        <tr><td><code>TEMPLATE_CODE</code></td><td>VARCHAR2(150)</td><td>NOT NULL</td><td>Unique machine-readable code (e.g. <code>ORA_OVERTIME_PAY_CALC</code>)</td></tr>
+        <tr><td><code>FORMULA_TEXT</code></td><td>CLOB</td><td>NULL</td><td>Fast Formula starter code (NULL allowed for prompt-only templates)</td></tr>
+        <tr><td><code>ADDITIONAL_PROMPT_TEXT</code></td><td>CLOB</td><td>NULL</td><td>Guidance appended to the AI <strong>system prompt</strong> at generation time</td></tr>
+        <tr><td><code>SOURCE_TYPE</code></td><td>VARCHAR2(30)</td><td>NOT NULL</td><td><code>SEEDED</code> / <code>USER_CREATED</code></td></tr>
+        <tr><td><code>ACTIVE_FLAG</code></td><td>VARCHAR2(1)</td><td>NOT NULL</td><td><code>Y</code>/<code>N</code> — visible in UI</td></tr>
+        <tr><td><code>SEMANTIC_FLAG</code></td><td>VARCHAR2(1)</td><td>NOT NULL</td><td><code>Y</code> = participates in RAG vector search; <code>N</code> = excluded</td></tr>
+        <tr><td><code>SORT_ORDER</code></td><td>NUMBER(9,0)</td><td>NULL</td><td>Display order within a formula type</td></tr>
+
+        <tr><td colspan="4" style="background:var(--copper-bg); color:var(--copper-dark); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:1px;">WHO Columns (6)</td></tr>
+        <tr><td><code>LAST_UPDATE_DATE</code></td><td>TIMESTAMP(6)</td><td>NOT NULL</td><td>Fusion WHO</td></tr>
+        <tr><td><code>CREATED_BY</code></td><td>VARCHAR2(64)</td><td>NOT NULL</td><td>Fusion WHO — <code>'SEED_DATA_FROM_APPLICATION'</code> for seeded rows</td></tr>
+        <tr><td><code>CREATION_DATE</code></td><td>TIMESTAMP(6)</td><td>NOT NULL</td><td>Fusion WHO</td></tr>
+        <tr><td><code>LAST_UPDATED_BY</code></td><td>VARCHAR2(64)</td><td>NOT NULL</td><td>Fusion WHO</td></tr>
+        <tr><td><code>LAST_UPDATE_LOGIN</code></td><td>VARCHAR2(32)</td><td>NULL</td><td>Fusion WHO</td></tr>
+        <tr><td><code>OBJECT_VERSION_NUMBER</code></td><td>NUMBER(9,0)</td><td>NOT NULL</td><td>Optimistic lock (default 1)</td></tr>
+
+        <tr><td colspan="4" style="background:var(--copper-bg); color:var(--copper-dark); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:1px;">Fusion SDF &amp; EBR Framework (5)</td></tr>
+        <tr><td><code>ENTERPRISE_ID</code></td><td>NUMBER(18,0)</td><td>NOT NULL</td><td>VPD multi-tenant key — <code>SYS_CONTEXT('FND_VPD_CTX','FND_ENTERPRISE_ID')</code></td></tr>
+        <tr><td><code>SEED_DATA_SOURCE</code></td><td>VARCHAR2(512)</td><td>NOT NULL</td><td>Seed Data Framework source file — <code>SYS_CONTEXT('FND_SDF_CTX','SDFFILE')</code></td></tr>
+        <tr><td><code>MODULE_ID</code></td><td>VARCHAR2(32)</td><td>NULL</td><td>Fusion module owning this row (FK → <code>FND_APPL_TAXONOMY</code>)</td></tr>
+        <tr><td><code>ORA_SEED_SET1</code></td><td>VARCHAR2(1)</td><td>NOT NULL</td><td>EBR (Edition-Based Redefinition) context — set 1</td></tr>
+        <tr><td><code>ORA_SEED_SET2</code></td><td>VARCHAR2(1)</td><td>NOT NULL</td><td>EBR context — set 2</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="connector"><div class="line line-copper" style="height:40px;"></div></div>
+
+  <div class="card accent-copper">
+    <h4>Key Design Decisions</h4>
+    <div class="split" style="margin-top:16px;">
+      <div class="inner-box">
+        <div class="title" style="color:var(--copper);">🧠 ADDITIONAL_PROMPT_TEXT — per-template prompt overlay</div>
+        <div class="text">
+          A CLOB column that the AI service appends to the <strong>system prompt</strong> whenever the template is selected. Lets domain-specific rule sets (e.g. Time &amp; Labor override rules) ride with the template instead of living in code. Templates without extra guidance simply leave this <code>NULL</code>.
+        </div>
+      </div>
+      <div class="inner-box">
+        <div class="title" style="color:var(--copper);">🔍 SEMANTIC_FLAG — RAG participation toggle</div>
+        <div class="text">
+          <code>Y</code> means this template is embedded into the vector store (ChromaDB today, Oracle 23ai Vector Search later) so it can be retrieved by semantic similarity. <code>N</code> excludes the row from retrieval while keeping it browseable by direct lookup — useful for drafts, internal templates, or near-duplicates.
+        </div>
+      </div>
+    </div>
+    <div class="split" style="margin-top:12px;">
+      <div class="inner-box">
+        <div class="title" style="color:var(--copper);">🌱 Seed Data Framework integration</div>
+        <div class="text">
+          Full Fusion SDF participation via <code>SEED_DATA_SOURCE</code>, <code>MODULE_ID</code>, <code>ORA_SEED_SET1/2</code>, and <code>ENTERPRISE_ID</code>. Oracle-delivered templates flow through the standard seed extract/apply pipeline; upgrades refresh seeded rows without touching user-created ones.
+        </div>
+      </div>
+      <div class="inner-box">
+        <div class="title" style="color:var(--copper);">🗝️ SOURCE_TYPE — seeded vs user-created discriminator</div>
+        <div class="text">
+          <code>SEEDED</code> rows are delivered by Oracle and read-only for end users (REST API rejects updates). <code>USER_CREATED</code> rows are fully mutable and saved via the <code>POST /api/templates</code> endpoint. Both live in the same table for unified retrieval.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="connector"><div class="line line-copper" style="height:40px;"></div></div>
+
+  <div class="card accent-copper" style="border-left-color: var(--copper-dark);">
+    <h4 style="color:var(--copper-dark); font-size:18px;">Relationship &amp; MLS Structure</h4>
+    <div class="code-block" style="font-size:12px; line-height:1.8;">
+      <span class="cm">/* Base table — language-independent */</span><br>
+      <span class="fn">ff_formula_templates</span>       <span class="cm">/* 20 cols, PK: TEMPLATE_ID */</span><br>
+      &nbsp;&nbsp;<span class="kw">│</span><br>
+      &nbsp;&nbsp;<span class="kw">├─ FK ──&gt;</span> <span class="fn">FF_FORMULA_TYPES</span>  <span class="cm">/* nullable, NULL = Custom */</span><br>
+      &nbsp;&nbsp;<span class="kw">│</span><br>
+      &nbsp;&nbsp;<span class="kw">└─ 1:N ─&gt;</span> <span class="fn">ff_formula_templates_tl</span>  <span class="cm">/* one row per LANGUAGE */</span><br>
+      <br>
+      <span class="cm">/* View — joins base + TL filtered on USERENV('LANG') */</span><br>
+      <span class="fn">FF_FORMULA_TEMPLATES_VL</span>    <span class="cm">/* = fft JOIN ffttl WHERE LANGUAGE = USERENV('LANG') */</span><br>
+      &nbsp;&nbsp;&rarr; ADF VO layer<br>
+      &nbsp;&nbsp;&rarr; REST <span class="str">/api/templates</span> endpoint<br>
+      &nbsp;&nbsp;&rarr; Monaco Editor template picker (frontend)<br>
+      <br>
+      <span class="cm">/* Files */</span><br>
+      <span class="fn">java/schema/oracle/apps/hcm/ff/</span><br>
+      &nbsp;&nbsp;├─ <span class="str">ff_formula_templates.table</span><br>
+      &nbsp;&nbsp;├─ <span class="str">ff_formula_templates_tl.table</span><br>
+      &nbsp;&nbsp;└─ <span class="str">FF_FORMULA_TEMPLATES_VL.view</span>
+    </div>
   </div>
 
 </div>

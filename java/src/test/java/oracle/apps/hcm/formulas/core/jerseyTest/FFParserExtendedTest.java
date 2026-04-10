@@ -108,6 +108,26 @@ public class FFParserExtendedTest {
         assertEquals("FIRST", mc.method());
     }
 
+    @Test
+    public void collectionAttributeNoParens() {
+        // PL/SQL-style collection attribute access: `arr.COUNT` with no
+        // parentheses. Regression test for the "Expected LPAREN, got: ..."
+        // parser crash that previously fired on real-world WFM formulas.
+        var p = parse("""
+                tcRecCount = HWM_CTXARY_RECORD_POSITIONS.COUNT
+                curDayStart = NullDate
+                RETURN tcRecCount
+                """);
+        var assign = (Assignment) p.statements().get(0);
+        assertTrue(assign.value() instanceof MethodCall);
+        var mc = (MethodCall) assign.value();
+        assertEquals("HWM_CTXARY_RECORD_POSITIONS", mc.object());
+        assertEquals("COUNT", mc.method());
+        assertEquals(0, mc.args().size());
+        // And the following statement must still parse cleanly.
+        assertTrue(p.statements().get(1) instanceof Assignment);
+    }
+
     // -- CALL_FORMULA ----------------------------------------------------------
 
     @Test

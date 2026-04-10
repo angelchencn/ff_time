@@ -1,0 +1,771 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<!--$Header: fusionapps/hcm/components/hcmPayroll/formulas/core/dbSchema/database/fusionDB/FUSION/ff_formula_templates.table ff_time/1 2026/04/08 00:00:00 alex Exp $-->
+<!-- adxml:    <src_file bootstrap="~BOOTSTRAP" version="~VERSION" -->
+<!-- adxml:       translation_level="~TRANS_LEVEL" techstack_level="~TXK_LEVEL" -->
+<!-- adxml:       verticalisation_level="~VERT_LEVEL" custom_level="~CUST_LEVEL" -->
+<!-- adxml:       language="~LANG" needs_translation="~TRANSLATION" ship="~SHIP" -->
+<!-- adxml:       localization="~LOCALIZATION" object_type="~OBJECT_TYPE"> -->
+<!-- adxml:     <abstract_file te="~PROD" subdir="~PATH" file_basename="~BASENAME" file_type="~FILE_TYPE"/> -->
+<!-- adxml:     <metadata> -->
+<!-- adxml:       <action identifier="TABLE" category="DD_TABLES" portion="D" online_category="N"> -->
+<!-- adxml:         <apply_action> -->
+<!-- adxml:           <action_details name="java"> -->
+<!-- adxml:             <invoking_exec> -->
+<!-- adxml:               <executable file_basename="oracle.apps.fnd.applxdf.comp.XdfSchemaDeploy" file_type="class"/> -->
+<!-- adxml:             </invoking_exec> -->
+<!-- adxml:             <args>owner_un=#un:fusion# apps_un=#un:fusion# -->
+<!-- adxml:                      jdbc_protocol=#jdbc_protocol# jdbc_db_addr=#jdbc_db_addr# xdf_mode=table -->
+<!-- adxml:                      xdf_file_name=#fullpath:~PROD:~PATH:~FILE#  -->
+<!-- adxml:             </args> -->
+<!-- adxml:           </action_details> -->
+<!-- adxml:         </apply_action> -->
+<!-- adxml:         <analysis_action> -->
+<!-- adxml:           <default_action/> -->
+<!-- adxml:         </analysis_action> -->
+<!-- adxml:         <ahead_of_time_run_conditions> -->
+<!-- adxml:           <check_file check="Y"/> -->
+<!-- adxml:         </ahead_of_time_run_conditions> -->
+<!-- adxml:       </action> -->
+<!-- adxml:     </metadata> -->
+<!-- adxml:   </src_file> -->
+<!--
+Primary Object's Schema : FUSION
+Primary Object Name    : "ff_formula_templates"
+Primary Object Type    : TABLE
+Dependent Objects' Information :
+  Index(es) on "ff_formula_templates" : FF_FORMULA_TEMPLATES_N1, FF_FORMULA_TEMPLATES_U1, FF_FORMULA_TEMPLATES_U2, FF_FORMULA_TEMPLATES_U3
+  Constraint(s) on "ff_formula_templates" : FF_FORMULA_TEMPLATES_PK
+-->
+<COMPOSITE version="1.0" xmlns="http://xmlns.oracle.com/ku">
+   <BASE_OBJECT>
+      <TABLE version="1.0">
+         <SCHEMA>FUSION</SCHEMA>
+         <NAME>ff_formula_templates</NAME>
+         <RELATIONAL_TABLE>
+            <COL_LIST>
+               <COL_LIST_ITEM>
+                  <NAME>TEMPLATE_ID</NAME>
+                  <DATATYPE>NUMBER</DATATYPE>
+                  <PRECISION>18</PRECISION>
+                  <SCALE>0</SCALE>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>TEMPLATE_ID, Unique Id for Fast Formula template.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>TEMPLATE_ID</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>FORMULA_TYPE_ID</NAME>
+                  <DATATYPE>NUMBER</DATATYPE>
+                  <PRECISION>18</PRECISION>
+                  <SCALE>0</SCALE>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Formula Type Id. Foreign key to FF_FORMULA_TYPES. NULL means the template belongs to the built-in Custom type and is not tied to any Fusion formula type row.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>FORMULA_TYPE_ID</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>TEMPLATE_CODE</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>150</LENGTH>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Template Code. Unique machine-readable identifier for the template (for example ORA_OVERTIME_PAY_CALC).</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>TEMPLATE_CODE</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>FORMULA_TEXT</NAME>
+                  <DATATYPE>CLOB</DATATYPE>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Formula Text. Fast Formula source code for the template. NULL is allowed for templates that only provide prompt guidance in ADDITIONAL_PROMPT_TEXT without a starter code body.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>FORMULA_TEXT</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>ADDITIONAL_PROMPT_TEXT</NAME>
+                  <DATATYPE>CLOB</DATATYPE>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Additional Prompt Text. Template-specific guidance appended to the AI system prompt at generation time. NULL when no extra guidance is required.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>ADDITIONAL_PROMPT_TEXT</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>SOURCE_TYPE</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>30</LENGTH>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Source Type. Indicates whether the row is SEEDED (delivered by Oracle) or USER_CREATED.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>SOURCE_TYPE</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>ACTIVE_FLAG</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>1</LENGTH>
+                  <DEFAULT>'Y'</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Active Flag. Y indicates the template is available for selection; N hides it from the UI.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>ACTIVE_FLAG</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>SEMANTIC_FLAG</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>1</LENGTH>
+                  <DEFAULT>'Y'</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Semantic Flag. Y indicates the template participates in semantic (vector-embedding) search and is indexed by the RAG retrieval pipeline; N excludes it from semantic retrieval (template is still available via direct lookup and browse).</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>SEMANTIC_FLAG</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>SORT_ORDER</NAME>
+                  <DATATYPE>NUMBER</DATATYPE>
+                  <PRECISION>9</PRECISION>
+                  <SCALE>0</SCALE>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Sort Order. Display order of the template within a formula type.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>SORT_ORDER</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>OBJECT_VERSION_NUMBER</NAME>
+                  <DATATYPE>NUMBER</DATATYPE>
+                  <PRECISION>9</PRECISION>
+                  <SCALE>0</SCALE>
+                  <DEFAULT>1</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Used to implement optimistic locking. This number is incremented every time that the row is updated. The number is compared at the start and end of a transaction to detect whether another session has updated the row since it was queried.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>OBJECT_VERSION_NUMBER</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>LAST_UPDATE_DATE</NAME>
+                  <DATATYPE>TIMESTAMP</DATATYPE>
+                  <SCALE>6</SCALE>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Who column: indicates the date and time of the last update of the row.</COMMENT>
+                        <DEFAULTED_SCALE/>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>LAST_UPDATE_DATE</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>CREATED_BY</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>64</LENGTH>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Who column: indicates the user who created the row.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>CREATED_BY</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>CREATION_DATE</NAME>
+                  <DATATYPE>TIMESTAMP</DATATYPE>
+                  <SCALE>6</SCALE>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Who column: indicates the date and time of the creation of the row.</COMMENT>
+                        <DEFAULTED_SCALE/>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>CREATION_DATE</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>LAST_UPDATED_BY</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>64</LENGTH>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Who column: indicates the user who last updated the row.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>LAST_UPDATED_BY</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>LAST_UPDATE_LOGIN</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>32</LENGTH>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Who column: indicates the session login associated to the user who last updated the row.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>LAST_UPDATE_LOGIN</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>ENTERPRISE_ID</NAME>
+                  <DATATYPE>NUMBER</DATATYPE>
+                  <PRECISION>18</PRECISION>
+                  <SCALE>0</SCALE>
+                  <DEFAULT>nvl(SYS_CONTEXT('FND_VPD_CTX','FND_ENTERPRISE_ID'), 0)</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Foreign key to PER_ENTERPRISES.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>ENTERPRISE_ID</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>SEED_DATA_SOURCE</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>512</LENGTH>
+                  <DEFAULT>SYS_CONTEXT('FND_SDF_CTX', 'SDFFILE')</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Source of seed data record. A value of 'BULK_SEED_DATA_SCRIPT' indicates that record was bulk loaded. Otherwise, specifies the name of the seed data file.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>SEED_DATA_SOURCE</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>MODULE_ID</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>32</LENGTH>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Seed Data Framework: indicates the module that owns the row. A module is an entry in Application Taxonomy such as a Logical Business Area. When the MODULE_ID column exists and the owner of the row is not specified, then the Seed Data Framework will not extract the row as seed data.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>MODULE_ID</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>ORA_SEED_SET1</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>1</LENGTH>
+                  <DEFAULT>'Y'</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Oracle internal use only. Indicates the edition-based redefinition (EBR) context of the row for SET1. Context values are Y or N.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>ORA_SEED_SET1</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>ORA_SEED_SET2</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>1</LENGTH>
+                  <DEFAULT>'Y'</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Oracle internal use only. Indicates the edition-based redefinition (EBR) context of the row for SET2. Context values are Y or N.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>ORA_SEED_SET2</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+            </COL_LIST>
+            <PRIMARY_KEY_CONSTRAINT_LIST>
+               <PRIMARY_KEY_CONSTRAINT_LIST_ITEM>
+                  <NAME>FF_FORMULA_TEMPLATES_PK</NAME>
+                  <COL_LIST>
+                     <COL_LIST_ITEM>
+                        <NAME>TEMPLATE_ID</NAME>
+                     </COL_LIST_ITEM>
+                  </COL_LIST>
+                  <DISABLE/>
+                  <CUSTOMER_AREA>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>FF_FORMULA_TEMPLATES_PK</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </PRIMARY_KEY_CONSTRAINT_LIST_ITEM>
+            </PRIMARY_KEY_CONSTRAINT_LIST>
+            <PHYSICAL_PROPERTIES>
+               <HEAP_TABLE>
+                  <SEGMENT_ATTRIBUTES>
+                     <TABLESPACE>Default</TABLESPACE>
+                  </SEGMENT_ATTRIBUTES>
+                  <COMPRESS>N</COMPRESS>
+               </HEAP_TABLE>
+            </PHYSICAL_PROPERTIES>
+         </RELATIONAL_TABLE>
+         <CUSTOMER_AREA>
+            <ODB_PROPERTY_LIST>
+               <COMMENT>This table contains Fast Formula templates available to users in the AI-assisted formula authoring tool. Seeded rows are delivered by Oracle; user-created rows are saved by users from the UI.</COMMENT>
+            </ODB_PROPERTY_LIST>
+            <UDP_LIST>
+               <UDP_LIST_ITEM>
+                  <NAME>adxml</NAME>
+                  <VALUE> adxml:    &lt;src_file bootstrap="~BOOTSTRAP" version="~VERSION"
+ adxml:       translation_level="~TRANS_LEVEL" techstack_level="~TXK_LEVEL"
+ adxml:       verticalisation_level="~VERT_LEVEL" custom_level="~CUST_LEVEL"
+ adxml:       language="~LANG" needs_translation="~TRANSLATION" ship="~SHIP"
+ adxml:       localization="~LOCALIZATION" object_type="~OBJECT_TYPE">
+ adxml:     &lt;abstract_file te="~PROD" subdir="~PATH" file_basename="~BASENAME" file_type="~FILE_TYPE"/>
+ adxml:     &lt;metadata>
+ adxml:       &lt;action identifier="TABLE" category="DD_TABLES" portion="D" online_category="N">
+ adxml:         &lt;apply_action>
+ adxml:           &lt;action_details name="java">
+ adxml:             &lt;invoking_exec>
+ adxml:               &lt;executable file_basename="oracle.apps.fnd.applxdf.comp.XdfSchemaDeploy" file_type="class"/>
+ adxml:             &lt;/invoking_exec>
+ adxml:             &lt;args>owner_un=#un:fusion# apps_un=#un:fusion#
+ adxml:                      jdbc_protocol=#jdbc_protocol# jdbc_db_addr=#jdbc_db_addr# xdf_mode=table
+ adxml:                      xdf_file_name=#fullpath:~PROD:~PATH:~FILE#
+ adxml:             &lt;/args>
+ adxml:           &lt;/action_details>
+ adxml:         &lt;/apply_action>
+ adxml:         &lt;analysis_action>
+ adxml:           &lt;default_action/>
+ adxml:         &lt;/analysis_action>
+ adxml:         &lt;ahead_of_time_run_conditions>
+ adxml:           &lt;check_file check="Y"/>
+ adxml:         &lt;/ahead_of_time_run_conditions>
+ adxml:       &lt;/action>
+</VALUE>
+               </UDP_LIST_ITEM>
+               <UDP_LIST_ITEM>
+                  <NAME>adxmlDeferredIndexes</NAME>
+                  <VALUE></VALUE>
+               </UDP_LIST_ITEM>
+               <UDP_LIST_ITEM>
+                  <NAME>adxmlFk</NAME>
+                  <VALUE></VALUE>
+               </UDP_LIST_ITEM>
+               <UDP_LIST_ITEM>
+                  <NAME>ebrImdCaptureModel</NAME>
+                  <VALUE>ORACLE_OWNED</VALUE>
+               </UDP_LIST_ITEM>
+               <UDP_LIST_ITEM>
+                  <NAME>logicalTableName</NAME>
+                  <VALUE>FF_FORMULA_TEMPLATES</VALUE>
+               </UDP_LIST_ITEM>
+               <UDP_LIST_ITEM>
+                  <NAME>objectOwner</NAME>
+                  <VALUE>FF</VALUE>
+               </UDP_LIST_ITEM>
+               <UDP_LIST_ITEM>
+                  <NAME>shortName</NAME>
+                  <VALUE>FF_FORMULA_TEMPLATES</VALUE>
+               </UDP_LIST_ITEM>
+               <UDP_LIST_ITEM>
+                  <NAME>tsClassification</NAME>
+                  <VALUE>REFERENCE</VALUE>
+               </UDP_LIST_ITEM>
+            </UDP_LIST>
+         </CUSTOMER_AREA>
+      </TABLE>
+   </BASE_OBJECT>
+   <INDEX_LIST>
+      <INDEX version="1.0">
+         <SCHEMA>FUSION</SCHEMA>
+         <NAME>FF_FORMULA_TEMPLATES_N1</NAME>
+         <TABLE_INDEX>
+            <ON_TABLE>
+               <SCHEMA>FUSION</SCHEMA>
+               <NAME>ff_formula_templates</NAME>
+            </ON_TABLE>
+            <COL_LIST>
+               <COL_LIST_ITEM>
+                  <NAME>FORMULA_TYPE_ID</NAME>
+               </COL_LIST_ITEM>
+            </COL_LIST>
+            <INDEX_ATTRIBUTES>
+               <TABLESPACE>Default</TABLESPACE>
+            </INDEX_ATTRIBUTES>
+         </TABLE_INDEX>
+         <CUSTOMER_AREA>
+            <ODB_PROPERTY_LIST>
+               <SYSTEM_GENERATED>N</SYSTEM_GENERATED>
+            </ODB_PROPERTY_LIST>
+            <UDP_LIST>
+               <UDP_LIST_ITEM>
+                  <NAME>shortName</NAME>
+                  <VALUE>FF_FORMULA_TEMPLATES_N1</VALUE>
+               </UDP_LIST_ITEM>
+            </UDP_LIST>
+         </CUSTOMER_AREA>
+      </INDEX>
+      <INDEX version="1.0">
+         <UNIQUE/>
+         <SCHEMA>FUSION</SCHEMA>
+         <NAME>FF_FORMULA_TEMPLATES_U1</NAME>
+         <TABLE_INDEX>
+            <ON_TABLE>
+               <SCHEMA>FUSION</SCHEMA>
+               <NAME>ff_formula_templates</NAME>
+            </ON_TABLE>
+            <COL_LIST>
+               <COL_LIST_ITEM>
+                  <NAME>TEMPLATE_ID</NAME>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>ORA_SEED_SET1</NAME>
+               </COL_LIST_ITEM>
+            </COL_LIST>
+            <INDEX_ATTRIBUTES>
+               <TABLESPACE>Default</TABLESPACE>
+            </INDEX_ATTRIBUTES>
+         </TABLE_INDEX>
+         <CUSTOMER_AREA>
+            <ODB_PROPERTY_LIST>
+               <SYSTEM_GENERATED>N</SYSTEM_GENERATED>
+            </ODB_PROPERTY_LIST>
+            <UDP_LIST>
+               <UDP_LIST_ITEM>
+                  <NAME>shortName</NAME>
+                  <VALUE>FF_FORMULA_TEMPLATES_U1</VALUE>
+               </UDP_LIST_ITEM>
+            </UDP_LIST>
+         </CUSTOMER_AREA>
+      </INDEX>
+      <INDEX version="1.0">
+         <UNIQUE/>
+         <SCHEMA>FUSION</SCHEMA>
+         <NAME>FF_FORMULA_TEMPLATES_U2</NAME>
+         <TABLE_INDEX>
+            <ON_TABLE>
+               <SCHEMA>FUSION</SCHEMA>
+               <NAME>ff_formula_templates</NAME>
+            </ON_TABLE>
+            <COL_LIST>
+               <COL_LIST_ITEM>
+                  <NAME>TEMPLATE_ID</NAME>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>ORA_SEED_SET2</NAME>
+               </COL_LIST_ITEM>
+            </COL_LIST>
+            <INDEX_ATTRIBUTES>
+               <TABLESPACE>Default</TABLESPACE>
+            </INDEX_ATTRIBUTES>
+         </TABLE_INDEX>
+         <CUSTOMER_AREA>
+            <ODB_PROPERTY_LIST>
+               <SYSTEM_GENERATED>N</SYSTEM_GENERATED>
+            </ODB_PROPERTY_LIST>
+            <UDP_LIST>
+               <UDP_LIST_ITEM>
+                  <NAME>shortName</NAME>
+                  <VALUE>FF_FORMULA_TEMPLATES_U2</VALUE>
+               </UDP_LIST_ITEM>
+            </UDP_LIST>
+         </CUSTOMER_AREA>
+      </INDEX>
+      <INDEX version="1.0">
+         <UNIQUE/>
+         <SCHEMA>FUSION</SCHEMA>
+         <NAME>FF_FORMULA_TEMPLATES_U3</NAME>
+         <TABLE_INDEX>
+            <ON_TABLE>
+               <SCHEMA>FUSION</SCHEMA>
+               <NAME>ff_formula_templates</NAME>
+            </ON_TABLE>
+            <COL_LIST>
+               <COL_LIST_ITEM>
+                  <NAME>TEMPLATE_CODE</NAME>
+               </COL_LIST_ITEM>
+            </COL_LIST>
+            <INDEX_ATTRIBUTES>
+               <TABLESPACE>Default</TABLESPACE>
+            </INDEX_ATTRIBUTES>
+         </TABLE_INDEX>
+         <CUSTOMER_AREA>
+            <ODB_PROPERTY_LIST>
+               <SYSTEM_GENERATED>N</SYSTEM_GENERATED>
+            </ODB_PROPERTY_LIST>
+            <UDP_LIST>
+               <UDP_LIST_ITEM>
+                  <NAME>shortName</NAME>
+                  <VALUE>FF_FORMULA_TEMPLATES_U3</VALUE>
+               </UDP_LIST_ITEM>
+            </UDP_LIST>
+         </CUSTOMER_AREA>
+      </INDEX>
+   </INDEX_LIST>
+</COMPOSITE>

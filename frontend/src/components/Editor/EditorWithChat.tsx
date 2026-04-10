@@ -9,10 +9,13 @@ import { extractCodeBlocks } from '../../services/formulaUtils';
 import { ChatMessage } from '../ChatPanel/ChatMessage';
 import { FFEditor } from './FFEditor';
 import { useFormulaTypes } from '../../hooks/useFormulaTypes';
+import { useTemplatesByFormulaType } from '../../hooks/useTemplatesByFormulaType';
 
 const { Text } = Typography;
 
-// Quick prompts are now loaded dynamically per formula type from the API
+// Sample templates are loaded from the FF_FORMULA_TEMPLATES table via
+// useTemplatesByFormulaType — no longer from the legacy sample_prompts[]
+// embedded in /api/formula-types.
 
 const MIN_CHAT_HEIGHT = 0;
 const MAX_CHAT_HEIGHT = 500;
@@ -24,17 +27,44 @@ export function EditorWithChat() {
   const { code, setCode, formulaType, setFormulaType } = useEditorStore();
   const { current } = useServerStore();
   const [inputValue, setInputValue] = useState('');
-  const [selectedSample, setSelectedSample] = useState<string | null>(null);
+  // selectedSampleId stores the picked template's primary key (template_id)
+  // purely for the dropdown's own state — antd Select needs a stable value.
+  const [selectedSampleId, setSelectedSampleId] = useState<number | null>(null);
+  // selectedTemplateCodeKey stores the picked template's TEMPLATE_CODE column
+  // value — a short business-key identifier like
+  // "ORA_FFT_CUSTOM_OVERTIME_PAY_CALCULATION_001". This is the only thing we
+  // send to the /chat backend; the server does its own DB lookup on the code
+  // to fetch the full FORMULA_TEXT + ADDITIONAL_PROMPT_TEXT. Keeps the
+  // request payload small and stops the frontend from drifting away from
+  // the authoritative template store.
+  const [selectedTemplateCodeKey, setSelectedTemplateCodeKey] = useState<string | null>(null);
   const { formulaTypes } = useFormulaTypes();
+  const { templates: dbTemplates, loading: templatesLoading } =
+    useTemplatesByFormulaType(formulaType);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatHeight, setChatHeight] = useState(DEFAULT_CHAT_HEIGHT);
   const listEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const quickPrompts = useMemo(() => {
-    const ft = formulaTypes.find((t) => t.type_name === formulaType);
-    return ft?.sample_prompts ?? [];
-  }, [formulaTypes, formulaType]);
+  // Sample dropdown options come from the DB-backed templates list.
+  // We show the human name (or fall back to description) and key by
+  // template_id so picking is unambiguous even if two templates share a name.
+  const sampleOptions = useMemo(() => {
+    return dbTemplates
+      .filter((t) => t.template_id != null)
+      .map((t) => ({
+        value: t.template_id as number,
+        label: t.name || t.description || `#${t.template_id}`,
+        description: t.description,
+      }));
+  }, [dbTemplates]);
+
+  // Reset the picked sample whenever the formula type changes — the previous
+  // selection no longer applies.
+  useEffect(() => {
+    setSelectedSampleId(null);
+    setSelectedTemplateCodeKey(null);
+  }, [formulaType]);
 
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -81,10 +111,25 @@ export function EditorWithChat() {
     addMessage({ role: 'assistant', content: '' });
     setStreaming(true);
 
-    const body: Record<string, unknown> = { message: text, code, formula_type: formulaType };
+    // Request body shape:
+    //   message          — the user's chat text
+    //   editor_code      — current Monaco editor content (renamed from `code`
+    //                      to disambiguate from `template_code`)
+    //   formula_type     — type_name from the Type dropdown
+    //   session_id       — for multi-turn chat history
+    //   template_code    — TEMPLATE_CODE business key of the picked sample.
+    //                      Server looks it up in FF_FORMULA_TEMPLATES and
+    //                      fetches FORMULA_TEXT + ADDITIONAL_PROMPT_TEXT
+    //                      itself, so we don't ship the CLOBs over the wire.
+    const body: Record<string, unknown> = {
+      message: text,
+      editor_code: code,
+      formula_type: formulaType,
+    };
     if (sessionId) body.session_id = sessionId;
-    if (selectedSample) body.selected_sample = selectedSample;
-    setSelectedSample(null);
+    if (selectedTemplateCodeKey) body.template_code = selectedTemplateCodeKey;
+    setSelectedSampleId(null);
+    setSelectedTemplateCodeKey(null);
 
     const authHeaders: Record<string, string> = {};
     if (current.auth) {
@@ -130,39 +175,68 @@ export function EditorWithChat() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Editor */}
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      {/* ─── Editor surface ─── */}
+      <div style={{ flex: 1, overflow: 'hidden', backgroundColor: '#ffffff' }}>
         <FFEditor height="100%" />
       </div>
 
-      {/* Chat toggle bar */}
+      {/* ─── Chat toggle bar ─── */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '4px 12px',
-          borderTop: '1px solid var(--border-default)',
+          padding: '8px 20px',
+          borderTop: '1px solid var(--border-muted)',
           backgroundColor: 'var(--bg-surface)',
           cursor: 'pointer',
           userSelect: 'none',
           flexShrink: 0,
+          transition: 'background-color 120ms ease',
         }}
         onClick={toggleChat}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--bg-elevated)';
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--bg-surface)';
+        }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <MessageOutlined style={{ color: 'var(--text-tertiary)', fontSize: 12 }} />
-          <Text style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-            Chat{messages.length > 0 ? ` (${messages.length})` : ''}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <MessageOutlined style={{ color: 'var(--text-tertiary)', fontSize: 11 }} />
+          <Text
+            style={{
+              fontSize: 10,
+              color: 'var(--text-tertiary)',
+              fontFamily: 'var(--font-body)',
+              fontWeight: 600,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+            }}
+          >
+            Conversation
           </Text>
+          {messages.length > 0 && (
+            <Text
+              style={{
+                fontSize: 10,
+                color: 'var(--text-tertiary)',
+                fontFamily: 'var(--font-mono)',
+                letterSpacing: '0.04em',
+              }}
+            >
+              {messages.length} {messages.length === 1 ? 'message' : 'messages'}
+            </Text>
+          )}
         </div>
-        {chatOpen
-          ? <DownOutlined style={{ color: 'var(--text-tertiary)', fontSize: 10 }} />
-          : <UpOutlined style={{ color: 'var(--text-tertiary)', fontSize: 10 }} />
-        }
+        {chatOpen ? (
+          <DownOutlined style={{ color: 'var(--text-tertiary)', fontSize: 10 }} />
+        ) : (
+          <UpOutlined style={{ color: 'var(--text-tertiary)', fontSize: 10 }} />
+        )}
       </div>
 
-      {/* Chat history (resizable) */}
+      {/* ─── Chat history (resizable) ─── */}
       {chatOpen && (
         <>
           <div
@@ -170,113 +244,213 @@ export function EditorWithChat() {
             style={{
               height: 5,
               cursor: 'row-resize',
-              backgroundColor: 'var(--border-default)',
+              backgroundColor: 'var(--border-muted)',
               flexShrink: 0,
               position: 'relative',
               zIndex: 10,
             }}
           >
-            <div style={{
-              width: 36,
-              height: 2,
-              backgroundColor: 'var(--text-tertiary)',
-              borderRadius: 1,
-              position: 'absolute',
-              left: '50%',
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
-            }} />
+            <div
+              style={{
+                width: 32,
+                height: 2,
+                backgroundColor: 'var(--text-tertiary)',
+                borderRadius: 1,
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                opacity: 0.5,
+              }}
+            />
           </div>
           <div
             style={{
               height: chatHeight,
               overflowY: 'auto',
               backgroundColor: 'var(--bg-base)',
-              padding: '12px',
+              padding: '16px 20px',
               flexShrink: 0,
             }}
           >
             {messages.length === 0 ? (
-              <Text style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>
-                No messages yet. Type below to start a conversation.
-              </Text>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  height: '100%',
+                  minHeight: 80,
+                }}
+              >
+                <Text
+                  style={{
+                    color: 'var(--text-secondary)',
+                    fontSize: 14,
+                    fontFamily: 'var(--font-display)',
+                    fontStyle: 'italic',
+                  }}
+                >
+                  No conversation yet
+                </Text>
+                <Text style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>
+                  Type a request below to begin.
+                </Text>
+              </div>
             ) : (
-              messages.map((msg) => (
-                <ChatMessage key={msg.id} message={msg} />
-              ))
+              messages.map((msg) => <ChatMessage key={msg.id} message={msg} />)
             )}
             <div ref={listEndRef} />
           </div>
         </>
       )}
 
-      {/* Formula type + sample selector row */}
+      {/* ─── Context selectors (formula type + sample) ─── */}
       <div
         style={{
-          padding: '6px 12px',
-          borderTop: '1px solid var(--border-default)',
+          padding: '12px 20px 10px',
+          borderTop: '1px solid var(--border-muted)',
           backgroundColor: 'var(--bg-surface)',
           display: 'flex',
-          gap: 8,
+          alignItems: 'center',
+          gap: 16,
           flexShrink: 0,
         }}
       >
-        <Select
-          value={formulaType}
-          onChange={setFormulaType}
-          size="small"
-          showSearch
-          optionFilterProp="label"
-          style={{ width: 260, flexShrink: 0 }}
-          options={[...formulaTypes]
-            .sort((a, b) => a.display_name.localeCompare(b.display_name))
-            .map((ft) => ({
-              value: ft.type_name,
-              label: ft.display_name,
-            }))}
-          placeholder="Formula Type"
-        />
-        <Select
-          value={selectedSample}
-          onChange={(val: string) => {
-            setSelectedSample(val || null);
-            if (val) {
-              setInputValue(val);
-              setCode('');
-            }
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 600,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: 'var(--text-tertiary)',
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            Type
+          </span>
+          <Select
+            value={formulaType}
+            onChange={setFormulaType}
+            size="small"
+            showSearch
+            optionFilterProp="label"
+            variant="borderless"
+            style={{ width: 220 }}
+            options={[...formulaTypes]
+              .sort((a, b) => a.display_name.localeCompare(b.display_name))
+              .map((ft) => ({
+                value: ft.type_name,
+                label: ft.display_name,
+              }))}
+            placeholder="Formula Type"
+          />
+        </div>
+
+        <div style={{ width: 1, height: 18, backgroundColor: 'var(--border-muted)' }} />
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            flex: 1,
+            minWidth: 0,
           }}
-          size="small"
-          style={{ flex: 1 }}
-          placeholder="Select a sample to start..."
-          allowClear
-          showSearch
-          optionFilterProp="label"
-          options={quickPrompts.map((p) => ({
-            value: p,
-            label: p,
-          }))}
-        />
+        >
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 600,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: 'var(--text-tertiary)',
+              fontFamily: 'var(--font-body)',
+              flexShrink: 0,
+            }}
+          >
+            Start with
+          </span>
+          <Select
+            value={selectedSampleId}
+            onChange={(val: number | null) => {
+              setSelectedSampleId(val ?? null);
+              // Switching to a new template (or clearing the selection) wipes
+              // any previously generated formula from the editor — the user
+              // is about to ask for a fresh generation, and leaving stale code
+              // around causes it to be sent back in the next /chat call as the
+              // "Current Formula in Editor" reference.
+              setCode('');
+              if (val != null) {
+                const picked = dbTemplates.find((t) => t.template_id === val);
+                if (picked) {
+                  // Only seed the chat input with the description — the main
+                  // Monaco editor is reserved for AI-generated formulas and
+                  // should NOT be overwritten with the template source code.
+                  setInputValue(picked.description || picked.name || '');
+                  // Stash only the short TEMPLATE_CODE business key. The
+                  // backend will look up the actual FORMULA_TEXT and
+                  // ADDITIONAL_PROMPT_TEXT from the DB on the next /chat call,
+                  // so we don't cache the CLOB bodies here.
+                  setSelectedTemplateCodeKey(picked.template_code || null);
+                } else {
+                  setSelectedTemplateCodeKey(null);
+                }
+              } else {
+                // val === null → user cleared the dropdown
+                setSelectedTemplateCodeKey(null);
+              }
+            }}
+            size="small"
+            variant="borderless"
+            style={{ flex: 1, minWidth: 0 }}
+            placeholder={
+              templatesLoading
+                ? 'Loading templates from database…'
+                : sampleOptions.length === 0
+                ? 'No templates for this formula type'
+                : 'A sample template to seed the editor…'
+            }
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            loading={templatesLoading}
+            notFoundContent={
+              templatesLoading ? 'Loading…' : 'No templates available'
+            }
+            options={sampleOptions}
+          />
+        </div>
       </div>
 
-      {/* Chat input bar */}
+      {/* ─── Chat input bar ─── */}
       <div
         style={{
-          padding: '6px 12px 8px',
+          padding: '10px 20px 14px',
           backgroundColor: 'var(--bg-surface)',
           display: 'flex',
-          gap: 8,
+          gap: 10,
           alignItems: 'flex-end',
           flexShrink: 0,
+          borderTop: '1px solid var(--border-muted)',
         }}
       >
         <Input.TextArea
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Describe what you need... (Enter to send)"
-          autoSize={{ minRows: 2, maxRows: 3 }}
+          placeholder="Describe what you need… (Enter to send · Shift+Enter for newline)"
+          autoSize={{ minRows: 2, maxRows: 4 }}
           disabled={isStreaming}
-          style={{ flex: 1 }}
+          style={{
+            flex: 1,
+            fontSize: 13,
+            backgroundColor: 'var(--bg-base)',
+            borderColor: 'var(--border-muted)',
+          }}
         />
         <Button
           type="primary"
@@ -284,7 +458,19 @@ export function EditorWithChat() {
           onClick={handleSend}
           loading={isStreaming}
           disabled={!inputValue.trim()}
-          style={{ flexShrink: 0, alignSelf: 'flex-end' }}
+          style={{
+            flexShrink: 0,
+            alignSelf: 'flex-end',
+            height: 38,
+            width: 38,
+            padding: 0,
+            backgroundColor: 'var(--accent-amber)',
+            borderColor: 'var(--accent-amber)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: 'var(--shadow-sm)',
+          }}
         />
       </div>
     </div>

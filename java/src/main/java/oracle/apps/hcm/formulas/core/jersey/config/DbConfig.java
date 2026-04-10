@@ -1,27 +1,277 @@
 package oracle.apps.hcm.formulas.core.jersey.config;
 
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import oracle.apps.hcm.formulas.core.jersey.service.AiService;
+
 /**
- * JDBC connection factory — reads config from environment variables.
+ * JDBC connection factory with two resolution modes, picked per-call based
+ * on the currently active AI provider:
  *
- * Required env vars:
- *   FF_DB_URL      = jdbc:oracle:thin:@//host:1521/service
- *   FF_DB_USER     = username
- *   FF_DB_PASSWORD = password
+ * <h2>Mode 1 ? Fusion ADF BC ApplicationModule (production)</h2>
+ *
+ * <p>When {@link AiService#isFusionProviderActive()} returns {@code true} ?
+ * i.e. the process is running inside Fusion with {@code FusionAiProvider} as
+ * the default ? {@link #getConnection()} checks out a root
+ * {@code ApplicationModule} from ADF BC, grabs its {@code DBTransaction}'s
+ * JDBC connection, and wraps it in a {@link Proxy} that releases the AM
+ * back to the pool when {@link Connection#close()} is called.</p>
+ *
+ * <p>This path uses reflection so the classes
+ * {@code oracle.jbo.client.Configuration} and
+ * {@code oracle.jbo.ApplicationModule} are <em>not</em> compile-time
+ * dependencies ? local Maven builds don't need ADF BC jars on the
+ * classpath, and the code gracefully fails at runtime with a clear message
+ * if the user ends up in this mode outside of Fusion.</p>
+ *
+ * <h3>Fusion-side prerequisites</h3>
+ *
+ * <p>You must define an ApplicationModule in the ADE workspace at
+ * {@code oracle.apps.hcm.formulas.core.applicationModule.FfTemplateAM}
+ * (default) with a BC4J config named {@code FfTemplateAMLocal} (default).
+ * Both names can be overridden at runtime without a recompile via env vars:</p>
+ *
+ * <ul>
+ *   <li>{@code FF_DB_AM_DEFINITION} ? fully-qualified AM definition class name</li>
+ *   <li>{@code FF_DB_AM_CONFIG}     ? BC4J configuration name from {@code bc4j.xcfg}</li>
+ * </ul>
+ *
+ * <h2>Mode 2 ? DriverManager via env vars (local dev)</h2>
+ *
+ * <p>When {@code LLM_PROVIDER=openai} (the dev laptop setup),
+ * {@link #getConnection()} falls back to a plain Oracle thin-driver
+ * connection using the usual {@code FF_DB_URL / FF_DB_USER / FF_DB_PASSWORD}
+ * env vars. This keeps the Grizzly-based local dev loop working without any
+ * WebLogic or ADF BC plumbing.</p>
  */
 public class DbConfig {
 
-    private static final String URL = System.getenv("FF_DB_URL");
-    private static final String USER = System.getenv("FF_DB_USER");
+    private static final Logger LOG = Logger.getLogger(DbConfig.class.getName());
+
+    // ?? Local-dev path (DriverManager) ??????????????????????????????????????
+    private static final String URL      = System.getenv("FF_DB_URL");
+    private static final String USER     = System.getenv("FF_DB_USER");
     private static final String PASSWORD = System.getenv("FF_DB_PASSWORD");
 
+    // ?? Fusion path (ADF BC ApplicationModule) ??????????????????????????????
+    private static final String AM_DEFINITION = firstNonEmpty(
+            System.getenv("FF_DB_AM_DEFINITION"),
+            "oracle.apps.hcm.formulas.core.restModel.applicationModule.FastFormulaRestAM");
+    private static final String AM_CONFIG = firstNonEmpty(
+            System.getenv("FastFormulaRestAMLocal"),
+            "FfTemplateAMLocal");
+
+    // ADF BC class names ? loaded via reflection so local builds don't need
+    // the jars on the classpath. Cached after first successful lookup.
+    private static final String ADF_CONFIG_CLASS = "oracle.jbo.client.Configuration";
+    private static final String ADF_APPLICATION_MODULE_CLASS = "oracle.jbo.ApplicationModule";
+
+    private static volatile Class<?> configClassCache;
+    private static volatile Class<?> amClassCache;
+
+    // ????????????????????????????????????????????????????????????????????????
+    // Entry point
+    // ????????????????????????????????????????????????????????????????????????
+
+    /**
+     * Returns a fresh JDBC connection. Caller is responsible for closing it.
+     * <p>Closing on an AM-backed connection triggers AM release, not a raw
+     * {@code close()} on the underlying physical connection.</p>
+     */
     public static Connection getConnection() throws SQLException {
+        if (AiService.isFusionProviderActive()) {
+            return openAdfBcConnection();
+        }
+        return openLocalDriverManagerConnection();
+    }
+
+    // ????????????????????????????????????????????????????????????????????????
+    // Mode 2 ? local dev
+    // ????????????????????????????????????????????????????????????????????????
+
+    private static Connection openLocalDriverManagerConnection() throws SQLException {
         if (URL == null || URL.isBlank()) {
-            throw new SQLException("FF_DB_URL environment variable is not set");
+            throw new SQLException(
+                    "Local-dev JDBC path selected (LLM_PROVIDER=openai) but "
+                  + "FF_DB_URL is not set. Set FF_DB_URL / FF_DB_USER / FF_DB_PASSWORD "
+                  + "to point at a reachable Oracle instance.");
         }
         return DriverManager.getConnection(URL, USER, PASSWORD);
+    }
+
+    // ????????????????????????????????????????????????????????????????????????
+    // Mode 1 ? Fusion ADF BC (reflection)
+    // ????????????????????????????????????????????????????????????????????????
+
+    private static Connection openAdfBcConnection() throws SQLException {
+        Object am = null;
+        try {
+            Class<?> configClass = loadConfigClass();
+
+            // ApplicationModule am = Configuration.createRootApplicationModule(def, cfg);
+            Method create = configClass.getMethod(
+                    "createRootApplicationModule", String.class, String.class);
+            am = create.invoke(null, AM_DEFINITION, AM_CONFIG);
+            if (am == null) {
+                throw new SQLException("Configuration.createRootApplicationModule('"
+                        + AM_DEFINITION + "', '" + AM_CONFIG + "') returned null");
+            }
+
+            // DBTransaction trans = am.getDBTransaction();
+            Method getTrans = am.getClass().getMethod("getDBTransaction");
+            Object trans = getTrans.invoke(am);
+            if (trans == null) {
+                releaseAmSilently(am);
+                throw new SQLException("ApplicationModule returned a null DBTransaction");
+            }
+
+            // Connection real = trans.getJdbcConnection();
+            Method getJdbc = trans.getClass().getMethod("getJdbcConnection");
+            Connection real = (Connection) getJdbc.invoke(trans);
+            if (real == null) {
+                releaseAmSilently(am);
+                throw new SQLException("DBTransaction.getJdbcConnection() returned null");
+            }
+
+            // Wrap so caller's close() releases the AM back to the pool
+            // instead of tearing down the underlying physical connection.
+            return wrapAmBoundConnection(real, am);
+
+        } catch (ClassNotFoundException cnfe) {
+            throw new SQLException(
+                    "ADF BC framework not on classpath (" + ADF_CONFIG_CLASS + "). "
+                  + "This path is meant for Fusion central deployment. "
+                  + "For local dev outside WebLogic, set LLM_PROVIDER=openai to "
+                  + "force the DriverManager path via FF_DB_URL/USER/PASSWORD.",
+                    cnfe);
+        } catch (InvocationTargetException ite) {
+            if (am != null) releaseAmSilently(am);
+            Throwable cause = ite.getCause() != null ? ite.getCause() : ite;
+            throw new SQLException(
+                    "ADF BC AM setup failed for definition '" + AM_DEFINITION
+                  + "' (config '" + AM_CONFIG + "'): " + cause.getMessage(), cause);
+        } catch (Exception e) {
+            if (am != null) releaseAmSilently(am);
+            throw new SQLException(
+                    "Unexpected error obtaining ADF BC AM connection for '"
+                  + AM_DEFINITION + "': " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Wrap {@code real} in a {@link Proxy} that delegates every call except
+     * {@code close()} and {@code isClosed()}. {@code close()} triggers an AM
+     * release; {@code isClosed()} reports the proxy's own state so callers
+     * using try-with-resources see consistent behavior regardless of whether
+     * the underlying pooled connection is still alive.
+     */
+    private static Connection wrapAmBoundConnection(Connection real, Object am) {
+        final AtomicBoolean closed = new AtomicBoolean(false);
+        InvocationHandler handler = new InvocationHandler() {
+            @Override
+            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+                String name = method.getName();
+                if ("close".equals(name)) {
+                    if (closed.compareAndSet(false, true)) {
+                        try {
+                            releaseAm(am);
+                        } catch (Throwable t) {
+                            throw new SQLException(
+                                    "Failed to release ADF BC ApplicationModule on close: "
+                                  + t.getMessage(), t);
+                        }
+                    }
+                    return null;
+                }
+                if ("isClosed".equals(name)) {
+                    return closed.get();
+                }
+                if ("isWrapperFor".equals(name) && args != null && args.length == 1) {
+                    Class<?> iface = (Class<?>) args[0];
+                    return iface != null && iface.isInstance(real);
+                }
+                if ("unwrap".equals(name) && args != null && args.length == 1) {
+                    Class<?> iface = (Class<?>) args[0];
+                    if (iface != null && iface.isInstance(real)) return real;
+                }
+                if (closed.get()) {
+                    throw new SQLException(
+                            "AM-backed connection already closed (AM released)");
+                }
+                try {
+                    return method.invoke(real, args);
+                } catch (InvocationTargetException ite) {
+                    throw ite.getCause() != null ? ite.getCause() : ite;
+                }
+            }
+        };
+        return (Connection) Proxy.newProxyInstance(
+                DbConfig.class.getClassLoader(),
+                new Class<?>[]{Connection.class},
+                handler);
+    }
+
+    /**
+     * Reflectively invoke
+     * {@code Configuration.releaseRootApplicationModule(am, true)} ? hand
+     * the AM back to the pool with {@code remove=true} so we don't keep
+     * per-request instances lying around.
+     */
+    private static void releaseAm(Object am) throws SQLException {
+        try {
+            Class<?> configClass = loadConfigClass();
+            Class<?> amClass = loadAmClass();
+            Method release = configClass.getMethod(
+                    "releaseRootApplicationModule", amClass, boolean.class);
+            release.invoke(null, am, true);
+        } catch (InvocationTargetException ite) {
+            Throwable cause = ite.getCause() != null ? ite.getCause() : ite;
+            throw new SQLException("releaseRootApplicationModule failed: " + cause.getMessage(), cause);
+        } catch (Exception e) {
+            throw new SQLException("Cannot release ADF BC ApplicationModule: " + e.getMessage(), e);
+        }
+    }
+
+    private static void releaseAmSilently(Object am) {
+        try {
+            releaseAm(am);
+        } catch (Throwable t) {
+            LOG.log(Level.WARNING, "Best-effort AM release failed", t);
+        }
+    }
+
+    private static Class<?> loadConfigClass() throws ClassNotFoundException {
+        Class<?> c = configClassCache;
+        if (c != null) return c;
+        c = Class.forName(ADF_CONFIG_CLASS);
+        configClassCache = c;
+        return c;
+    }
+
+    private static Class<?> loadAmClass() throws ClassNotFoundException {
+        Class<?> c = amClassCache;
+        if (c != null) return c;
+        c = Class.forName(ADF_APPLICATION_MODULE_CLASS);
+        amClassCache = c;
+        return c;
+    }
+
+    // ????????????????????????????????????????????????????????????????????????
+    // Tiny helpers
+    // ????????????????????????????????????????????????????????????????????????
+
+    private static String firstNonEmpty(String a, String b) {
+        return (a == null || a.isBlank()) ? b : a;
     }
 }

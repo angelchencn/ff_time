@@ -51,6 +51,16 @@
             <version>${jackson.version}</version>
         </dependency>
 
+        <!-- Oracle JDBC thin driver — used by DbConfig for local dev connections
+             to the Fusion DB. In Fusion WebLogic deployment the JDBC driver is
+             already provided by the container, so this is a compile/runtime
+             dependency locally and can stay on the classpath without conflict. -->
+        <dependency>
+            <groupId>com.oracle.database.jdbc</groupId>
+            <artifactId>ojdbc11</artifactId>
+            <version>23.4.0.24.05</version>
+        </dependency>
+
         <!-- Testing (JUnit 4) -->
         <dependency>
             <groupId>junit</groupId>
@@ -106,4 +116,80 @@
             </plugin>
         </plugins>
     </build>
+
+    <!--
+        Build profiles
+        ==============
+
+        local-dev  (active by default)
+            Excludes Fusion-only sources — files that import ADF share,
+            Apache HttpClient 5, or other Fusion internal classes that
+            aren't on this project's classpath. This keeps
+            `mvn clean test` green on developer machines.
+
+            Note: oracle.apps.fnd.applcore.log.AppsLogger is NOT excluded
+            here — we ship a local stub of that class under
+            src/main/java/oracle/apps/fnd/applcore/log/AppsLogger.java so
+            any new local code can use AppsLogger as a logging channel.
+            The stub delegates to java.util.logging.
+
+        fusion
+            Used by ADE / ojmake builds where the full Fusion classpath
+            (adf-share, applcore, etc.) is already provided by the
+            platform. The only thing we strip here is our own AppsLogger
+            stub — Fusion's real oracle.apps.fnd.applcore.log.AppsLogger
+            must win on that classpath. Activate with `mvn -P fusion ...`.
+
+        To add another Fusion-only file later, append its path (relative to
+        src/main/java) to the appropriate `<excludes>` list below.
+    -->
+    <profiles>
+        <profile>
+            <id>local-dev</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <version>3.13.0</version>
+                        <configuration>
+                            <excludes>
+                                <!-- Imports HttpClient 5 + commons-lang3 + AppsLogger.
+                                     AppsLogger is covered by our stub, but the other
+                                     deps are not on the local classpath, so still skip. -->
+                                <exclude>oracle/apps/hcm/formulas/core/jersey/util/ConnectionHelper.java</exclude>
+                                <!-- Imports oracle.adf.share.* + commons-lang3 — not
+                                     resolvable outside WebLogic / ADE. -->
+                                <exclude>oracle/apps/hcm/formulas/core/jersey/util/FastFormulaResourceUtil.java</exclude>
+                            </excludes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <profile>
+            <id>fusion</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <version>3.13.0</version>
+                        <configuration>
+                            <excludes>
+                                <!-- Drop our local AppsLogger stub so Fusion's real
+                                     oracle.apps.fnd.applcore.log.AppsLogger class is
+                                     used from the platform classpath. -->
+                                <exclude>oracle/apps/fnd/applcore/log/AppsLogger.java</exclude>
+                            </excludes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

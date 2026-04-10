@@ -2,9 +2,9 @@ import { useState, useRef } from 'react';
 import { Button, Tabs, Typography } from 'antd';
 import { BulbOutlined } from '@ant-design/icons';
 import { ValidationResults } from './ValidationResults';
-import { InputForm } from './InputForm';
-import { ExecutionTrace } from './ExecutionTrace';
-import { DBIPanel } from './DBIPanel';
+// NOTE: Simulate + DBIs tabs are temporarily removed from the UI. The
+// underlying InputForm / ExecutionTrace / DBIPanel component files are kept
+// on disk so they can be wired back up when those features are reimplemented.
 import { useEditorStore } from '../../stores/editorStore';
 import { useServerStore } from '../../stores/serverStore';
 import { streamSSE } from '../../services/sse';
@@ -74,26 +74,15 @@ function ExplainPanel() {
 }
 
 export function SimulationPanel() {
+  // Simulate and DBIs tabs are removed from the UI entirely until the real
+  // implementations are reworked against the DB-backed template store. The
+  // InputForm / ExecutionTrace / DBIPanel source files are kept on disk so
+  // they can be re-wired later without re-writing them from scratch.
   const tabItems = [
     {
       key: 'validate',
       label: 'Validate',
       children: <ValidationResults />,
-    },
-    {
-      key: 'simulate',
-      label: 'Simulate',
-      children: (
-        <>
-          <InputForm />
-          <ExecutionTrace />
-        </>
-      ),
-    },
-    {
-      key: 'dbis',
-      label: 'DBIs',
-      children: <DBIPanel />,
     },
     {
       key: 'explain',
