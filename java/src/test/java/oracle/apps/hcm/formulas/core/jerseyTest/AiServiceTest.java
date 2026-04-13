@@ -26,33 +26,33 @@ public class AiServiceTest {
 
     @Test
     public void systemPromptContainsKeywords() {
-        assertTrue(AiService.SYSTEM_PROMPT.contains("Fast Formula"));
-        assertTrue(AiService.SYSTEM_PROMPT.contains("DEFAULT"));
+        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("Fast Formula"));
+        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("DEFAULT"));
     }
 
     @Test
     public void systemPromptContainsFusionCloudDeclaration() {
-        assertTrue(AiService.SYSTEM_PROMPT.contains("Fusion Cloud"));
-        assertTrue(AiService.SYSTEM_PROMPT.contains("Do NOT use EBS"));
+        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("Fusion Cloud"));
+        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("Do NOT use EBS"));
     }
 
     @Test
     public void systemPromptContainsFormulaTypeFirst() {
-        assertTrue(AiService.SYSTEM_PROMPT.contains("Formula Type First"));
-        assertTrue(AiService.SYSTEM_PROMPT.contains("formula_status"));
-        assertTrue(AiService.SYSTEM_PROMPT.contains("skip_flag"));
+        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("Formula Type First"));
+        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("formula_status"));
+        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("skip_flag"));
     }
 
     @Test
     public void systemPromptContainsAntiHallucination() {
-        assertTrue(AiService.SYSTEM_PROMPT.contains("Anti-Hallucination"));
-        assertTrue(AiService.SYSTEM_PROMPT.contains("PLACEHOLDER"));
+        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("Anti-Hallucination"));
+        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("PLACEHOLDER"));
     }
 
     @Test
     public void systemPromptContainsCompileSelfCheck() {
-        assertTrue(AiService.SYSTEM_PROMPT.contains("Compile Self-Check"));
-        assertTrue(AiService.SYSTEM_PROMPT.contains("READ-ONLY"));
+        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("Compile Self-Check"));
+        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("READ-ONLY"));
     }
 
     // ── Provider selection tests (flattened from @Nested ProviderSelectionTests) ──

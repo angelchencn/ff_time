@@ -92,36 +92,34 @@ public class OpenAiProvider implements LlmProvider {
                     new InputStreamReader(response.body()), 1)) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    if (line.contains("\"error\"")) {
-                        if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-                            AppsLogger.write(this, "[OpenAI] API Error: " + line, AppsLogger.WARNING);
-                        }
-                        try {
-                            JsonNode err = MAPPER.readTree(line);
-                            String msg = err.at("/error/message").asText(line);
-                            tokenCallback.accept("API Error: " + msg);
-                        } catch (Exception e2) {
-                            // SEVERE inside catch — error envelope itself
-                            // didn't parse, fall back to raw line.
-                            AppsLogger.write(this, e2, AppsLogger.SEVERE);
-                            tokenCallback.accept("API Error: " + line);
-                        }
-                        return;
-                    }
-
                     if (!line.startsWith("data: ")) continue;
                     String data = line.substring(6).trim();
                     if (data.isEmpty() || "[DONE]".equals(data)) continue;
 
                     try {
                         JsonNode event = MAPPER.readTree(data);
+
+                        // Check for a top-level "error" object — OpenAI
+                        // returns {"error":{"message":"...","type":"..."}}
+                        // when the request itself failed. Do NOT match on
+                        // line.contains("error") because the LLM can
+                        // legitimately generate the word "error" as content
+                        // (e.g. RAISE_ERROR in a formula).
+                        if (event.has("error") && event.get("error").isObject()) {
+                            String msg = event.at("/error/message").asText(data);
+                            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                                AppsLogger.write(this,
+                                        "[OpenAI] API Error: " + msg, AppsLogger.WARNING);
+                            }
+                            tokenCallback.accept("API Error: " + msg);
+                            return;
+                        }
+
                         String content = event.at("/choices/0/delta/content").asText("");
                         if (!content.isEmpty()) {
                             tokenCallback.accept(content);
                         }
                     } catch (Exception e3) {
-                        // FINER — malformed SSE chunk is common when the
-                        // upstream cuts a multi-byte boundary; don't escalate.
                         if (AppsLogger.isEnabled(AppsLogger.FINER)) {
                             AppsLogger.write(this,
                                     "[OpenAI] skipping malformed SSE line: " + data,

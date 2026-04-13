@@ -38,6 +38,9 @@ public class AiService {
     private final LlmProvider provider;
     private final RagService ragService = new RagService();
 
+    /** Cached system prompt — loaded from DB on first use, then held in memory. */
+    private volatile String cachedSystemPrompt;
+
     public AiService() {
         this.provider = isFusionProviderActive()
                 ? loadFusionProviderOrFallback()
@@ -48,6 +51,69 @@ public class AiService {
                             + " (available=" + provider.isAvailable() + ")",
                     AppsLogger.INFO);
         }
+    }
+
+    /**
+     * Returns the effective system prompt. On first call, attempts to load
+     * from the {@code FF_FORMULA_TEMPLATES} table (the single row with
+     * {@code SYSTEMPROMPT_FLAG='Y'} and {@code ACTIVE_FLAG='Y'}). If the
+     * DB is unreachable or the row is missing/inactive, falls back to the
+     * hardcoded {@link #DEFAULT_SYSTEM_PROMPT} constant. The result is
+     * cached for the lifetime of this instance.
+     */
+    /**
+     * Returns the effective system prompt. On first call, queries
+     * {@code FF_FORMULA_TEMPLATES} for all active rows with
+     * {@code SYSTEMPROMPT_FLAG='Y'}, ordered by {@code SORT_ORDER}.
+     * Their {@code FORMULA_TEXT} values are concatenated (separated by
+     * blank lines) to form the final prompt — so each row can be a
+     * self-contained section (base rules, formula-type contracts,
+     * anti-hallucination rules, etc.) and ops can reorder, enable, or
+     * disable individual sections from the Manage Templates UI without
+     * touching code.
+     *
+     * <p>Falls back to {@link #DEFAULT_SYSTEM_PROMPT} when the DB is
+     * unreachable or no active rows exist.</p>
+     */
+    public String getSystemPrompt() {
+        String cached = cachedSystemPrompt;
+        if (cached != null) return cached;
+
+        try {
+            TemplateService ts = new TemplateService();
+            List<Map<String, Object>> rows = ts.findSystemPrompts();
+            if (!rows.isEmpty()) {
+                StringBuilder sb = new StringBuilder();
+                for (Map<String, Object> row : rows) {
+                    String text = (String) row.get("code"); // FORMULA_TEXT
+                    if (text != null && !text.isBlank()) {
+                        if (sb.length() > 0) sb.append("\n\n");
+                        sb.append(text);
+                    }
+                }
+                if (sb.length() > 0) {
+                    String combined = sb.toString();
+                    if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                        AppsLogger.write(this,
+                                "System prompt loaded from DB: " + rows.size()
+                                        + " template(s), " + combined.length() + " chars",
+                                AppsLogger.INFO);
+                    }
+                    cachedSystemPrompt = combined;
+                    return combined;
+                }
+            }
+        } catch (Exception e) {
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "Cannot load system prompt from DB, using default: "
+                                + e.getMessage(),
+                        AppsLogger.WARNING);
+            }
+        }
+
+        cachedSystemPrompt = DEFAULT_SYSTEM_PROMPT;
+        return DEFAULT_SYSTEM_PROMPT;
     }
 
     /**
@@ -87,6 +153,11 @@ public class AiService {
     /** Constructor for testing — inject a custom provider. */
     public AiService(LlmProvider provider) {
         this.provider = provider;
+    }
+
+    /** Expose the underlying provider for direct calls (e.g. extract-prompt). */
+    public LlmProvider getProvider() {
+        return provider;
     }
 
     /**
@@ -234,9 +305,9 @@ public class AiService {
 
         String userPrompt = isFirstTurn
                 ? buildGenerationPrompt(message, formulaType, editorCode, customSampleCode)
-                : buildFollowUpPrompt(message, editorCode);
+                : buildFollowUpPrompt(message, editorCode, formulaType);
 
-        String sysPrompt = SYSTEM_PROMPT;
+        String sysPrompt = getSystemPrompt();
         if (customRule != null && !customRule.isBlank()) {
             sysPrompt = sysPrompt + "\n\n## 19. Custom Rule\n\n" + customRule;
         }
@@ -254,15 +325,13 @@ public class AiService {
      * Formula generator (system prompt) and now sees the formula it's
      * supposed to modify (editorCode) plus what to do with it (message).
      */
-    private String buildFollowUpPrompt(String message, String editorCode) {
+    private String buildFollowUpPrompt(String message, String editorCode, String formulaType) {
         boolean hasEditorCode = editorCode != null && !editorCode.isBlank();
         if (!hasEditorCode) {
-            // Defensive: the frontend should always ship editor_code on
-            // follow-up turns. If it didn't (curl user, edge case),
-            // degrade to "just the message" rather than fail.
-            return message;
+            return "Formula type: " + formulaType + "\n\n" + message;
         }
-        return "## Current Formula\n\n```\n" + editorCode + "\n```\n\n"
+        return "Formula type: " + formulaType + "\n\n"
+                + "## Current Formula\n\n```\n" + editorCode + "\n```\n\n"
                 + "Modify the formula above according to the request below. "
                 + "Return ONLY the complete updated formula — no markdown fences, "
                 + "no explanation.\n\n"
@@ -291,7 +360,7 @@ public class AiService {
                 + "Return only the completion text, no explanation.";
 
         List<Map<String, String>> messages = List.of(
-                Map.of("role", "system", "content", SYSTEM_PROMPT),
+                Map.of("role", "system", "content", getSystemPrompt()),
                 Map.of("role", "user", "content", prompt)
         );
 
@@ -320,7 +389,7 @@ public class AiService {
 
         String prompt = "Formula:\n```\n" + code + "\n```\n\nAction: explain";
         List<Map<String, String>> messages = List.of(
-                Map.of("role", "system", "content", SYSTEM_PROMPT),
+                Map.of("role", "system", "content", getSystemPrompt()),
                 Map.of("role", "user", "content", prompt)
         );
         provider.streamChat(messages, MAX_TOKENS_CHAT, tokenCallback);
@@ -363,18 +432,20 @@ public class AiService {
                     + "Output the complete updated formula incorporating the requested change.");
         }
 
-        boolean isCustom = customSampleCode != null;
+        boolean hasReferenceFormula = customSampleCode != null && !customSampleCode.isBlank();
+        boolean isCustomType = "Custom".equalsIgnoreCase(formulaType);
 
-        if (isCustom) {
-            sections.add("## Request\n\n"
-                    + "Formula type: Custom (general-purpose formula, not bound to a specific Fusion formula type contract). "
-                    + "Do NOT ask the user to confirm the formula type. "
-                    + "Use the Reference Formula above as the structural template. "
-                    + "RETURN variables should match the reference formula pattern or the user's requirement.\n\n"
-                    + "Requirement: " + message);
-        } else {
-            sections.add("## Request\n\nFormula type: " + formulaType + "\n\nRequirement: " + message);
+        StringBuilder request = new StringBuilder("## Request\n\nFormula type: " + formulaType + "\n\n");
+        if (hasReferenceFormula) {
+            request.append("Use the Reference Formula above as the structural template. ");
+            if (isCustomType) {
+                request.append("This is a general-purpose formula, not bound to a specific Fusion formula type contract. ");
+            }
+            request.append("RETURN variables should match the reference formula pattern or the user's requirement.\n\n");
         }
+        request.append("Do NOT ask the user to confirm the formula type.\n\n");
+        request.append("Requirement: ").append(message);
+        sections.add(request.toString());
 
         if (hasEditorCode) {
             sections.add("Return the complete modified formula. Do not explain the changes unless asked. "
@@ -451,7 +522,8 @@ public class AiService {
 
     // ── System Prompt ───────────────────────────────────────────────────────
 
-    public static final String SYSTEM_PROMPT = "You are an expert assistant for Oracle Fusion Cloud HCM Fast Formula — a domain-specific language used to "
+    /** Hardcoded fallback used when no DB system prompt template is available. */
+    public static final String DEFAULT_SYSTEM_PROMPT = "You are an expert assistant for Oracle Fusion Cloud HCM Fast Formula — a domain-specific language used to "
             + "configure payroll, time, and absence rules in Oracle Fusion Cloud.\n\n"
             + "IMPORTANT: This is Oracle Fusion Cloud HCM ONLY. Do NOT use EBS (E-Business Suite) or legacy "
             + "Oracle Applications Fast Formula syntax, APIs, or patterns. If you are unsure whether a feature "

@@ -1,0 +1,191 @@
+/* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_TER_ABSENCE_SHIFT_OVERLAP_AP
+ *
+ * Formula Type:  Time Entry Rule (TER)
+ *
+ * Description:   Returns a validation message for each absence time entry
+ *                that overlaps a published schedule shift on the same day.
+ *
+ * Detail:        For each DETAIL record where AbsenceType is populated, the
+ *                formula loads published schedule shifts for the absence
+ *                date range and checks for a time overlap. If an overlap is
+ *                found, an output message is returned for that entry.
+ *
+ *  Change History
+ *  --------------
+ *  Who               Ver      Date          Description
+ *-----------------  ------   ------------  -------------------------------------
+ * Codex Assistant     1.0    2026-03-24    Initial development based on user spec.
+ *
+ ***************************************************************************/
+
+/*
+ * Block 1: Default Declarations
+ */
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS IS EMPTY_TEXT_NUMBER
+DEFAULT FOR measure                     IS EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime                   IS EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime                    IS EMPTY_DATE_NUMBER
+DEFAULT FOR AbsenceType                 IS EMPTY_NUMBER_NUMBER
+
+/* Published schedule detail DBIs (loaded based on search contexts) */
+DEFAULT_DATA_VALUE FOR HWM_DTL_SCHD_START_TIME IS '01-JAN-1900'(DATE)
+DEFAULT_DATA_VALUE FOR HWM_DTL_SCHD_END_TIME IS '01-JAN-1900'(DATE)
+DEFAULT_DATA_VALUE FOR HWM_DTL_SCHD_SCHEDULED_REF_DATE IS '01-JAN-1900'(DATE)
+
+/*
+ * Block 2: Inputs
+ */
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  measure,
+  StartTime,
+  StopTime,
+  AbsenceType
+
+/*
+ * Block 3: Context and Parameter Setup
+ */
+NullDate = '01-JAN-1900'(DATE)
+NullDateTime = '1900/01/01 00:00:00'(DATE)
+NullText = '**FF_NULL**'
+sTrue = 'Y'
+sFalse = 'N'
+maxLoop = 5000
+
+RecPositionDetail = 'DETAIL'
+
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+
+ffName = 'WFM_TER_ABSENCE_SHIFT_OVERLAP_AP'
+rLog = add_rlog(ffs_id, rule_id, 'Enter: ' || ffName)
+
+/* Rule header metadata */
+hSumLvl   = Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'DETAIL')
+hExecType = Get_Hdr_Text(rule_id, 'RULE_EXEC_TYPE', 'CREATE')
+
+/* Rule parameters */
+pMessageCode = GET_RVALUE_TEXT(rule_id, 'OVERRIDE_MESSAGE_CODE', 'HWM_FF_TER_ABS_SCH_OVERLAP_ERR')
+
+rLog = add_rlog(
+  ffs_id,
+  rule_id,
+  '(Header/Params) SumLevel=' || hSumLvl ||
+  '; ExecType=' || hExecType ||
+  '; MessageCode=' || pMessageCode
+)
+
+/*
+ * Block 4: Processing Logic
+ */
+out_msg_ary = EMPTY_TEXT_NUMBER
+tcRecordCount = HWM_CTXARY_RECORD_POSITIONS.count
+
+rec_idx = 0
+WHILE (rec_idx < tcRecordCount) LOOP
+(
+  rec_idx = rec_idx + 1
+
+  recPos = NullText
+  recAbsenceType = 0
+  recStartTime = NullDate
+  recStopTime = NullDate
+  recMeasure = 0
+
+  IF (HWM_CTXARY_RECORD_POSITIONS.exists(rec_idx)) THEN ( recPos = HWM_CTXARY_RECORD_POSITIONS[rec_idx] )
+  IF (AbsenceType.exists(rec_idx)) THEN ( recAbsenceType = AbsenceType[rec_idx] )
+  IF (StartTime.exists(rec_idx)) THEN ( recStartTime = StartTime[rec_idx] )
+  IF (StopTime.exists(rec_idx)) THEN ( recStopTime = StopTime[rec_idx] )
+  IF (measure.exists(rec_idx)) THEN ( recMeasure = measure[rec_idx] )
+
+  /* For measure-based absences, derive a stop time from the reported duration (hours) */
+  IF (recAbsenceType > 0 AND recStartTime <> NullDate AND recStopTime = NullDate AND recMeasure > 0) THEN (
+    recStopTime = recStartTime + (recMeasure / 24)
+  )
+
+  /* Only validate absence DETAIL rows */
+  IF (recPos = RecPositionDetail AND recAbsenceType > 0) THEN
+  (
+    /* Require start/stop to evaluate overlap */
+    IF (recStartTime <> NullDate AND recStopTime <> NullDate) THEN
+    (
+      /* Load published schedule shifts for the absence entry window */
+      CHANGE_CONTEXTS(
+        HWM_CTX_SEARCH_START_DATE = TRUNC(recStartTime),
+        HWM_CTX_SEARCH_END_DATE = ADD_DAYS(TRUNC(recStopTime), 1)
+      )
+      (
+        schedCount = HWM_DTL_SCHD_SCHEDULED_REF_DATE.count
+        schedIdx = 0
+        overlapFound = sFalse
+        overlapShiftStart = NullDate
+        overlapShiftStop = NullDate
+
+        rLog = add_rlog(
+          ffs_id,
+          rule_id,
+          'Absence rec_idx=' || TO_CHAR(rec_idx) ||
+          '; AbsStart=' || TO_CHAR(recStartTime) ||
+          '; AbsStop=' || TO_CHAR(recStopTime) ||
+          '; SchedCount=' || TO_CHAR(schedCount)
+        )
+
+        WHILE (schedIdx < schedCount) LOOP
+        (
+          schedIdx = schedIdx + 1
+
+          schStart = HWM_DTL_SCHD_START_TIME[schedIdx]
+          schStop = HWM_DTL_SCHD_END_TIME[schedIdx]
+
+          /* Overlap if schedule start < absence stop AND schedule stop > absence start */
+          IF (overlapFound = sFalse AND schStart <> NullDate AND schStop <> NullDate) THEN
+          (
+            IF (schStart < recStopTime AND schStop > recStartTime) THEN
+            (
+              overlapFound = sTrue
+              overlapShiftStart = schStart
+              overlapShiftStop = schStop
+            )
+          )
+        )
+
+        IF (overlapFound = sTrue) THEN
+        (
+          l_tkn1 = 'ABS_START'
+          l_val1 = TO_CHAR(recStartTime, 'YYYY-MM-DD HH24:MI')
+          l_tkn2 = 'ABS_STOP'
+          l_val2 = TO_CHAR(recStopTime, 'YYYY-MM-DD HH24:MI')
+          l_tkn3 = 'SHIFT'
+          l_val3 = TO_CHAR(overlapShiftStart, 'YYYY-MM-DD HH24:MI') || ' - ' || TO_CHAR(overlapShiftStop, 'YYYY-MM-DD HH24:MI')
+
+          out_msg_ary[rec_idx] = get_output_msg3('HWM', pMessageCode, l_tkn1, l_val1, l_tkn2, l_val2, l_tkn3, l_val3)
+
+          rLog = add_rlog(
+            ffs_id,
+            rule_id,
+            'Overlap found for rec_idx=' || TO_CHAR(rec_idx) ||
+            '; Shift=' || l_val3 ||
+            '; Msg=' || out_msg_ary[rec_idx]
+          )
+        )
+      )
+    )
+  )
+
+  IF (rec_idx > maxLoop) THEN (
+    ex = raise_error(ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.')
+  )
+)
+
+rLog = add_rlog(ffs_id, rule_id, 'Exit: ' || ffName)
+
+/*
+ * Block 5: Outputs
+ */
+RETURN out_msg_ary

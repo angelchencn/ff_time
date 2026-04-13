@@ -292,3 +292,27 @@ cp -r -f /scratch/xiaojuch/ff_time/java/src/main/java/oracle/apps/hcm/formulas/c
 
 ade co -nc hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/service/AiService.java
 ade co -nc hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/config/DbConfig.java
+
+
+
+https://docs.oracle.com/en/cloud/saas/human-resources/fapid/element-input-validation-formula-type.html#Status-Processing-Rules
+
+
+这个值 "hcm.hrg.goal_creation" 是你从 ADE 拉过来的 — 看起来是 HCM Goals 团队注册的
+  usecase，不是 Fast Formula 自己的。
+
+  ---
+  关于你的新问题 "fast formula 想创建一个新的怎么弄？"
+
+  Fusion AI Apps 的 usecase 需要在 AI Apps 平台注册。流程大致是：
+
+  1. 注册 usecase — 联系 AI Apps 团队（或者在 Topology Manager / AI Apps console
+  里）注册一个新的 usecase key，比如 hcm.ff.formula_generation
+  2. 配置 scope/policy — 在 PolicySetFeature 里关联 OAuth scope
+  3. 更新 USECASE 常量 — 把 FusionAiProvider.java 里的值改成新注册的 key
+
+  如果你暂时没法注册新的，可以先借用
+  hcm.hrg.goal_creation（当前就是这样）。但正式上线前应该有自己的 usecase，因为：
+  - AI Apps 的 quota / rate limiting 是按 usecase 隔离的
+  - 日志和监控也按 usecase 分
+  - 用别人的 usecase 会影响他们的用量统计

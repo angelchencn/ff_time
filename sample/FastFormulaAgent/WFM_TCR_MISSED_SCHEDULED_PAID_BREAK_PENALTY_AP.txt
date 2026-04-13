@@ -1,0 +1,196 @@
+/* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_TCR_MISSED_SCHEDULED_PAID_BREAK_PENALTY_AP
+ *
+ * Formula Type:  Time Calculation Rule (TCR)
+ *
+ * Description:   Generates a penalty (in hours) for each day where the worker
+ *                has a paid break on their published schedule but doesn't
+ *                report a break time entry on the time card.
+ *
+ * Detail:        For each END_DAY record, the formula:
+ *                  1) Determines whether a break was reported for the day
+ *                     (based on PayrollTimeType = BREAK_TIME_ENTRY).
+ *                  2) Loads published schedule details for the day and sums
+ *                     the scheduled paid-break duration.
+ *                  3) If schedule paid-break minutes > 0 and no break is
+ *                     reported, outputs PENALTY_HOURS for the day.
+ *
+ *  Change History
+ *  --------------
+ *  Who               Ver      Date          Description
+ *-----------------  ------   ------------  -------------------------------------
+ * Codex Assistant     1.0    2026-03-24    Initial development based on user spec.
+ *
+ ***************************************************************************/
+
+/*
+ * Block 1: Default Declarations
+ */
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS IS EMPTY_TEXT_NUMBER
+DEFAULT FOR measure                     IS EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime                   IS EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime                    IS EMPTY_DATE_NUMBER
+DEFAULT FOR PayrollTimeType             IS EMPTY_TEXT_NUMBER
+
+/* Published schedule detail DBIs (loaded based on search contexts) */
+DEFAULT_DATA_VALUE FOR HWM_DTL_SCHD_START_TIME IS '01-JAN-1900'(DATE)
+DEFAULT_DATA_VALUE FOR HWM_DTL_SCHD_END_TIME IS '01-JAN-1900'(DATE)
+DEFAULT_DATA_VALUE FOR HWM_DTL_SCHD_PAID_BREAK_DURATION IS 0
+
+/*
+ * Block 2: Inputs
+ */
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  measure,
+  StartTime,
+  StopTime,
+  PayrollTimeType
+
+/*
+ * Block 3: Context and Parameter Setup
+ */
+NullDate = '01-JAN-1900'(DATE)
+NullDateTime = '1900/01/01 00:00:00'(DATE)
+NullText = '**FF_NULL**'
+sTrue = 'Y'
+sFalse = 'N'
+maxLoop = 5000
+
+RecPositionDetail = 'DETAIL'
+RecPositionEndDay = 'END_DAY'
+RecPositionEndPeriod = 'END_PERIOD'
+
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+
+ffName = 'WFM_TCR_MISSED_SCHEDULED_PAID_BREAK_PENALTY_AP'
+rLog = add_rlog(ffs_id, rule_id, 'Enter: ' || ffName)
+
+/* Rule header metadata */
+hSumLvl   = Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'DETAIL')
+hExecType = Get_Hdr_Text(rule_id, 'RULE_EXEC_TYPE', 'CREATE')
+
+/* Rule parameters */
+pBreakPayType = GET_RVALUE_TEXT(rule_id, 'BREAK_TIME_ENTRY', NullText)
+pPenaltyHours = GET_RVALUE_NUMBER(rule_id, 'PENALTY_HOURS', 1)
+
+rLog = add_rlog(
+  ffs_id,
+  rule_id,
+  '(Header/Params) SumLevel=' || hSumLvl ||
+  '; ExecType=' || hExecType ||
+  '; BreakPayType=' || pBreakPayType ||
+  '; PenaltyHours=' || TO_CHAR(pPenaltyHours)
+)
+
+/*
+ * Block 4: Processing Logic
+ */
+OUT_MEASURE = EMPTY_NUMBER_NUMBER
+tcRecordCount = HWM_CTXARY_RECORD_POSITIONS.count
+
+dayBreakReported = sFalse
+dayDate = NullDate
+
+rec_idx = 0
+WHILE (rec_idx < tcRecordCount) LOOP
+(
+  rec_idx = rec_idx + 1
+
+  recPos = NullText
+  recStartTime = NullDate
+  recStopTime = NullDate
+  recPayType = NullText
+  recMeasure = 0
+
+  IF (HWM_CTXARY_RECORD_POSITIONS.exists(rec_idx)) THEN ( recPos = HWM_CTXARY_RECORD_POSITIONS[rec_idx] )
+  IF (StartTime.exists(rec_idx)) THEN ( recStartTime = StartTime[rec_idx] )
+  IF (StopTime.exists(rec_idx)) THEN ( recStopTime = StopTime[rec_idx] )
+  IF (PayrollTimeType.exists(rec_idx)) THEN ( recPayType = PayrollTimeType[rec_idx] )
+  IF (measure.exists(rec_idx)) THEN ( recMeasure = measure[rec_idx] )
+
+  /* Track the current day based on the last seen detail start time */
+  IF (recPos = RecPositionDetail AND recStartTime <> NullDate) THEN
+  (
+    dayDate = TRUNC(recStartTime)
+
+    /* Any reported break entry on the day counts as reporting the break */
+    IF (pBreakPayType <> NullText AND recPayType <> NullText AND UPPER(recPayType) = UPPER(pBreakPayType)) THEN
+    (
+      IF (recMeasure > 0 OR recStopTime <> NullDate) THEN (
+        dayBreakReported = sTrue
+      )
+    )
+  )
+
+  /* Evaluate at end-of-day */
+  IF (recPos = RecPositionEndDay) THEN
+  (
+    /* Fallback: some configurations populate a day marker start time */
+    IF (dayDate = NullDate AND recStartTime <> NullDate) THEN (
+      dayDate = TRUNC(recStartTime)
+    )
+
+    scheduledPaidBreakMinutes = 0
+
+    IF (dayDate <> NullDate) THEN
+    (
+      CHANGE_CONTEXTS(
+        HWM_CTX_SEARCH_START_DATE = dayDate,
+        HWM_CTX_SEARCH_END_DATE = ADD_DAYS(dayDate, 1)
+      )
+      (
+        schedCount = HWM_DTL_SCHD_START_TIME.count
+        schedIdx = 0
+        WHILE (schedIdx < schedCount) LOOP
+        (
+          schedIdx = schedIdx + 1
+          IF (HWM_DTL_SCHD_PAID_BREAK_DURATION.exists(schedIdx)) THEN (
+            scheduledPaidBreakMinutes = scheduledPaidBreakMinutes + HWM_DTL_SCHD_PAID_BREAK_DURATION[schedIdx]
+          )
+        )
+      )
+    )
+
+    rLog = add_rlog(
+      ffs_id,
+      rule_id,
+      'Day=' || TO_CHAR(dayDate, 'YYYY-MM-DD') ||
+      '; ScheduledPaidBreakMin=' || TO_CHAR(scheduledPaidBreakMinutes) ||
+      '; BreakReported=' || dayBreakReported
+    )
+
+    IF (scheduledPaidBreakMinutes > 0 AND dayBreakReported = sFalse AND pPenaltyHours > 0) THEN
+    (
+      OUT_MEASURE[rec_idx] = pPenaltyHours
+      rLog = add_rlog(ffs_id, rule_id, 'Penalty applied at rec_idx=' || TO_CHAR(rec_idx) || '; Hours=' || TO_CHAR(pPenaltyHours))
+    )
+
+    /* Reset for next day */
+    dayBreakReported = sFalse
+    dayDate = NullDate
+  )
+
+  IF (recPos = RecPositionEndPeriod) THEN
+  (
+    dayBreakReported = sFalse
+    dayDate = NullDate
+  )
+
+  IF (rec_idx > maxLoop) THEN (
+    ex = raise_error(ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.')
+  )
+)
+
+rLog = add_rlog(ffs_id, rule_id, 'Exit: ' || ffName)
+
+/*
+ * Block 5: Outputs
+ */
+RETURN OUT_MEASURE

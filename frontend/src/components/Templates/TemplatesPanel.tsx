@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, Modal, Select, Switch, Tooltip, message } from 'antd';
 import {
   PlusOutlined,
@@ -44,8 +44,9 @@ interface Template {
   formula_type_id?: number | null;
   formula_type_name?: string | null;
   source_type?: string;
-  active_flag?: string;   // 'Y' or 'N', default 'Y'
-  semantic_flag?: string; // 'Y' or 'N', default 'Y'
+  active_flag?: string;        // 'Y' or 'N', default 'Y'
+  semantic_flag?: string;      // 'Y' or 'N', default 'Y'
+  systemprompt_flag?: string;  // 'Y' or 'N', default 'N'
   sort_order?: number;
   object_version_number?: number;
   /** Local-only marker for rows that haven't been saved yet. */
@@ -57,6 +58,178 @@ const CUSTOM_FORMULA_TYPE = 'Custom';
 
 interface Props {
   onBack: () => void;
+}
+
+// ─── Formula Lookup (load existing formula into template body) ────────────
+
+interface FormulaLookupProps {
+  formulaType: string | null;
+  serverConfig: import('../../stores/serverStore').ServerConfig;
+  onSelect: (formulaText: string) => void;
+}
+
+function FormulaLookup({ formulaType, serverConfig, onSelect }: FormulaLookupProps) {
+  const PAGE_SIZE = 25;
+  const [options, setOptions] = useState<{ value: number; label: string }[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const offsetRef = useRef(0);
+  const searchTermRef = useRef<string | undefined>(undefined);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const headers: Record<string, string> = {};
+  if (serverConfig.auth) {
+    headers['Authorization'] = `Basic ${btoa(`${serverConfig.auth.username}:${serverConfig.auth.password}`)}`;
+  }
+
+  async function fetchFormulas(search?: string, offset = 0, append = false) {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        offset: String(offset),
+      });
+      if (formulaType) params.set('formula_type', formulaType);
+      if (search) params.set('search', search);
+      const url = `${serverConfig.baseUrl}${serverConfig.apiPrefix}/formulas/lookup?${params}`;
+      const res = await axios.get<{ formula_id: number; formula_name: string }[]>(url, { headers });
+      const newOpts = res.data.map((f) => ({ value: f.formula_id, label: f.formula_name }));
+      setOptions((prev) => (append ? [...prev, ...newOpts] : newOpts));
+      setHasMore(res.data.length >= PAGE_SIZE);
+      offsetRef.current = offset + res.data.length;
+    } catch {
+      if (!append) setOptions([]);
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Reload when formula type changes
+  useEffect(() => {
+    offsetRef.current = 0;
+    searchTermRef.current = undefined;
+    fetchFormulas();
+  }, [formulaType]);
+
+  function handleSearch(value: string) {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTermRef.current = value || undefined;
+    searchTimerRef.current = setTimeout(() => {
+      offsetRef.current = 0;
+      fetchFormulas(value || undefined, 0, false);
+    }, 300);
+  }
+
+  function handlePopupScroll(e: React.UIEvent<HTMLDivElement>) {
+    const target = e.target as HTMLDivElement;
+    if (loading || !hasMore) return;
+    // Load more when scrolled to within 40px of bottom
+    if (target.scrollTop + target.clientHeight >= target.scrollHeight - 40) {
+      fetchFormulas(searchTermRef.current, offsetRef.current, true);
+    }
+  }
+
+  async function handleSelect(formulaId: number) {
+    try {
+      const url = `${serverConfig.baseUrl}${serverConfig.apiPrefix}/formulas/lookup/${formulaId}/text`;
+      const res = await axios.get<{ formula_text: string }>(url, { headers });
+      if (res.data.formula_text) {
+        onSelect(res.data.formula_text);
+      }
+    } catch (err) {
+      console.error('Failed to load formula text', err);
+    }
+  }
+
+  return (
+    <Select
+      showSearch
+      filterOption={false}
+      placeholder="Load from formula…"
+      onSearch={handleSearch}
+      onSelect={handleSelect}
+      onPopupScroll={handlePopupScroll}
+      loading={loading}
+      options={options}
+      notFoundContent={loading ? 'Searching…' : 'No formulas found'}
+      size="middle"
+      style={{
+        flex: 1,
+        fontSize: 13,
+      }}
+      allowClear
+      value={null}
+    />
+  );
+}
+
+// ─── Extract Prompt from URL ──────────────────────────────────────────────
+
+interface ExtractPromptBarProps {
+  formulaType: string | null;
+  serverConfig: import('../../stores/serverStore').ServerConfig;
+  onExtracted: (promptText: string) => void;
+}
+
+function ExtractPromptBar({ formulaType, serverConfig, onExtracted }: ExtractPromptBarProps) {
+  const [url, setUrl] = useState('');
+  const [extracting, setExtracting] = useState(false);
+
+  async function handleExtract() {
+    if (!url.trim()) return;
+    setExtracting(true);
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (serverConfig.auth) {
+        headers['Authorization'] = `Basic ${btoa(`${serverConfig.auth.username}:${serverConfig.auth.password}`)}`;
+      }
+      const resp = await axios.post<{ prompt: string }>(
+        `${serverConfig.baseUrl}${serverConfig.apiPrefix}/templates/extract-prompt`,
+        { url: url.trim(), formula_type: formulaType },
+        { headers }
+      );
+      if (resp.data.prompt) {
+        onExtracted(resp.data.prompt);
+        message.success('Prompt extracted');
+      }
+    } catch (err: any) {
+      const detail = err?.response?.data?.error || err.message;
+      message.error(`Extract failed: ${detail}`);
+    } finally {
+      setExtracting(false);
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+      <Input
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder="Oracle help URL (e.g. https://docs.oracle.com/…)"
+        style={{
+          flex: 1,
+          fontSize: 12,
+          backgroundColor: 'var(--bg-base)',
+          border: '1px solid var(--border-muted)',
+        }}
+        onPressEnter={handleExtract}
+      />
+      <Button
+        onClick={handleExtract}
+        loading={extracting}
+        disabled={!url.trim()}
+        size="middle"
+        style={{
+          flexShrink: 0,
+          fontSize: 12,
+          fontWeight: 600,
+        }}
+      >
+        Extract Prompt
+      </Button>
+    </div>
+  );
 }
 
 // ─── Tiny presentational helpers ──────────────────────────────────────────
@@ -122,6 +295,25 @@ export function TemplatesPanel({ onBack }: Props) {
   const { current } = useServerStore();
   const { formulaTypes } = useFormulaTypes();
 
+  // All formula types from FF_FORMULA_TYPES (for the detail panel type picker)
+  const [allFormulaTypes, setAllFormulaTypes] = useState<{ type_name: string; display_name: string }[]>([]);
+  useEffect(() => {
+    const headers: Record<string, string> = {};
+    if (current.auth) {
+      headers['Authorization'] = `Basic ${btoa(`${current.auth.username}:${current.auth.password}`)}`;
+    }
+    axios
+      .get<{ type_name: string; display_name: string }[]>(
+        `${current.baseUrl}${current.apiPrefix}/formula-types?all=true`,
+        { headers }
+      )
+      .then((res) => setAllFormulaTypes(res.data))
+      .catch(() => {
+        // Fallback: use the template-filtered list
+        setAllFormulaTypes(formulaTypes.map((ft) => ({ type_name: ft.type_name, display_name: ft.display_name })));
+      });
+  }, [current.baseUrl]);
+
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const [editName, setEditName] = useState('');
@@ -130,6 +322,7 @@ export function TemplatesPanel({ onBack }: Props) {
   const [editRule, setEditRule] = useState('');
   const [editActive, setEditActive] = useState(true);
   const [editSemantic, setEditSemantic] = useState(true);
+  const [editSystemPrompt, setEditSystemPrompt] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -205,6 +398,7 @@ export function TemplatesPanel({ onBack }: Props) {
     // Flags default to 'Y' when the row is new or missing the column
     setEditActive(t.active_flag !== 'N');
     setEditSemantic(t.semantic_flag !== 'N');
+    setEditSystemPrompt(t.systemprompt_flag === 'Y');
     setIsDirty(false);
   }
 
@@ -234,7 +428,7 @@ export function TemplatesPanel({ onBack }: Props) {
       formula_type_name: filterType === CUSTOM_FORMULA_TYPE ? null : filterType,
       source_type: 'USER_CREATED',
       active_flag: 'Y',
-      semantic_flag: 'Y',
+      semantic_flag: 'N',
       sort_order: templates.length + 1,
       code: `/******************************************************************************
  *
@@ -278,7 +472,8 @@ RETURN l_result
       rule: editRule,
       active_flag: editActive ? 'Y' : 'N',
       semantic_flag: editSemantic ? 'Y' : 'N',
-      formula_type: filterType, // server resolves to FORMULA_TYPE_ID
+      systemprompt_flag: editSystemPrompt ? 'Y' : 'N',
+      formula_type: current.formula_type_name || CUSTOM_FORMULA_TYPE,
     };
 
     setSaving(true);
@@ -298,9 +493,15 @@ RETURN l_result
         saved = resp.data;
       }
 
-      const updated = [...templates];
-      updated[selectedIndex] = saved;
-      setTemplates(updated);
+      const savedType = saved.formula_type_name || CUSTOM_FORMULA_TYPE;
+      if (savedType !== filterType) {
+        // Auto-switch filter so the saved template appears in the left list
+        setFilterType(savedType);
+      } else {
+        const updated = [...templates];
+        updated[selectedIndex] = saved;
+        setTemplates(updated);
+      }
       setIsDirty(false);
       message.success('Saved');
     } catch (err: any) {
@@ -913,7 +1114,7 @@ RETURN l_result
                   overflow: 'hidden',
                 }}
               >
-                {/* Identity + Behavior + Prompt overlay (scrollable on small heights) */}
+                {/* Identity + Behavior + Additional Prompt Text (scrollable on small heights) */}
                 <div
                   style={{
                     padding: '20px 32px 16px',
@@ -926,19 +1127,56 @@ RETURN l_result
                   {/* Identity */}
                   <section style={{ marginBottom: 22 }}>
                     <SectionLabel>Identity</SectionLabel>
-                    <Input
-                      value={editDesc}
-                      onChange={(e) => {
-                        setEditDesc(e.target.value);
-                        setIsDirty(true);
-                      }}
-                      placeholder="A short description of what this template does"
-                      style={{
-                        fontSize: 13,
-                        backgroundColor: 'var(--bg-base)',
-                        border: '1px solid var(--border-muted)',
-                      }}
-                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <Input
+                        value={editDesc}
+                        onChange={(e) => {
+                          setEditDesc(e.target.value);
+                          setIsDirty(true);
+                        }}
+                        placeholder="A short description of what this template does"
+                        style={{
+                          fontSize: 13,
+                          backgroundColor: 'var(--bg-base)',
+                          border: '1px solid var(--border-muted)',
+                        }}
+                      />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {/* Formula type — all types from FF_FORMULA_TYPES */}
+                        <Select
+                          value={selected?.formula_type_name || CUSTOM_FORMULA_TYPE}
+                          onChange={(val: string) => {
+                            if (selected) {
+                              const updated = [...templates];
+                              updated[selectedIndex] = {
+                                ...selected,
+                                formula_type_name: val === CUSTOM_FORMULA_TYPE ? null : val,
+                              };
+                              setTemplates(updated);
+                              setIsDirty(true);
+                            }
+                          }}
+                          showSearch
+                          optionFilterProp="label"
+                          placeholder="Formula type"
+                          style={{ flex: 1, fontSize: 13 }}
+                          size="middle"
+                          options={allFormulaTypes.map((ft) => ({
+                            value: ft.type_name,
+                            label: ft.display_name,
+                          }))}
+                        />
+                        {/* Formula name — search FF_FORMULAS_VL, load code */}
+                        <FormulaLookup
+                          formulaType={selected?.formula_type_name || null}
+                          serverConfig={current}
+                          onSelect={(text) => {
+                            setEditCode(text);
+                            setIsDirty(true);
+                          }}
+                        />
+                      </div>
+                    </div>
                   </section>
 
                   {/* Behavior */}
@@ -1060,11 +1298,70 @@ RETURN l_result
                         </span>
                       </label>
                     </div>
+
+                    {/* System Prompt flag */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+                      <label
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 3,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: editSystemPrompt
+                                ? 'var(--accent-amber)'
+                                : 'var(--text-tertiary)',
+                              fontFamily: 'var(--font-body)',
+                              letterSpacing: '0.06em',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            System Prompt
+                          </span>
+                          <Switch
+                            size="small"
+                            checked={editSystemPrompt}
+                            onChange={(v) => {
+                              setEditSystemPrompt(v);
+                              setIsDirty(true);
+                            }}
+                          />
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: editSystemPrompt
+                              ? 'var(--accent-amber)'
+                              : 'var(--text-tertiary)',
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          {editSystemPrompt
+                            ? 'This row\'s FORMULA_TEXT is the LLM system prompt.'
+                            : 'Normal template (not a system prompt).'}
+                        </span>
+                      </label>
+                    </div>
                   </section>
 
-                  {/* Prompt overlay */}
+                  {/* Additional Prompt Text */}
                   <section>
-                    <SectionLabel hint="ADDITIONAL_PROMPT_TEXT">Prompt overlay</SectionLabel>
+                    <SectionLabel hint="ADDITIONAL_PROMPT_TEXT">Additional Prompt Text</SectionLabel>
+                    {!fieldsLocked && (
+                      <ExtractPromptBar
+                        formulaType={selected?.formula_type_name || null}
+                        serverConfig={current}
+                        onExtracted={(text) => {
+                          setEditRule(text);
+                          setIsDirty(true);
+                        }}
+                      />
+                    )}
                     <Input.TextArea
                       value={editRule}
                       rows={5}
@@ -1093,7 +1390,7 @@ RETURN l_result
                   </section>
                 </div>
 
-                {/* Formula body — fills remaining height */}
+                {/* Reference Formula — fills remaining height */}
                 <div
                   style={{
                     flex: 1,
@@ -1112,7 +1409,7 @@ RETURN l_result
                     }}
                   >
                     <div style={{ flex: 1 }}>
-                      <SectionLabel hint="FORMULA_TEXT · CLOB">Formula body</SectionLabel>
+                      <SectionLabel hint="FORMULA_TEXT · CLOB">Reference Formula</SectionLabel>
                     </div>
                     {fieldsLocked && (
                       <div

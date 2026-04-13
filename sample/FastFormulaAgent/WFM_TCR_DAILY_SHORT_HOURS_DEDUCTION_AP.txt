@@ -1,0 +1,148 @@
+/* +======================================================================+
+ |                Copyright (c) 2026 Your Organization                   |
+ |                        All rights reserved.                          |
+ +======================================================================+
+ *
+ * Formula Name : WFM_TCR_DAILY_SHORT_HOURS_DEDUCTION_AP
+ * Formula Type : Time Calculation Rule (TCR)
+ *
+ * Description  : Deducts one hour for each day a worker reports fewer
+ *                hours than the scheduled daily hours parameter.
+ *
+ * Change History
+ * --------------
+ * Who                Ver        Date         Description
+ * -----------------  ---------  -----------  --------------------------------
+ * FastFormulaAssist  1.0        2026-03-20   Initial version.
+ *
+ ***************************************************************************/
+
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS is EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY  is EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure                     is EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime                   is EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime                    is EMPTY_DATE_NUMBER
+DEFAULT FOR TimeRecordType              is EMPTY_TEXT_NUMBER
+DEFAULT FOR PayrollTimeType             is EMPTY_TEXT_NUMBER
+DEFAULT FOR AbsenceType                 is EMPTY_NUMBER_NUMBER
+DEFAULT FOR UnitOfMeasure               is EMPTY_TEXT_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  measure,
+  StartTime,
+  StopTime,
+  TimeRecordType,
+  PayrollTimeType,
+  AbsenceType,
+  UnitOfMeasure
+
+NullDate     = '01-JAN-1900'(DATE)
+NullDateTime = '1900/01/01 00:00:00'(DATE)
+NullText     = '**FF_NULL**'
+NullNumber   = 0
+
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+
+rLog = add_rlog(ffs_id, rule_id, 'Enter: WFM_TCR_DAILY_SHORT_HOURS_DEDUCTION_AP')
+
+processEmptyTc = Get_Hdr_Text(rule_id, 'INCLUDE_EMPTY_TC', 'Y')
+includeEmpty = 'N'
+if (upper(processEmptyTc) = 'YES' or upper(processEmptyTc) = 'Y') then (
+  includeEmpty = 'Y'
+)
+
+hSumLvl = Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'DAY')
+hExecType = Get_Hdr_Text(rule_id, 'RULE_EXEC_TYPE', 'CREATE')
+
+pScheduleHours = GET_RVALUE_NUMBER(rule_id, 'DAILY_SCHEDULE_HOURS', 8)
+pWorkedCategory = GET_RVALUE_NUMBER(rule_id, 'WORKED_TIME_CONDITION', 0)
+
+rLog = add_rlog(ffs_id, rule_id,
+                'Parameters: includeEmpty=' || includeEmpty ||
+                '; hSumLvl=' || hSumLvl ||
+                '; DAILY_SCHEDULE_HOURS=' || TO_CHAR(pScheduleHours) ||
+                '; WORKED_TIME_CONDITION=' || TO_CHAR(pWorkedCategory))
+
+OUT_MEASURE_DEDUCTION = EMPTY_NUMBER_NUMBER
+
+maxRecords = HWM_CTXARY_RECORD_POSITIONS.count
+nidx = 0
+loopGuard = 0
+maxLoop = 10000
+
+dayActualHours = 0
+dayMeasureArrayValue = 0
+dayDate = NullDate
+
+WHILE (nidx < maxRecords) LOOP
+(
+  nidx = nidx + 1
+  loopGuard = loopGuard + 1
+
+  if (loopGuard > maxLoop) then (
+    ex = RAISE_ERROR(ffs_id, rule_id,
+                     'Formula WFM_TCR_DAILY_SHORT_HOURS_DEDUCTION_AP exceeded loop guard.')
+  )
+
+  recPos = HWM_CTXARY_RECORD_POSITIONS[nidx]
+  entryMeasure = NullNumber
+  entryDayMeasure = NullNumber
+  entryDayDate = NullDate
+
+  if (MEASURE.exists(nidx)) then (
+    entryMeasure = MEASURE[nidx]
+  )
+
+  if (HWM_CTXARY_HWM_MEASURE_DAY.exists(nidx)) then (
+    entryDayMeasure = HWM_CTXARY_HWM_MEASURE_DAY[nidx]
+  )
+
+  if (StartTime.exists(nidx)) then (
+    entryDayDate = StartTime[nidx]
+  ) else if (StopTime.exists(nidx)) then (
+    entryDayDate = StopTime[nidx]
+  )
+
+  if (entryMeasure <> 0) then (
+    dayActualHours = dayActualHours + entryMeasure
+  )
+
+  if (entryDayMeasure <> NullNumber) then (
+    dayMeasureArrayValue = entryDayMeasure
+  )
+
+  if (entryDayDate <> NullDate) then (
+    dayDate = entryDayDate
+  )
+
+  if (recPos = 'END_DAY') then (
+    evaluatedHours = dayMeasureArrayValue
+    if (evaluatedHours = 0) then (
+      evaluatedHours = dayActualHours
+    )
+
+    shouldEvaluate = 'Y'
+    if (includeEmpty = 'N' and evaluatedHours = 0) then (
+      shouldEvaluate = 'N'
+    )
+
+    if (shouldEvaluate = 'Y' and evaluatedHours < pScheduleHours) then (
+      OUT_MEASURE_DEDUCTION[nidx] = 1
+      rLog = add_rlog(ffs_id, rule_id,
+                      'Deduction created for day=' || TO_CHAR(dayDate) ||
+                      '; worked=' || TO_CHAR(evaluatedHours) ||
+                      '; scheduled=' || TO_CHAR(pScheduleHours))
+    )
+
+    dayActualHours = 0
+    dayMeasureArrayValue = 0
+    dayDate = NullDate
+  )
+)
+
+rLog = add_rlog(ffs_id, rule_id, 'Exit: WFM_TCR_DAILY_SHORT_HOURS_DEDUCTION_AP')
+
+RETURN OUT_MEASURE_DEDUCTION

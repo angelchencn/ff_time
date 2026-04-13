@@ -392,14 +392,12 @@ export function EditorWithChat() {
             value={selectedSampleId}
             onChange={(val: number | null) => {
               setSelectedSampleId(val ?? null);
-              // Switching to a new template (or clearing the selection) wipes
-              // any previously generated formula from the editor — the user
-              // is about to ask for a fresh generation, and leaving stale code
-              // around causes it to be sent back in the next /chat call as the
-              // "Current Formula in Editor" reference. Programmatic clear, so
-              // markDirty=false: an empty buffer with isDirty=true would also
-              // get filtered out by handleSend (`if (isDirty && code)`), but
-              // keeping the flag accurate matches the rest of the codebase.
+              // Switching templates starts a fresh conversation — clear the
+              // session so the next send is a first turn (with reference
+              // formula injection, RAG, etc.). Without this, the backend
+              // sees the existing sessionId and treats the call as a
+              // follow-up, which skips the template's FORMULA_TEXT.
+              setSessionId(null);
               setCode('', false);
               if (val != null) {
                 const picked = dbTemplates.find((t) => t.template_id === val);

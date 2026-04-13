@@ -1,0 +1,4552 @@
+### WFM_PERIOD_MINIMUM_TIME_ENTRY_RULE_AP
+Type: WORKFORCE_MANAGEMENT_TIME_ENTRY_RULES
+Description: Formula that validates if reported time entries are less than a defined minimum hours value.
+```
+ /* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_PERIOD_MINIMUM_TIME_ENTRY_RULE_AP
+ *
+ * Formula Type:  Time Entry Rule (TER)
+ *
+ * Description:   Evaluates whether reported time entries for the time category
+ *                are less than the defined minimum hours . The minimum hours
+ *                and time attributes are inputs to the delivered formula.
+ *                This formula uses an array to process time card data.
+ *
+ * Detail:        Compares the reported time category hours to the defined minimum
+ *                hours.  If the reported hours are less than the defined minimum,
+ *                the defined message appears.  If no message is defined, the
+ *                default message appears. The message severity is defined as an
+ *                output value associated with the displayed message.
+ *                HWM_FF_TER_PERIOD_LS_MIN_ERR - HWM_FF_TER_PERIOD_LS_MIN_WRN.
+ *
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who               Ver      Date          Description
+ *-----------------  ------   ------------  -------------------------------------
+ * David Cohanoff      104.0805  2014-FEB-19   Created.
+ * David Cohanoff      107.1205  2015-DEC-07   Updated .
+ * David Cohanoff      109.0421  2019-APR-24   Remove check for Record position. Check Measure only.
+ * David Cohanoff      120.0718  2020-JUL-18   Updated.
+ *
+***************************************************************************/
+
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS   is  EMPTY_TEXT_NUMBER
+DEFAULT FOR measure  is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime   is  EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime   is  EMPTY_DATE_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  measure ,
+  StartTime,
+  StopTime
+
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+
+ffName = 'WFM_PERIOD_MINIMUM_TIME_ENTRY_RULE_AP -v120.0718  '
+rLog  = add_rlog (ffs_id, rule_id, 'Enter: ' || ffName  )
+
+NullDate =  '01-JAN-1900'(DATE)
+NullDateTime = '1900/01/01 00:00:00' (date)
+NullText = '**FF_NULL**'
+
+
+TimeRecordType_MEASURE = 'MEASURE'
+TimeRecordType_RANGE = 'RANGE'
+
+sumLvlTimeCard = 'TIMECARD'
+sumLvlDay = 'DAY'
+sumLvlDetail  = 'DETAIL'
+
+RecPositoinEoPeriod = 'END_PERIOD'
+RecPositoinEoDay = 'END_DAY'
+RecPositoinDetail = 'DETAIL'
+
+
+sum_lvl= Get_Hdr_Text(rule_id ,'RUN_SUMMATION_LEVEL', 'TIMECARD')
+process_empty_tc  = Get_Hdr_Text(rule_id,'INCLUDE_EMPTY_TC', 'Y')
+empty_tc = 'N'
+if (upper(process_empty_tc) = 'YES' or upper(process_empty_tc) = 'Y' ) then (
+   empty_tc = 'Y'
+)
+
+
+pMinHr  = get_rvalue_number (rule_id  ,'DEFINED_LIMIT', 0)
+pMsgcd  = get_rvalue_text (rule_id  ,'MESSAGE_CODE', 'HWM_FF_TER_PERIOD_LS_MIN_WRN')
+pTimeCatId  =  get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+
+
+ rLog = add_rlog (ffs_id, rule_id, '(Rule parameters: '  ||
+							'; ffs_id='  ||  TO_CHAR( ffs_id ) ||
+							'; pMinHr='  ||  TO_CHAR( pMinHr )  ||
+							'; pMsgcd='  ||  pMsgcd ||
+							'; pTimeCatId='  ||  TO_CHAR( pTimeCatId ) )
+
+
+wk_hrs_total_day  = 0
+wk_hrs_total_tc   = 0
+
+max_ary = HWM_CTXARY_RECORD_POSITIONS.count
+out_msg_ary 	=	EMPTY_TEXT_NUMBER
+
+nidx = 0
+WHILE (nidx < max_ary ) LOOP
+(
+    nidx = nidx + 1
+	tcMEASURE = 0
+
+	/*if (HWM_CTXARY_RECORD_POSITIONS.exists(nidx) ) then  */
+	tcRecPos   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+	if (MEASURE.exists(nidx) ) then ( tcMEASURE  = MEASURE[nidx] )
+
+	if (tcMEASURE <> 0) then (
+		wk_hrs_total_day  = wk_hrs_total_day + tcMEASURE
+		wk_hrs_total_tc   =  wk_hrs_total_tc + tcMEASURE
+
+	)
+
+    rLog  = add_rlog (ffs_id, rule_id,  'TIMECARD_INPUT Row:='  ||  TO_CHAR( nidx )  ||
+							'; tcRecPos='  ||tcRecPos  ||
+							'; tcMEASURE='  ||  TO_CHAR( tcMEASURE )  ||
+							'; wk_hrs_total_day='  ||  TO_CHAR( wk_hrs_total_day )  ||
+							'; wk_hrs_total_tc='  ||  TO_CHAR( wk_hrs_total_tc ) )
+
+
+	ocMsg = NullText
+	CHANGE_CONTEXTS(HWM_RECORD_POSITION = tcRecPos)
+	(
+		CALL_FORMULA ('WFM_PERIOD_MINIMUM_TIME_ENTRY_RULE_SUB'
+					  ,ffs_id > 'ffs_id'
+					  ,rule_id > 'rule_id'
+					  ,tcMEASURE > 'measure'
+					  ,sum_lvl > 'sum_lvl'
+					  ,empty_tc > 'empty_tc'
+					  ,pMinHr > 'l_min_hr'
+					  ,pMsgcd > 'l_msg_cd'
+					  ,tcRecPos > 'tcRecPos'
+					  ,wk_hrs_total_day > 'wk_hrs_total_day'
+					  ,wk_hrs_total_tc > 'wk_hrs_total_tc'
+					  , ocMsg     <  'OUT_MSG'  DEFAULT NullText  )
+	)
+
+	if (ocMsg <> NullText) Then (
+		out_msg_ary[nidx]   = ocMsg
+		rLog  = add_rlog (ffs_id, rule_id, 'ocMsg text:'  || ocMsg)
+	)
+
+	if (tcRecPos = RecPositoinEoDay ) then (
+		wk_hrs_total_day  = 0
+	) else if (tcRecPos = RecPositoinEoPeriod ) then (
+		wk_hrs_total_day  = 0
+		wk_hrs_total_tc   =  0
+	)
+
+	if (nidx >  100 ) Then (
+		/* endless loop?  Stop process if more than max_loop records found */
+		ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+	)
+
+)
+
+rLog  = add_rlog (ffs_id, rule_id, 'Exit: ' || ffName  )
+
+RETURN  out_msg_ary
+```
+
+### WFM_PERIOD_MAXIMUM_TIME_ENTRY_RULE_AP
+Type: WORKFORCE_MANAGEMENT_TIME_ENTRY_RULES
+Description: Formula that validates if reported time entries are greater than a defined maximum hours value.
+```
+   /* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_PERIOD_MAXIMUM_TIME_ENTRY_RULE_AP
+ *
+ * Formula Type:  Time Entry Rule (TER)
+ *
+ * Description:   Evaluates whether reported time entries for the time
+ *                category are greater than the defined maximum hours. The
+ *                maximum hours  and time attributes are inputs to the
+ *                delivered formula. This formula uses an array to process
+ *                time card data.
+ *
+ * Detail:        Compares the reported time category hours to the defined
+ *                maximum hours.  If the reported hours are greater than
+ *                the defined maximum, the defined message appears.
+ *                If no message is defined, the default message appears.
+ *                The message severity is defined as an output value
+ *                associated with the displayed message.
+ *                 HWM_FF_TER_PERIOD_GT_MAX_ERR - HWM_FF_TER_PERIOD_GT_MAX_WRN.
+ *
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who               Ver      Date          Description
+ *-----------------  ------   ------------  -----------------------------------------
+ * David Cohanoff    104.0805  2014-FEB-19   Created.
+ * David Cohanoff    107.1205  2015-DEC-07   Updated .
+ * David Cohanoff    109.0421  2019-APR-24   Remove check for Record position. Check Measure only.
+ * David Cohanoff    120.0718  2020-JUL-18   Updated.
+ *
+***************************************************************************/
+
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS   is  EMPTY_TEXT_NUMBER
+DEFAULT FOR measure  is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime   is  EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime   is  EMPTY_DATE_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  measure ,
+  StartTime,
+  StopTime
+
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+
+ffName = 'WFM_PERIOD_MAXIMUM_TIME_ENTRY_RULE_AP  - v120.0718'
+rLog  = add_rlog (ffs_id, rule_id, '>>> ' || ffName    )
+
+
+
+/* ----------- constant values   -------- */
+/* ------------------------------------- */
+NullDate =  '01-JAN-1900'(DATE)
+NullDateTime = '1900/01/01 00:00:00' (date)
+NullText = '**FF_NULL**'
+
+TimeRecordType_MEASURE = 'MEASURE'
+TimeRecordType_RANGE = 'RANGE'
+
+sumLvlTimeCard = 'TIMECARD'
+sumLvlDay = 'DAY'
+sumLvlDetail  = 'DETAIL'
+
+RecPositoinEoPeriod = 'END_PERIOD'
+RecPositoinEoDay = 'END_DAY'
+RecPositoinDetail = 'DETAIL'
+
+
+/* ----------- Rule Header parameters  -------- */
+/* -------------------------------------------- */
+process_empty_tc  = Get_Hdr_Text(rule_id ,'INCLUDE_EMPTY_TC', 'Y')
+if (upper(process_empty_tc) = 'YES' or upper(process_empty_tc) = 'Y' ) then (
+   process_empty_tc = 'Y'
+)
+
+sum_lvl = Get_Hdr_Text(rule_id ,'RUN_SUMMATION_LEVEL', 'TIMECARD')
+
+
+/* ----------- Rule input parameters  -------- */
+/* ------------------------------------------- */
+pMaxHr  = get_rvalue_number (rule_id ,'DEFINED_LIMIT', 0)
+pMsgCd  = get_rvalue_text (rule_id ,'MESSAGE_CODE', 'HWM_FF_TER_PERIOD_GT_MAX_WRN')
+pTimeCatId  =   get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+
+rLog = add_rlog (ffs_id, rule_id, '(Rule parameters: '  ||
+							'; ffs_id='  ||  TO_CHAR( ffs_id ) ||
+							'; pMaxHr='  ||  TO_CHAR( pMaxHr )  ||
+							'; pMsgcd='  ||  pMsgcd ||
+							'; pTimeCatId='  ||  TO_CHAR( pTimeCatId ) )
+
+
+
+/* ----------- Temp Workarea variables  -------- */
+/* --------------------------------------------- */
+out_msg_ary 	=	EMPTY_TEXT_NUMBER
+
+/* ----------- Temp Workarea variables  -------- */
+/* --------------------------------------------- */
+wk_hrs_total_day  = 0
+wk_hrs_total_tc   = 0
+
+
+/* ----------- Loop through current Time Card(POJO) Main Logic -------- */
+/* -------------------------------------------------------------------- */
+max_ary = HWM_CTXARY_RECORD_POSITIONS.count
+rLog  = add_rlog (ffs_id, rule_id, ' >>> Start bulk process - max_ary=' || TO_CHAR( max_ary )  )
+
+nidx = 0
+WHILE (nidx < max_ary ) LOOP
+(
+    nidx = nidx + 1
+	tcMEASURE = 0
+
+	tcRecPos   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+	if (MEASURE.exists(nidx) ) then ( tcMEASURE  = MEASURE[nidx] )
+
+	if (tcMEASURE <> 0) then (
+		wk_hrs_total_day  = wk_hrs_total_day + tcMEASURE
+		wk_hrs_total_tc   =  wk_hrs_total_tc + tcMEASURE
+
+	)
+
+    rLog  = add_rlog (ffs_id, rule_id,  'TIMECARD_INPUT Row:='  ||  TO_CHAR( nidx )  ||
+							'; tcRecPos='  ||tcRecPos  ||
+							'; tcMEASURE='  ||  TO_CHAR( tcMEASURE )  ||
+							'; wk_hrs_total_day='  ||  TO_CHAR( wk_hrs_total_day )  ||
+							'; wk_hrs_total_tc='  ||  TO_CHAR( wk_hrs_total_tc ) )
+
+	ocMsg = NullText
+	CALL_FORMULA ('WFM_PERIOD_MAXIMUM_TIME_ENTRY_RULE_SUB'
+						,ffs_id > 'ffs_id'
+						,rule_id > 'rule_id'
+						,tcMEASURE > 'measure'
+						,pMaxHr > 'l_max_hr'
+						,pMsgCd  > 'l_msg_cd'
+						,process_empty_tc > 'process_empty_tc'
+						,sum_lvl  > 'sum_lvl'
+						,tcRecPos > 'rec_position'
+						,wk_hrs_total_day  > 'wk_hrs_total_day'
+						,wk_hrs_total_tc  > 'wk_hrs_total_tc'
+						,ocMsg     <  'OUT_MSG'  DEFAULT NullText  )
+
+	if (ocMsg <> NullText) Then (
+		out_msg_ary[nidx]   = ocMsg
+	)
+
+	if (tcRecPos = RecPositoinEoDay ) then (
+		wk_hrs_total_day  = 0
+	) else if (tcRecPos = RecPositoinEoPeriod ) then (
+		wk_hrs_total_day  = 0
+		wk_hrs_total_tc   =  0
+	)
+
+	if (nidx >  100 ) Then (
+		/* endless loop?  Stop process if more than max_loop records found */
+		ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+	)
+)
+rLog  = add_rlog (ffs_id, rule_id, '-- end bulk process <<<<' )
+
+
+RETURN  out_msg_ary
+```
+
+### WFM_THRESHOLD_W_ABS_TIME_CALCULATION_RULE_AP
+Type: WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES
+Description: Formula that divides defined daily or weekly reported and absence time into calculated time attributes for values above and below a defined threshold hours value.
+```
+   /* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_THRESHOLD_W_ABS_TIME_CALCULATION_RULE_AP
+ *
+ * Formula Type:  Time Calculation Rules
+ *
+ * Description:  Divides reported daily or period time and absence time into
+ *               calculated time attributes for values  above and below
+ *               defined threshold hours.  Reported and absence time and
+ *               specific time attribute results are inputs to the delivered
+ *               formula. This formula uses an array to process time card
+ *               data.
+ *
+ * Detail:      Compares the total time category hours, which might include
+ *              absence time, for the day or to the threshold value.
+ *              Hours above the threshold are converted to a single pay
+ *              time type. Hours below the threshold either remain the
+ *              same pay time type  or are converted to a new pay time
+ *              type attribute.
+ *              The formula assumes
+ *              RESTRICTED_ALL_ABSENCE_YN is Y, if AbsenceType is not Null.
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who             Ver       Date         Description
+ *----------------  ------    -----------  -------------------------------
+ * David Cohanoff   104.0710  2014-FEB-19  Created.
+ * David Cohanoff   108.0514  2018-May-17  Partial rewrite for performance.
+ * David Cohanoff   108.0615  2018-Oct-12  Modify day calculation.
+ *
+ *
+***************************************************************************/
+
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS     is  EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY      is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure           is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR PayrollTimeType   is  EMPTY_TEXT_NUMBER
+DEFAULT FOR AbsenceType       is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime         is  EMPTY_DATE_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  measure ,
+  StartTime,
+  PayrollTimeType ,
+  AbsenceType
+
+ffName = 'WFM_THRESHOLD_W_ABS_TIME_CALCULATION_RULE_AP  -v1019.0102 '
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+rLog  = add_rlog (ffs_id, rule_id, ffName    )
+
+
+ctxMeasurePeriod = GET_CONTEXT(HWM_MEASURE_PERIOD, 0)
+
+
+
+NullDate =  '01-JAN-1900'(DATE)
+NullText =  '**FF_NULL**'
+
+sumLvlTimeCard = 'TIMECARD'
+sumLvlDay = 'DAY'
+sumLvlDetail  = 'DETAIL'
+
+RecPositoinEoPeriod = 'END_PERIOD'
+RecPositoinEoDay = 'END_DAY'
+RecPositoinDetail = 'DETAIL'
+
+/* Fixed Values from Rule header  */
+hSumLvl= Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
+exec_type  = Get_Hdr_Text(rule_id,'RULE_EXEC_TYPE', 'CREATE')
+
+hCreateYn  = 'N'
+if (upper(exec_type) = 'CREATE'  ) then (
+  hCreateYn  = 'Y'
+)
+
+rLog = add_rlog (ffs_id, rule_id, 'In Context/Rule header: '  ||
+					 ' ffs_id='  ||  TO_CHAR( ffs_id ) ||
+					 '; ctxMeasurePeriod='  ||  TO_CHAR( ctxMeasurePeriod )  ||
+					 '; hSumLvl='  ||  hSumLvl   ||
+					 '; hCreateYn='  || hCreateYn      )
+
+categoryId  = get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+pMaxHrs  = get_rvalue_number (rule_id ,'DEFINED_LIMIT', 0)
+resAbs1  = get_rvalue_number (rule_id ,'RESTRICTED_ABSENCE_TYPE1', -1)
+resAbs2  = get_rvalue_number (rule_id ,'RESTRICTED_ABSENCE_TYPE2', -1)
+resAbs3  = get_rvalue_number (rule_id ,'RESTRICTED_ABSENCE_TYPE3', -1)
+resAbsAll  = get_rvalue_text (rule_id ,'RESTRICTED_ALL_ABSENCE_YN', 'N')
+if (upper(resAbsAll) = 'YES' or upper(resAbsAll) = 'Y' or upper(resAbsAll) = 'TRUE'  ) then (
+  resAbsAll  = 'Y'
+) else (
+  resAbsAll  = 'N'
+)
+
+ rLog = add_rlog (ffs_id, rule_id, 'Input_parameters:'  ||
+				' pMaxHrs='  ||  TO_CHAR( pMaxHrs ) ||
+				'; resAbs1='  || TO_CHAR( resAbs1) ||
+				'; resAbs2='  || TO_CHAR( resAbs2 ) ||
+				'; resAbs3='  || TO_CHAR( resAbs3 ) ||
+				'; resAbsAll='  || resAbsAll ||
+				'; category='  || TO_CHAR( categoryId )   )
+
+
+ max_loop = 500
+ max_ary = HWM_CTXARY_RECORD_POSITIONS.count
+ rLog  = add_rlog (ffs_id, rule_id, ' >>> Start bulk process - max_ary=' || TO_CHAR( max_ary )  )
+
+ /* Do normal handle if  execution type =Create or no resticted  AbsenceType  found */
+ isNormalHandle = 'Y'
+
+ if  (hCreateYn  = 'N' ) then
+ (
+	rLog  = add_rlog (ffs_id, rule_id, ' >>> Check Abs types- max_ary=' || TO_CHAR( max_ary )  )
+	nidx = 0
+	WHILE (nidx < max_ary ) LOOP
+	(
+		nidx = nidx + 1
+
+		tcPayrolltimetype = NullText
+		tcAbsenceType = -1
+
+		if (PAYROLLTIMETYPE.exists(nidx) ) then ( tcPayrolltimetype  = PAYROLLTIMETYPE[nidx]   )
+		if (ABSENCETYPE.exists(nidx) ) then ( tcAbsenceType  = ABSENCETYPE[nidx]    	)
+
+
+		rLog = add_rlog (ffs_id, rule_id, 'loop1 - ck AbsenceType Index: '  ||    TO_CHAR( nidx )  ||
+					 ' , payrolltimetype='  || tcPayrolltimetype ||
+					  ' , AbsenceType='  || TO_CHAR( tcAbsenceType )  )
+
+		if  ( (tcAbsenceType  > 0 ) and
+			  (resAbsAll  = 'Y'  or
+			   tcAbsenceType = resAbs1 or tcAbsenceType = resAbs2 or tcAbsenceType = resAbs3 ) ) then
+		(
+			isNormalHandle = 'N'
+			rLog = add_rlog (ffs_id, rule_id, ' isNormalHandle = No - Exit loop1.' )
+			exit
+		 )
+
+		if (nidx >  max_loop ) Then (
+			/* endless loop?  Stop process if more than max_loop records found */
+			ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+		)
+
+	)
+	rLog  = add_rlog (ffs_id, rule_id, '-- end  Check Abs type loop <<<<' )
+
+)
+
+
+MEASURE_UNDER 	=	EMPTY_NUMBER_NUMBER
+MEASURE_OVER 	=	EMPTY_NUMBER_NUMBER
+
+wkTotalHrsDay = 0
+wkTotalHrsTc  = 0
+
+wkIsOverTimeSet  = 'N'
+wkOverTimeRemain   =  0
+cntr = 0
+nidx = 0
+nxtRec = 1
+if ( isNormalHandle = 'N' ) then (
+	nidx = max_ary + 1
+	nxtRec = -1
+)
+
+WHILE (cntr < max_ary ) LOOP
+(
+    cntr = cntr + 1
+    nidx = nidx + nxtRec
+
+	tcRecPos = NullText
+	tcMeasure = 0
+	tcMeasureDay = 0
+	tcStartTime = nullDate
+	tcPayrolltimetype = NullText
+	tcAbsenceType = -1
+
+	tcRecPos   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+
+	if (MEASURE.exists(nidx) ) then ( tcMeasure  = MEASURE[nidx]   )
+	if (StartTime.exists(nidx) ) then ( tcStartTime  = StartTime[nidx]   )
+	if (HWM_CTXARY_HWM_MEASURE_DAY.exists(nidx) ) then ( tcMeasureDay  = HWM_CTXARY_HWM_MEASURE_DAY[nidx]  )
+	if (PAYROLLTIMETYPE.exists(nidx) ) then ( tcPayrolltimetype  = PAYROLLTIMETYPE[nidx]   )
+	if (ABSENCETYPE.exists(nidx) ) then ( tcAbsenceType  = ABSENCETYPE[nidx] )
+
+
+	 rLog = add_rlog (ffs_id, rule_id, 'Tc_Inputs #: '  ||    TO_CHAR( nidx )  ||
+								'; rec_pos='  || tcRecPos    ||
+								'; measure='  ||  TO_CHAR( tcMeasure ) ||
+								'; measureDay='  ||  TO_CHAR( tcMeasureDay ) ||
+								'; payrolltimetype='  || tcPayrolltimetype ||
+								'; AbsenceType='  ||  TO_CHAR(tcAbsenceType) ||
+								'; StartTime='  ||  TO_CHAR(tcStartTime)  )
+
+
+
+	oMU = -999
+	oMO = -999
+	isNormalDetail = 'Y'
+
+	if (tcMeasure <> 0 )  then
+	(
+			if ( isNormalHandle = 'Y' ) then
+			(
+				CALL_FORMULA ('WFM_THRESHOLD_TIME_CALCULATION_RULE_SUB'
+						  , ffs_id        > 'ffs_id'
+						  , rule_id       > 'rule_id'
+						  , hSumLvl       > 'hSumLvl'
+						  , hCreateYn     > 'create_yn'
+						  , ctxMeasurePeriod  > 'measurePeriod'
+						  , tcMeasureDay     > 'measureDay'
+						  , tcRecPos    > 'recPosition'
+						  , wkTotalHrsDay    > 'wkTotalHrsDay'
+						  , wkTotalHrsTc     > 'wkTotalHrsTc'
+						  , tcMeasure       > 'measure'
+						  , pMaxHrs         > 'pMaxHrs'
+						  , oMU   <  'out_measure_under'  DEFAULT -9999
+						  , oMO    <  'out_measure_over'  DEFAULT -9999
+						  , wkTotalHrsDay     <  'oTotalHrsDay'  DEFAULT 0
+						  , wkTotalHrsTc      <  'oTotalHrsTc'   DEFAULT 0  )
+
+					rLog  = add_rlog (ffs_id, rule_id, 'CALL_FORMULA_NORMAL Result:  '  ||
+										 ' , oMU ='  ||  TO_CHAR( oMU ) ||
+										 ' , oMO ='  ||  TO_CHAR(  oMO ) ||
+										 ' , wkTotalHrsDay ='  ||  TO_CHAR(  wkTotalHrsDay ) ||
+										 ' , wkTotalHrsTc ='   ||  TO_CHAR(  wkTotalHrsTc ) )
+
+			) else
+			(
+				if  (tcAbsenceType  > 0 ) then
+				(
+					if (resAbsAll  = 'Y'  or
+						tcAbsenceType = resAbs1 or tcAbsenceType = resAbs2 or tcAbsenceType = resAbs3 ) then (
+						isNormalDetail = 'N'
+					)
+				)
+
+				CALL_FORMULA ('WFM_THRESHOLD_W_ABS_TIME_CALCULATION_RULE_SUB'
+							  , ffs_id        > 'ffs_id'
+							  , rule_id       > 'rule_id'
+							  , tcMeasure > 'tcMeasure'
+							  , hSumLvl > 'hSumLvl'
+							  , tcRecPos > 'tcRecPos'
+							  , pMaxHrs > 'pMaxHrs'
+							  , hCreateYn     > 'hCreateYn'
+							  , tcMeasureDay   > 'tcMeasureDay'
+							  , ctxMeasurePeriod  > 'ctxMeasurePeriod'
+							  , isNormalDetail > 'isNormalDetail'
+							  , wkIsOverTimeSet > 'wkIsOverTimeSet'
+							  , wkOverTimeRemain > 'wkOverTimeRemain'
+							  , oMU               < 'OUT_MEASURE_UNDER' DEFAULT  -999
+							  , oMO               < 'OUT_MEASURE_OVER'  DEFAULT  -999
+							  , wkIsOverTimeSet   < 'wkIsOverTimeSet'   DEFAULT  'N'
+							  , wkOverTimeRemain  < 'wkOverTimeRemain'  DEFAULT   0 )
+
+
+					rLog  = add_rlog (ffs_id, rule_id, 'CALL_FORMULA_ABS Result:  '  ||
+										 ' , oMU ='  ||  TO_CHAR( oMU ) ||
+										 ' , oMO ='  ||  TO_CHAR( oMO ) ||
+										 ' , wkIsOverTimeSet ='  ||    wkIsOverTimeSet ||
+										 ' , wkOverTimeRemain ='  ||  TO_CHAR(  wkOverTimeRemain )  )
+			)
+
+
+
+			if (isNormalDetail = 'N' ) then (
+				rLog = add_rlog (ffs_id, rule_id, ' isNormalDetail = No   - Absence Record - skip ' )
+			) else (
+				if (oMU >= 0 ) Then (
+					MEASURE_UNDER[nidx]   = oMU
+					rLog  = add_rlog (ffs_id, rule_id, 'OUT_PUT MEASURE_UNDER: ' || TO_CHAR(oMU) )
+				)
+
+				if (oMO >= 0 ) Then (
+					MEASURE_OVER[nidx]   = oMO
+					rLog  = add_rlog (ffs_id, rule_id, 'OUT_PUT MEASURE_OVER: ' || TO_CHAR(oMU) )
+				)
+			)
+
+	)  /*  end tcMeasure > 0   */
+
+
+
+	if (hSumLvl = sumLvlDay and tcRecPos =  RecPositoinEoDay) then  (
+	   wkIsOverTimeSet    = 'N'
+	   wkOverTimeRemain = 0
+	   wkTotalHrsDay  = 0
+	)  ELSE IF (hSumLvl = sumLvlTimeCard  and tcRecPos = RecPositoinEoPeriod) then  (
+	   wkIsOverTimeSet    = 'N'
+	   wkOverTimeRemain = 0
+	  wkTotalHrsTc  = 0
+	)  ELSE IF (hSumLvl = sumLvlDetail) then  (
+	   wkIsOverTimeSet    = 'N'
+	   wkOverTimeRemain = 0
+	)
+
+
+	if (nidx >  1000 ) Then (
+		/* endless loop?  Stop process if more than max_loop records found */
+		ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+	)
+
+
+)
+	rLog  = add_rlog (ffs_id, rule_id, '-- end bulk process <<<<' )
+
+
+RETURN  MEASURE_UNDER,  MEASURE_OVER
+```
+
+### WFM_THRESHOLD_TIME_CALCULATION_RULE_AP
+Type: WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES
+Description: Formula that divides defined daily or weekly reported time into calculated time attributes for values above and below a defined threshold hours value.
+```
+     /* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_THRESHOLD_TIME_CALCULATION_RULE_AP
+ *
+ * Formula Type:  Time Calculation rule
+ *
+ *
+ * Description:   Divides reported daily or period time into calculated
+ *                time attributes for hours above and below defined
+ *                threshold hours. Reported time and specific time attribute
+ *                results are inputs to the delivered formula. This formula
+ *                uses an array to process time card data.
+ *
+ * Detail:        Compares the total time category hours for the day or
+ *                period to the threshold value. Hours above the threshold
+ *                are converted to a single pay time type. Hours under the
+ *                threshold either remain the same pay time type value or
+ *                are converted into a new pay time type attribute.
+ *
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who               Ver      Date          Description
+ *-----------------  ------   ------------  -----------------------------------------
+ * David Cohanoff     206.12       2013-FEB-10    Created.
+ * David Cohanoff     104.0525     2014-JAN-04    Modified for R9 - New HWM_FF_UTIL.
+ * David Cohanoff     114.1117     2014-SEP-12    NEW AP Version.
+ * David Cohanoff     107.1205     2017-DEC-07   Updated .
+ *
+ *
+***************************************************************************/
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS   is  EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY    is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure  is  EMPTY_NUMBER_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  measure
+
+/*  Following 2 lines are required right after inputs for all OTL and HWM formulas */
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+ffName = 'WFM_THRESHOLD_TIME_CALCULATION_RULE_AP'   || ' - v115.1125 '
+rLog  = add_rlog (ffs_id, rule_id, '>>> Enter - ' || ffName  )
+
+/* ----------- constant values   -------- */
+/* ------------------------------------- */
+NullDate =  '01-JAN-1900'(DATE)
+NullDateTime = '1900/01/01 00:00:00' (date)
+NullText = '**FF_NULL**'
+
+RecPositoinEoPeriod = 'END_PERIOD'
+RecPositoinEoDay = 'END_DAY'
+RecPositoinDetail = 'DETAIL'
+
+sumLvlTimeCard = 'TIMECARD'
+sumLvlDay = 'DAY'
+sumLvlDetail  = 'DETAIL'
+
+TimeRecordType_MEASURE = 'MEASURE'
+TimeRecordType_RANGE = 'RANGE'
+
+/* ----------- Context value   -------- */
+/* ------------------------------------ */
+measure_period = GET_CONTEXT(HWM_MEASURE_PERIOD, 0)
+
+
+/* ----------- Rule Header parameters  -------- */
+/* -------------------------------------------- */
+hSumLvl= Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
+hExecType  = Get_Hdr_Text(rule_id,'RULE_EXEC_TYPE', 'CREATE')
+
+hCreateYn  = 'N'
+if (upper(hExecType) = 'CREATE'  ) then (
+  hCreateYn  = 'Y'
+)
+
+ l_status = add_rlog (ffs_id , rule_id ,'Rule Header and Context:'  ||
+					 ' , ffs_id ='  ||  TO_CHAR( ffs_id ) ||
+					 ' , rule_id ='  ||  TO_CHAR( rule_id ) ||
+					 ' , measure_period='  ||  TO_CHAR( measure_period ) ||
+					 ' , hSumLvl='  ||   hSumLvl ||
+					 ' , hExecType='  ||   hExecType ||
+					 ' , hCreateYn='  ||   hCreateYn   )
+
+/* ----------- Rule input parameters  -------- */
+/* ------------------------------------------- */
+pCategoryId  = get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+pMaxHrs  = get_rvalue_number (rule_id ,'DEFINED_LIMIT', 0)
+
+l_status = add_rlog (ffs_id , rule_id , 'Rule Parameters: '   ||
+			 ' , pMaxHrs='  ||  TO_CHAR( pMaxHrs ) ||
+			 ' , pCategoryId ='  ||  TO_CHAR( pCategoryId )  )
+
+
+
+/* ----------- initialize output variables  -------- */
+/* ------------------------------------------------- */
+out_measure_ary_under 	=	EMPTY_NUMBER_NUMBER
+out_measure_ary_over 	=	EMPTY_NUMBER_NUMBER
+
+
+/* ----------- Temp Workarea variables  -------- */
+/* --------------------------------------------- */
+wMaAry = HWM_CTXARY_RECORD_POSITIONS.count
+rLog  = add_rlog (ffs_id, rule_id, 'Start bulk process - wMaAry=' || TO_CHAR( wMaAry )  )
+wkTotalHrsDay = 0
+wkTotalHrsTc = 0
+nidx = 0
+
+
+/* ----------- Loop through current Time Card(POJO) Main Logic -------- */
+/* -------------------------------------------------------------------- */
+WHILE (nidx < wMaAry ) LOOP
+(
+    nidx = nidx + 1
+	tcMeasure = 0
+	tcMeasureDay = 0
+
+	tcRecPosition   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+	if (MEASURE.exists(nidx) ) then ( tcMeasure  = MEASURE[nidx]   )
+	if (HWM_CTXARY_HWM_MEASURE_DAY.exists(nidx) ) then ( tcMeasureDay  = HWM_CTXARY_HWM_MEASURE_DAY[nidx]  )
+
+	ocMeasure_under  = -9999
+	ocMeasure_over   = -9999
+	CALL_FORMULA ('WFM_THRESHOLD_TIME_CALCULATION_RULE_SUB'
+				  , ffs_id        > 'ffs_id'
+				  , rule_id       > 'rule_id'
+				  , hSumLvl       > 'hSumLvl'
+				  , hCreateYn     > 'hCreateYn'
+				  , measure_period  > 'measurePeriod'
+				  , tcMeasureDay     > 'measureDay'
+				  , tcRecPosition    > 'recPosition'
+				  , wkTotalHrsDay    > 'wkTotalHrsDay'
+				  , wkTotalHrsTc     > 'wkTotalHrsTc'
+				  , tcMeasure       > 'measure'
+				  , pMaxHrs         > 'pMaxHrs'
+				  , ocMeasure_under   <  'out_measure_under'  DEFAULT -9999
+				  , ocMeasure_over    <  'out_measure_over'  DEFAULT -9999
+				  , wkTotalHrsDay     <  'oTotalHrsDay'  DEFAULT 0
+				  , wkTotalHrsTc      <  'oTotalHrsTc'   DEFAULT 0  )
+
+
+
+	rLog  = add_rlog (ffs_id, rule_id, '>>> CALL_FORMULA Result:  '  ||
+				 ' , tcMeasureDay ='  ||  TO_CHAR( tcMeasureDay ) ||
+				 ' , ocMeasure_under ='  ||  TO_CHAR( ocMeasure_under ) ||
+				 ' , ocMeasure_over ='  ||  TO_CHAR(  ocMeasure_over ) ||
+				 ' , wkTotalHrsDay ='  ||  TO_CHAR(  wkTotalHrsDay ) ||
+				 ' , wkTotalHrsTc ='   ||  TO_CHAR(  wkTotalHrsTc ) )
+
+	if (ocMeasure_under <>  -9999 ) Then (
+		out_measure_ary_under[nidx]   = ocMeasure_under
+	)
+	 if (ocMeasure_over <>  -9999 ) Then (
+		out_measure_ary_over[nidx]   = ocMeasure_over
+	)
+
+	if (nidx >  1000 ) Then (   /* endless loop?  Stop process  */
+			ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+	)
+)
+
+rLog  = add_rlog (ffs_id, rule_id, '<< Exit - ' || ffName   )
+
+RETURN  out_measure_ary_under, out_measure_ary_over
+```
+
+### WFM_TER_VALIDATE_REST_PERIOD_DURATION_AP
+Type: WORKFORCE_MANAGEMENT_TIME_ENTRY_RULES
+Description: Back to back shift which have insufficient rest periods between shifts
+```
+ /* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_TER_VALIDATE_REST_PERIOD_DURATION_AP
+ *
+ * Formula Type:  Time Entry Rules
+ *
+ * Description:   Evaluates whether the time between reported consecutive
+ *                shifts is less than the defined rest period. The rest period
+ *                and specific time attribute results are inputs to the
+ *                delivered formula. This formula uses an array to process
+ *                time card data.
+ *
+ * Detail:        Compares the reported consecutive shift end and start times.
+ *                If the rest period between the two shifts is less than the
+ *                defined rest period, then a message appears.
+ *
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who             Ver       Date         Description
+ *----------------  ------    -----------  -------------------------------
+ * David Cohanoff    114.0804  2014-FEB-19  Created.
+ *
+ *
+***************************************************************************/
+
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS     is  EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY      is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure           is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime   is  EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime   is  EMPTY_DATE_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  measure ,
+  StartTime,
+  StopTime
+
+ffName = 'WFM_TER_VALIDATE_REST_PERIOD_DURATION_AP'
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+rLog  = add_rlog (ffs_id, rule_id, ffName || ' -v 115.0216  '  )
+
+
+l_measurePeriod = GET_CONTEXT(HWM_MEASURE_PERIOD, 0)
+
+ rLog = add_rlog (ffs_id, rule_id, '(In Context: '  ||
+ ' , ffs_id='  ||  TO_CHAR( ffs_id ) ||   ' , rule_id='  ||  TO_CHAR( rule_id ) ||
+  ' , l_measurePeriod='  ||  TO_CHAR( l_measurePeriod ) ||
+ ' ) ' )
+
+
+NullDate =  '01-JAN-1900'(DATE)
+NullText =  '**FF_NULL**'
+
+/* Fixed Values from Rule header  */
+sumLvl= Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
+
+ rLog = add_rlog (ffs_id, rule_id, '(In Rule header: '  ||    ' , sumLvl='  ||  sumLvl   )
+
+
+
+categoryId  = get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+restPeriod  = get_rvalue_number (rule_id ,'REST_PERIOD_IN_MINUTES', 0)
+p_msg       = get_rvalue_text (rule_id  ,'OVERRIDE_MESSAGE_CODE', 'HWM_FF_TDR_INSFT_REST_ERR')
+
+
+isEntireShift  =  'Y'
+
+ rLog = add_rlog (ffs_id, rule_id, '(In Rule Parms: '  ||
+  ' , category='  || TO_CHAR( categoryId )||
+  ' , restPeriod='  ||  TO_CHAR( restPeriod ) ||
+ ' ) ' )
+
+
+
+ OUT_MSG 	=	EMPTY_TEXT_NUMBER
+
+ max_loop = 5000
+ max_ary = HWM_CTXARY_RECORD_POSITIONS.count
+ rLog  = add_rlog (ffs_id, rule_id, ' >>> Start bulk process - max_ary=' || TO_CHAR( max_ary )  )
+
+cntr = 0
+nidx = 0
+nxtRec = 1
+WkLastStopTime = NullDate
+
+WHILE (cntr < max_ary ) LOOP
+(
+    cntr = cntr + 1
+    nidx = nidx + nxtRec
+
+	l_rec_pos = NullText
+	l_measure = 0
+	l_measureDay = 0
+    l_StartTime = NullDate
+    l_StopTime = NullDate
+
+	l_rec_pos   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+
+	if (MEASURE.exists(nidx) ) then (
+		l_measure  = MEASURE[nidx]
+	)
+
+	if (HWM_CTXARY_HWM_MEASURE_DAY.exists(nidx) ) then (
+		l_measureDay  = HWM_CTXARY_HWM_MEASURE_DAY[nidx]
+	)
+
+	if (STARTTIME.exists(nidx) ) then (
+		l_StartTime  = STARTTIME[nidx]
+	)
+
+	if (STOPTIME.exists(nidx) ) then (
+		l_StopTime  = STOPTIME[nidx]
+	)
+
+	rLog = add_rlog (ffs_id, rule_id, '(In Rule Inputs number : '  ||    TO_CHAR( nidx )  ||
+	 ' , measure='  ||  TO_CHAR( l_measure ) ||
+	 ' ,  measureDay='  ||  TO_CHAR( l_measureDay ) ||
+	 ' ,  StartTime='  ||  TO_CHAR(l_StartTime) ||
+	  ' , StopTime='  ||  TO_CHAR(l_StopTime) ||
+     ' , WkLastStopTime='  ||  TO_CHAR(WkLastStopTime) ||
+	  ' , rec_pos='  || l_rec_pos ||
+	 ' ) ' )
+
+
+
+
+	oMU = -999
+	oMO = -999
+
+	if (restPeriod > 0  and  l_measure > 0) then (
+		CHANGE_CONTEXTS(HWM_RECORD_POSITION = l_rec_pos)
+		(
+			CALL_FORMULA ('WFM_TCR_INSUFFICIENT_REST_PERIOD_PREMIUM_SUB'
+					  , ffs_id > 'ffs_id'
+					  , rule_id > 'rule_id'
+					  , l_measure > 'measure'
+					  , sumLvl > 'sum_lvl'
+					  , l_rec_pos > 'rec_position'
+					  , l_measureDay   > 'cMEASURE_DAY'
+					  , l_measurePeriod  > 'cMEASURE_Period'
+					  , l_StartTime > 'StartTime'
+					  , l_StopTime > 'StopTime'
+					  , restPeriod > 'restPeriod'
+					  , isEntireShift > 'isEntireShift'
+					  , WkLastStopTime > 'WkLastStopTime'
+					  , WkLastStopTime    <  'WkLastStopTime'  DEFAULT  NullDate
+					  , oMU     		  <  'OUT_MEASURE_UNDER'  DEFAULT  -999
+					  , oMO               <  'OUT_MEASURE_OVER'  DEFAULT  -999 )
+
+		)
+	)
+
+
+	if (oMO <> -999) Then (
+		/*
+		HWM_FF_TDR_INSFT_REST_ERR
+		There is an insufficient amount of rest time between the reported Out time of the prior shift and the reported In time of this shift.
+	*/
+		  tm =  get_msg_attribute('StartTime') || get_output_msg  ( 'HWM' ,p_msg )
+	      OUT_MSG[nidx] =  tm
+		 l_status = add_rlog (ffs_id , rule_id ,  ' out msg tm ='  ||  tm  )
+
+	)
+
+	rLog  = add_rlog (ffs_id, rule_id, 'Call Output index' || TO_CHAR(nidx)  ||
+            ' , WkLastStopTime='  ||  TO_CHAR(WkLastStopTime) ||
+			' - MEASURE_UNDER= '  || TO_CHAR(oMU)  || ' - MEASURE_OVER= '  || TO_CHAR(oMO)   )
+
+
+	if (nidx >  1000 ) Then (
+		/* endless loop?  Stop process if more than max_loop records found */
+		ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+	)
+
+
+)
+	rLog  = add_rlog (ffs_id, rule_id, '-- end bulk process <<<<' )
+
+
+RETURN    OUT_MSG
+```
+
+### WFM_TDR_VALIDATE_REST_PERIOD_DURATION_AP
+Type: WORKFORCE_MANAGEMENT_TIME_DEVICE_RULES
+Description: Back to back shift which have insufficient rest periods between shifts
+```
+  /* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_TDR_VALIDATE_REST_PERIOD_DURATION_AP
+ *
+ * Formula Type:  Time Device Rules
+ *
+ * Description:   Evaluates whether reported shifts are less than the defined
+ *                minimum rest period minutes apart.  Rest period and specific
+ *                time attribute results are inputs to the delivered formula.
+ *
+ * Detail:        Compares the end time of the first shift to the start time of the
+ *                second shift. If the rest period between the two shifts is
+ *                less than the defined minimum minutes, then a message appears.
+ *                The rest period is defined in minutes and a time category defines
+ *                the time attributes in the shift to validate.
+ *
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who             Ver       Date         Description
+ *----------------  ------    -----------  -------------------------------
+ * David Cohanoff    114.0804  2014-FEB-19  Created.
+ * David Cohanoff    119.0921  2019-SEP-22  Code update.
+ *
+ *
+***************************************************************************/
+
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS     is  EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY      is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure           is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime   is  EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime   is  EMPTY_DATE_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  measure ,
+  StartTime,
+  StopTime
+
+ffName = 'WFM_TDR_VALIDATE_REST_PERIOD_DURATION_AP'
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+rLog  = add_rlog (ffs_id, rule_id, '>>> Enter - ' || ffName || ' - v119.0921 '  )
+
+
+l_measurePeriod = GET_CONTEXT(HWM_MEASURE_PERIOD, 0)
+
+ rLog = add_rlog (ffs_id, rule_id, 'In Context: '  ||
+ ' , ffs_id='  ||  TO_CHAR( ffs_id ) ||   ' , rule_id='  ||  TO_CHAR( rule_id ) ||
+  ' , l_measurePeriod='  ||  TO_CHAR( l_measurePeriod )  )
+
+
+NullDate =  '01-JAN-1900'(DATE)
+NullText =  '**FF_NULL**'
+
+/* Fixed Values from Rule header  */
+sumLvl= Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
+
+ rLog = add_rlog (ffs_id, rule_id, '(In Rule header: '  ||    ' , sumLvl='  ||  sumLvl   )
+
+
+
+categoryId  = get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+restPeriod  = get_rvalue_number (rule_id ,'REST_PERIOD_IN_MINUTES', 0)
+p_msg       = get_rvalue_text (rule_id  ,'OVERRIDE_MESSAGE_CODE', 'HWM_FF_TDR_INSFT_REST_ERR')
+
+
+isEntireShift  =  'Y'
+
+ rLog = add_rlog (ffs_id, rule_id, '(In Rule Parms: '  ||
+  ' , category='  || TO_CHAR( categoryId )||
+  ' , restPeriod='  ||  TO_CHAR( restPeriod ) ||
+ ' ) ' )
+
+
+
+ OUT_MSG 	=	EMPTY_TEXT_NUMBER
+
+ max_loop = 5000
+ max_ary = HWM_CTXARY_RECORD_POSITIONS.count
+ rLog  = add_rlog (ffs_id, rule_id, ' >>> Start bulk process - max_ary=' || TO_CHAR( max_ary )  )
+
+cntr = 0
+nidx = 0
+nxtRec = 1
+WkLastStopTime = NullDate
+
+WHILE (cntr < max_ary ) LOOP
+(
+    cntr = cntr + 1
+    nidx = nidx + nxtRec
+
+	l_rec_pos = NullText
+	l_measure = 0
+	l_measureDay = 0
+    l_StartTime = NullDate
+    l_StopTime = NullDate
+
+	l_rec_pos   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+
+	if (MEASURE.exists(nidx) ) then (
+		l_measure  = MEASURE[nidx]
+	)
+
+	if (HWM_CTXARY_HWM_MEASURE_DAY.exists(nidx) ) then (
+		l_measureDay  = HWM_CTXARY_HWM_MEASURE_DAY[nidx]
+	)
+
+	if (STARTTIME.exists(nidx) ) then (
+		l_StartTime  = STARTTIME[nidx]
+	)
+
+	if (STOPTIME.exists(nidx) ) then (
+		l_StopTime  = STOPTIME[nidx]
+	)
+
+	rLog = add_rlog (ffs_id, rule_id, 'In Rule Inputs number : '  ||    TO_CHAR( nidx )  ||
+	 ' , measure='  ||  TO_CHAR( l_measure ) ||
+	 ' ,  measureDay='  ||  TO_CHAR( l_measureDay ) ||
+	 ' ,  StartTime='  ||  TO_CHAR(l_StartTime) ||
+	  ' , StopTime='  ||  TO_CHAR(l_StopTime) ||
+     ' , WkLastStopTime='  ||  TO_CHAR(WkLastStopTime) ||
+	  ' , rec_pos='  || l_rec_pos  )
+
+
+
+	oMU = -999
+	oMO = -999
+
+	if (restPeriod > 0  and  l_measure > 0) then (
+		CHANGE_CONTEXTS(HWM_RECORD_POSITION = l_rec_pos)
+		(
+			CALL_FORMULA ('WFM_TCR_INSUFFICIENT_REST_PERIOD_PREMIUM_SUB'
+					  , ffs_id > 'ffs_id'
+					  , rule_id > 'rule_id'
+					  , l_measure > 'measure'
+					  , sumLvl > 'sum_lvl'
+					  , l_rec_pos > 'rec_position'
+					  , l_measureDay   > 'cMEASURE_DAY'
+					  , l_measurePeriod  > 'cMEASURE_Period'
+					  , l_StartTime > 'StartTime'
+					  , l_StopTime > 'StopTime'
+					  , restPeriod > 'restPeriod'
+					  , isEntireShift > 'isEntireShift'
+					  , WkLastStopTime > 'WkLastStopTime'
+					  , WkLastStopTime    <  'WkLastStopTime'  DEFAULT  NullDate
+					  , oMU     		  <  'OUT_MEASURE_UNDER'  DEFAULT  -999
+					  , oMO               <  'OUT_MEASURE_OVER'  DEFAULT  -999 )
+
+		)
+	)
+
+
+	if (oMO <> -999) Then (
+		/*
+		HWM_FF_TDR_INSFT_REST_ERR
+		There is an insufficient amount of rest time between the reported Out time of the prior shift and the reported In time of this shift.
+	*/
+		  tm =  get_msg_attribute('StartTime') || get_output_msg  ( 'HWM' ,p_msg )
+	      OUT_MSG[nidx] =  tm
+		 l_status = add_rlog (ffs_id , rule_id ,  ' out msg tm ='  ||  tm  )
+
+	)
+
+	rLog  = add_rlog (ffs_id, rule_id, 'Call Output index' || TO_CHAR(nidx)  ||
+            ' , WkLastStopTime='  ||  TO_CHAR(WkLastStopTime) ||
+			' - MEASURE_UNDER= '  || TO_CHAR(oMU)  || ' - MEASURE_OVER= '  || TO_CHAR(oMO)   )
+
+	if (nidx >  1000 ) Then (
+		/* endless loop?  Stop process if more than max_loop records found */
+		ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+	)
+
+
+)
+	rLog  = add_rlog (ffs_id, rule_id, '-- end bulk process <<<<' )
+
+
+RETURN    OUT_MSG
+```
+
+### WFM_TCR_INSUFFICIENT_REST_PERIOD_PREMIUM_AP
+Type: WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES
+Description: Back to back shift which have insufficient rest periods between shifts
+```
+ /* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_TCR_INSUFFICIENT_REST_PERIOD_PREMIUM_AP
+ *
+ * Formula Type:  Time Calculation Rules
+ *
+ * Description:     Evaluates whether the time between reported consecutive
+ *                  shifts is less than the defined rest period. The rest
+ *                  period and specific time attribute results are inputs
+ *                  to the delivered formula. This formula uses an array to
+ *                  process time card data.
+ *
+ * Detail:          Compares the reported consecutive shift end and start times.
+ *                  If the rest period between the two shifts is less than the
+ *                  defined rest period, either all of the hours in the initial
+ *                  shift or only those hours that occurred within the rest period
+ *                  receive a premium pay time type.
+ *
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who             Ver       Date         Description
+ *----------------  ------    -----------  -------------------------------
+ * David Cohanoff    114.0804  2014-FEB-19  Created.
+ *
+ *
+***************************************************************************/
+
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS     is  EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY      is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure           is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime   is  EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime   is  EMPTY_DATE_NUMBER
+DEFAULT FOR TimeRecordType    is  EMPTY_TEXT_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  TimeRecordType,
+  measure ,
+  StartTime,
+  StopTime
+
+ffName = 'WFM_TCR_INSUFFICIENT_REST_PERIOD_PREMIUM_AP'
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+rLog  = add_rlog (ffs_id, rule_id, ffName || ' >>> Enter  -v 1320012.7  '  )
+
+
+/* ----------- Context value   -------- */
+/* ------------------------------------ */
+ctxMeasurePeriod = GET_CONTEXT(HWM_MEASURE_PERIOD, 0)
+rLog = add_rlog (ffs_id, rule_id, 'In Context: ctxMeasurePeriod='  ||  TO_CHAR( ctxMeasurePeriod )  )
+
+
+
+/* ----------- constant values   -------- */
+/* ------------------------------------- */
+NullDate =  '01-JAN-1900'(DATE)
+NullDateTime = '1900/01/01 00:00:00' (date)
+NullText = '**FF_NULL**'
+
+TimeRecordType_MEASURE = 'MEASURE'
+TimeRecordType_RANGE = 'RANGE'
+
+
+/* ----------- Rule Header parameters  -------- */
+/* -------------------------------------------- */
+/* Fixed Values from Rule header  */
+sumLvl= Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
+exec_type  = Get_Hdr_Text(rule_id,'RULE_EXEC_TYPE', 'CREATE')
+
+create_yn  = 'N'
+if (upper(exec_type) = 'CREATE'  ) then (
+  create_yn  = 'Y'
+)
+
+rLog = add_rlog (ffs_id, rule_id, 'In Rule header: '  ||
+		'; sumLvl='  ||  sumLvl   ||   '; create_yn='  || create_yn  )
+
+
+
+/* ----------- Rule input parameters  -------- */
+/* ------------------------------------------- */
+categoryId  = get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+restPeriod  = get_rvalue_number (rule_id ,'REST_PERIOD_IN_MINUTES', 0)
+isEntireShift  = get_rvalue_text (rule_id ,'IS_ENTIRE_SHIFT_PREMIUM', 'N')
+
+ rLog = add_rlog (ffs_id, rule_id, 'In Rule parameters: '  ||
+  '; category='  || TO_CHAR( categoryId )||
+  '; restPeriod='  ||  TO_CHAR( restPeriod ) ||
+  '; isEntireShift='  || isEntireShift  )
+
+
+
+
+/* ----------- initialize output variables  -------- */
+/* ------------------------------------------------- */
+MEASURE_UNDER 	=	EMPTY_NUMBER_NUMBER
+MEASURE_OVER 	=	EMPTY_NUMBER_NUMBER
+
+
+/* ----------- Temp Workarea variables  -------- */
+/* --------------------------------------------- */
+
+cntr = 0
+nidx = 0
+nxtRec = 1
+WkLastStopTime = NullDate
+
+max_ary = HWM_CTXARY_RECORD_POSITIONS.count
+rLog  = add_rlog (ffs_id, rule_id, ' >>> Start bulk process - max_ary=' || TO_CHAR( max_ary )  )
+WHILE (cntr < max_ary ) LOOP
+(
+    cntr = cntr + 1
+    nidx = nidx + nxtRec
+
+	tcRecPos = NullText
+	tcMeasure = 0
+	tcMeasureDay = 0
+    tcStartTime = NullDate
+    tcStopTime = NullDate
+	tcTimeRecordType = nullText
+
+
+	tcRecPos   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+	if (MEASURE.exists(nidx) ) then (tcMeasure  = MEASURE[nidx]   )
+	if (HWM_CTXARY_HWM_MEASURE_DAY.exists(nidx) ) then (tcMeasureDay  = HWM_CTXARY_HWM_MEASURE_DAY[nidx]  )
+   	if (STARTTIME.exists(nidx) ) then (tcStartTime  = STARTTIME[nidx]   	)
+	if (STOPTIME.exists(nidx) ) then (tcStopTime  = STOPTIME[nidx]   )
+	if (TimeRecordType.exists(nidx) ) then ( tcTimeRecordType  = TimeRecordType[nidx]  )
+
+	 rLog = add_rlog (ffs_id, rule_id, 'In Rule Inputs number : '  ||    TO_CHAR( nidx )  ||
+					 '; rec_pos='  || tcRecPos  ||
+					 '; tcTimeRecordType='  || tcTimeRecordType  ||
+					 '; measure='  ||  TO_CHAR( tcMeasure ) ||
+					 ';  measureDay='  ||  TO_CHAR( tcMeasureDay ) ||
+					 ';  StartTime='  ||  TO_CHAR(tcStartTime) ||
+					 '; StopTime='  ||  TO_CHAR(tcStopTime) ||
+					 '; WkLastStopTime='  ||  TO_CHAR(WkLastStopTime)   )
+
+	oMU = -999
+	oMO = -999
+
+	if (restPeriod > 0  and  tcMeasure > 0 and tcTimeRecordType = TimeRecordType_RANGE  ) then (
+		CHANGE_CONTEXTS(HWM_RECORD_POSITION = tcRecPos)
+		(
+			CALL_FORMULA ('WFM_TCR_INSUFFICIENT_REST_PERIOD_PREMIUM_SUB'
+					  , ffs_id > 'ffs_id'
+					  , rule_id > 'rule_id'
+					  , tcMeasure > 'measure'
+					  , sumLvl > 'sum_lvl'
+					  , tcRecPos > 'rec_position'
+					  , tcMeasureDay   > 'cMEASURE_DAY'
+					  , ctxMeasurePeriod  > 'cMEASURE_Period'
+					  , tcStartTime    > 'StartTime'
+					  , tcStopTime     > 'StopTime'
+					  , restPeriod     > 'restPeriod'
+					  , isEntireShift  > 'isEntireShift'
+					  , WkLastStopTime > 'WkLastStopTime'
+					  , WkLastStopTime    <  'WkLastStopTime'  DEFAULT  NullDate
+					  , oMU     		  <  'OUT_MEASURE_UNDER'  DEFAULT  -999
+					  , oMO               <  'OUT_MEASURE_OVER'  DEFAULT  -999 )
+		)
+	)
+
+
+	if (oMU <> -999) Then (
+		MEASURE_UNDER[nidx]   = oMU
+	)
+
+	if (oMO <> -999) Then (
+		MEASURE_OVER[nidx]   = oMO
+	)
+
+	rLog  = add_rlog (ffs_id, rule_id, 'Call Output index' || TO_CHAR(nidx)  ||
+            '; WkLastStopTime='  ||  TO_CHAR(WkLastStopTime) ||
+			' - MEASURE_UNDER= '  || TO_CHAR(oMU)  || ' - MEASURE_OVER= '  || TO_CHAR(oMO)   )
+
+	if (nidx >  1000 ) Then ( 	/* endless loop?  Stop process  */
+		ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+	)
+
+
+)
+
+rLog  = add_rlog (ffs_id, rule_id, ffName || ' <<<< Exit '  )
+
+
+RETURN  MEASURE_UNDER,  MEASURE_OVER
+```
+
+### WFM_TDR_VALIDATE_SUPPLIER_EVENT_AP
+Type: WORKFORCE_MANAGEMENT_TIME_DEVICE_RULES
+Description: Ensure that specific time device events are reviewed prior to acceptance.
+```
+/* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_TDR_VALIDATE_SUPPLIER_EVENT_AP
+ *
+ * Formula Type:  Time Device Rules
+ *
+ * Description:      Evaluates whether the time collection device automatically
+ *                   generated the event and if so, display the specified message.
+ *
+ *  Detail:          Evaluates time collection device  events to identify those
+ *                   that were automatically generated by the device. The
+ *                   automatically-generated event is defined as an input parameter.
+ *                   If the event is one of the defined automatically generated
+ *                   events, a message appears.
+ *
+ *  Default message Codes:
+ *       HWM_FF_TDR_OUT_ERR
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who               Ver        Date           Description
+ *-----------------  ------      ------------   -----------------------------------------
+ * David Cohanoff     104.0814  2014-AUG-19   Created.
+ *
+ *
+ ***************************************************************************/
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS     is  EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY      is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure           is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime         is  EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime         is  EMPTY_DATE_NUMBER
+DEFAULT FOR SupplierEventOut  is  EMPTY_TEXT_NUMBER
+
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  measure,
+  StartTime,
+  StopTime ,
+  SupplierEventOut
+
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+
+NullDate =  '01-JAN-1900'(DATE)
+NullText =  '**FF_NULL**'
+ffName = 'WFM_VALIDATE_SUPPLIER_EVENT_AP'
+rLog  = add_rlog (ffs_id, rule_id, '>>> Enter - ' || ffName || ' - v115.0216 '  )
+
+
+measure_period = GET_CONTEXT(HWM_MEASURE_PERIOD, 0)
+
+/* Fixed Values from Rule header  */
+hSumLvl= Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
+
+ l_status = add_rlog (ffs_id , rule_id ,'Rule Header and Context:'  ||
+ ' , ffs_id ='  ||  TO_CHAR( ffs_id ) ||
+ ' , rule_id ='  ||  TO_CHAR( rule_id ) ||
+ ' , measure_period='  ||  TO_CHAR( measure_period ) ||
+ ' , hSumLvl='  ||   hSumLvl     )
+
+
+OUT_MSG  =	EMPTY_TEXT_NUMBER
+
+pCategoryId  = get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+pEventExcp1  = get_rvalue_text (rule_id ,'SUPPLIER_EVENT_OUT_EXCEPTION_1', NullText)
+pEventExcp2  = get_rvalue_text (rule_id ,'SUPPLIER_EVENT_OUT_EXCEPTION_2', NullText)
+pEventExcp3  = get_rvalue_text (rule_id ,'SUPPLIER_EVENT_OUT_EXCEPTION_3', NullText)
+pMsg         = get_rvalue_text (rule_id  ,'OVERRIDE_MESSAGE_CODE', 'HWM_FF_TDR_OUT_ERR')
+
+ rLog = add_rlog (ffs_id, rule_id, '(In Rule Parms: '  ||
+  ' , pMsg='  ||   pMsg   ||
+  ' , pEventExcp1='  ||   pEventExcp1   ||
+  ' , pEventExcp2='  ||   pEventExcp2   ||
+  ' , pEventExcp3='  ||   pEventExcp3   ||
+  ' , pCategoryId='  || TO_CHAR( pCategoryId ) )
+
+
+ max_loop = 5000
+ wMaAry = HWM_CTXARY_RECORD_POSITIONS.count
+    rLog  = add_rlog (ffs_id, rule_id, 'Start bulk process - wMaAry=' || TO_CHAR( wMaAry )  )
+
+cntr = 0
+nidx = 0
+nxtRec = 1
+tknSupplierEvent = NullText
+tknStopTime = NullText
+
+WHILE (cntr < wMaAry ) LOOP
+(
+    cntr = cntr + 1
+    nidx = nidx + nxtRec
+
+	l_rec_pos = NullText
+	l_measure = 0
+	l_measureDay = 0
+    l_StopTime = NullDate
+    l_SupplierEventOut = NullText
+
+	l_rec_pos   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+
+	if (MEASURE.exists(nidx) ) then (
+		l_measure  = MEASURE[nidx]
+	)
+
+	 if (STOPTIME.exists(nidx) ) then (
+		l_StopTime  = STOPTIME[nidx]
+	)
+	if (SupplierEventOut.exists(nidx) ) then (
+		l_SupplierEventOut  = SupplierEventOut[nidx]
+	)
+
+	oMU = NullText
+
+	if (l_SupplierEventOut <> NullText ) then
+	(
+		if (pEventExcp1 = l_SupplierEventOut or  pEventExcp2 = l_SupplierEventOut or pEventExcp3 = l_SupplierEventOut )then
+		(
+		  oMU = pMsg
+		)
+	)
+
+	 	 rLog = add_rlog (ffs_id, rule_id, 'Rule Input cntr: '  ||    TO_CHAR( cntr )  ||
+						' ,l_SupplierEventOut= '  ||    l_SupplierEventOut  ||
+						' ,pMsg= '  ||    pMsg  ||
+						' ,oMU= '  ||    oMU   )
+
+	if (oMU <> NullText ) Then (
+	    /*
+			HWM_FF_TDR_OUT_ERR  11
+		The time collection device automatically generated an Out time event
+		of {SUPPLIER_EVENT} with a time of {STOP_TIME} that requires a review.
+		*/
+
+
+		 /* Temporary dummy msg code  - replace with real one once ready  */
+		 l_tkn1 = 'SUPPLIER_EVENT'
+		 l_val1 =  l_SupplierEventOut
+		 l_tkn2 = 'STOP_TIME'
+		 l_val2 =  TO_CHAR( l_StopTime )
+		   tm =  get_msg_attribute('StopTime') ||  get_output_msg2( 'HWM' ,oMU ,l_tkn1 , l_val1 ,l_tkn2 , l_val2 )
+		 l_status = add_rlog (ffs_id , rule_id ,  ' out msg tm ='  ||  tm  )
+	      OUT_MSG[nidx] = tm
+	)
+
+
+	if (nidx >  1000 ) Then (
+		/* endless loop?  Stop process if more than max_loop records found */
+		ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+	)
+
+
+)
+
+
+rLog  = add_rlog (ffs_id, rule_id, '<< Exit - ' || ffName   )
+
+RETURN    OUT_MSG
+```
+
+### WFM_TSR_SUBMIT_OR_SAVE_ON_NUMBER_OF_HOURS_AP
+Type: WORKFORCE_MANAGEMENT_TIME_SUBMISSION_RULES
+Description: Compare total time to rule parameters. Send Submit or Save Action code.
+```
+/* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_TSR_SUBMIT_OR_SAVE_ON_NUMBER_OF_HOURS_AP
+ *
+ * Formula Type:  Time Submission Rules
+ *
+ *
+ * Description:   Submits or saves the time card when  the reported hours from
+ *                the time collection device exceeds the defined minimum hours.
+ *                Reported hours  and specific time attribute results are inputs
+ *                to the delivered formula.
+ *
+ * Detail:        Submits or saves the time card based on the reported time
+ *                category hours received from the time collection device.
+ *                The reported time category hours associated with each Out
+ *                event are formula inputs. The formula first compares the
+ *                reported hours to the minimum hours defined for the Submit
+ *                action.  If equal to or greater than the minimum, it submits
+ *                the time card. Otherwise, the formula compares the minimum
+ *                defined for the Save action to the reported hours. If the
+ *                reported hours exceed the defined minimum, the formula saves
+ *                the time card. If neither condition is met, the time card
+ *                status is set to Entered.
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who             Ver       Date         Description
+ *----------------  ------    -----------  -------------------------------
+ * David Cohanoff    114.0804  2014-FEB-19  Created.
+ *
+ *
+***************************************************************************/
+
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS     is  EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY      is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure           is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime   is  EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime   is  EMPTY_DATE_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  measure ,
+  StartTime,
+  StopTime
+
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+
+NullDate =  '01-JAN-1900'(DATE)
+NullText =  '**FF_NULL**'
+ffName = 'WFM_TSR_SUBMIT_OR_SAVE_ON_NUMBER_OF_HOURS_AP'
+rLog  = add_rlog (ffs_id, rule_id, '>>> Enter - ' || ffName || ' - v114.0914 '  )
+
+
+l_measurePeriod = GET_CONTEXT(HWM_MEASURE_PERIOD, 0)
+ rLog = add_rlog (ffs_id, rule_id, '(In Context: '  ||
+			 ' , ffs_id='  ||  TO_CHAR( ffs_id ) ||
+			 ' , rule_id='  ||  TO_CHAR( rule_id ) ||
+			  ' , l_measurePeriod='  ||  TO_CHAR( l_measurePeriod )  )
+
+
+/* must match Enum for  oracle.apps.hcm.wfm.core.publicModel.util.WfmCoreConstants.STATUS_VALUE */
+TSR_SUBMIT = 'SUBMITTED'
+TSR_SAVE  = 'SAVED'
+TSR_ENTER= 'ENTERED'
+
+
+
+/* Fixed Values from Rule header  */
+sumLvl= Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
+
+
+ rLog = add_rlog (ffs_id, rule_id, '(In Rule header: '  ||
+ ' , sumLvl='  ||  sumLvl   ||
+ ' ) ' )
+
+pCategoryId   = get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+pMinHourSub   = get_rvalue_number (rule_id ,'MIN_HOURS_SUBMIT', 0)
+pMinHourSave  = get_rvalue_number (rule_id ,'MIN_HOURS_SAVE', 0)
+
+
+ rLog = add_rlog (ffs_id, rule_id, '(In Rule Parms: '  ||
+  ' , pCategoryId='  || TO_CHAR( pCategoryId   )||
+  ' , pMinHourSub='  ||  TO_CHAR( pMinHourSub ) ||
+  ' , pMinHourSave='  ||  TO_CHAR( pMinHourSave ) ||
+ ' ) ' )
+
+
+OUT_FINAL_TSR = NullText
+
+ max_loop = 5000
+ max_ary = HWM_CTXARY_RECORD_POSITIONS.count
+ rLog  = add_rlog (ffs_id, rule_id, ' >>> Start bulk process - max_ary=' || TO_CHAR( max_ary )  )
+
+cntr = 0
+nidx = 0
+nxtRec = 1
+
+wkTotalHours  = 0
+wkActionTSR = NullText
+
+
+WHILE (cntr < max_ary ) LOOP
+(
+    cntr = cntr + 1
+    nidx = nidx + nxtRec
+
+	l_rec_pos = NullText
+	l_measure = 0
+	l_measureDay = 0
+    l_StartTime = NullDate
+    l_StopTime = NullDate
+
+	l_rec_pos   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+
+	if (MEASURE.exists(nidx) ) then (
+		l_measure  = MEASURE[nidx]
+	)
+
+	if (HWM_CTXARY_HWM_MEASURE_DAY.exists(nidx) ) then (
+		l_measureDay  = HWM_CTXARY_HWM_MEASURE_DAY[nidx]
+	)
+
+	if (STARTTIME.exists(nidx) ) then (
+		l_StartTime  = STARTTIME[nidx]
+	)
+
+	if (STOPTIME.exists(nidx) ) then (
+		l_StopTime  = STOPTIME[nidx]
+	)
+
+
+	 rLog = add_rlog (ffs_id, rule_id, 'In Rule Inputs index: '  ||    TO_CHAR( nidx )  ||
+				 ' , measure='  ||  TO_CHAR( l_measure ) ||
+				 ' ,  measureDay='  ||  TO_CHAR( l_measureDay ) ||
+				 ' ,  StartTime='  ||  TO_CHAR(l_StartTime) ||
+				  ' , StopTime='  ||  TO_CHAR(l_StopTime) ||
+				 ' ,  wkTotalHours='  ||  TO_CHAR( wkTotalHours ) ||
+				 ' ,  wkActionTSR='  ||  wkActionTSR ||
+				  ' , rec_pos='  || l_rec_pos    )
+
+
+	oTSR = NullText
+	CALL_FORMULA ('WFM_TSR_SUBMIT_OR_SAVE_ON_NUMBER_OF_HOURS_SUB'
+			  , ffs_id > 'ffs_id'
+			  , rule_id > 'rule_id'
+			  , l_measureDay   > 'cMEASURE_DAY'
+			  , l_measurePeriod  > 'cMEASURE_Period'
+			  , l_rec_pos > 'rec_position'
+			  , sumLvl > 'sum_lvl'
+			  , l_measure > 'measure'
+			  , l_StartTime > 'StartTime'
+			  , l_StopTime > 'StopTime'
+			  , pMinHourSub > 'pMinHourSub'
+			  , pMinHourSave > 'pMinHourSave'
+			  , wkTotalHours >  'wkTotalHours'
+			  , wkActionTSR  > 'wkActionTSR'
+			  , wkTotalHours   <  'wkTotalHours'  DEFAULT  0
+			  , wkActionTSR    <  'wkActionTSR'  DEFAULT  NullText
+			  , oTSR           <  'OUT_FINAL_TSR'  DEFAULT  NullText   )
+
+	rLog  = add_rlog (ffs_id, rule_id, 'Call Output index' || TO_CHAR(nidx)  ||
+				 ' ,  wkTotalHours='  ||  TO_CHAR( wkTotalHours ) ||
+				 ' ,  wkActionTSR='  ||  wkActionTSR ||
+				 ' - oTSR= '  || oTSR  )
+
+	if ( oTSR = TSR_SUBMIT  ) then (
+		OUT_FINAL_TSR  = oTSR
+		exit
+	) else if (oTSR = TSR_Save ) then (
+		OUT_FINAL_TSR  = oTSR
+	)
+
+	if (nidx >  1000 ) Then (
+		/* endless loop?  Stop process if more than max_loop records found */
+		ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+	)
+
+
+)
+if ( OUT_FINAL_TSR = NullText  ) then (
+		OUT_FINAL_TSR  =TSR_ENTER
+)
+
+rLog  = add_rlog (ffs_id, rule_id, '<< Exit - ' || ffName  ||
+			' - OUT_FINAL_TSR = ' || OUT_FINAL_TSR )
+
+
+
+RETURN OUT_FINAL_TSR
+```
+
+### WFM_TSR_SUBMIT_OR_SAVE_ON_NUMBER_OF_DEVICE_EVENTS_AP
+Type: WORKFORCE_MANAGEMENT_TIME_SUBMISSION_RULES
+Description: Compare total entries to rule parameters. Send Submit Action Code, Save Action.
+```
+/* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_TSR_SUBMIT_OR_SAVE_ON_NUMBER_OF_DEVICE_EVENTS_AP
+ *
+ * Formula Type:  Time Submission Rules
+ *
+ * Description:   Submits or saves the time card when the number of time
+ *                collection device Out events exceed the defined minimum
+ *                entries value.  The number of Out events and specific
+ *                time attribute results are inputs to the delivered
+ *                formula.
+ *
+ * Detail:        Submits or saves the time card based on the Out events
+ *                received from the time collection device.  The number
+ *                of Out events and time category hours associated with
+ *                each Out event are formula inputs. The formula first
+ *                compares the reported Out events to the minimum entries
+ *                defined for the Submit action.  If equal to or greater
+ *                than the minimum, it submits the time card. Otherwise,
+ *                the formula compares the minimum defined for the Save
+ *                action to the reported Out events.  If the reported Out
+ *                events exceed the defined minimum, the formula saves the
+ *                time card.  If neither condition is met, the time card
+ *                status is set to Entered.
+ *
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who             Ver       Date         Description
+ *----------------  ------    -----------  -------------------------------
+ * David Cohanoff    114.0804  2014-FEB-19  Created.
+ *
+ *
+***************************************************************************/
+
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS     is  EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY      is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure           is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime   is  EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime   is  EMPTY_DATE_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  measure ,
+  StartTime,
+  StopTime
+
+ffName = 'WFM_TSR_SUBMIT_OR_SAVE_ON_NUMBER_OF_DEVICE_EVENTS_AP'
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+rLog  = add_rlog (ffs_id, rule_id, ffName || ' -v 114.0804  '  )
+
+
+l_measurePeriod = GET_CONTEXT(HWM_MEASURE_PERIOD, 0)
+ rLog = add_rlog (ffs_id, rule_id, '(In Context: '  ||
+ ' , ffs_id='  ||  TO_CHAR( ffs_id ) ||   ' , rule_id='  ||  TO_CHAR( rule_id ) ||
+  ' , l_measurePeriod='  ||  TO_CHAR( l_measurePeriod ) ||
+ ' ) ' )
+
+
+NullDate =  '01-JAN-1900'(DATE)
+NullText =  '**FF_NULL**'
+
+/* must match Enum for  oracle.apps.hcm.wfm.core.publicModel.util.WfmCoreConstants.STATUS_VALUE */
+TSR_SUBMIT = 'SUBMITTED'
+TSR_SAVE  = 'SAVED'
+TSR_ENTER= 'ENTERED'
+
+
+
+/* Fixed Values from Rule header  */
+sumLvl= Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
+
+
+ rLog = add_rlog (ffs_id, rule_id, '(In Rule header: '  ||
+ ' , sumLvl='  ||  sumLvl   ||
+ ' ) ' )
+
+categoryId   = get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+minEntrySub   = get_rvalue_number (rule_id ,'MIN_ENTRY_SUBMIT', 0)
+minEntrySave  = get_rvalue_number (rule_id ,'MIN_ENTRY_SAVE', 0)
+
+
+ rLog = add_rlog (ffs_id, rule_id, '(In Rule Parms: '  ||
+  ' , category='  || TO_CHAR( categoryId )||
+  ' , minEntrySub='  ||  TO_CHAR( minEntrySub ) ||
+  ' , minEntrySave='  ||  TO_CHAR( minEntrySave ) ||
+ ' ) ' )
+
+
+OUT_FINAL_TSR = NullText
+
+ max_loop = 5000
+ max_ary = HWM_CTXARY_RECORD_POSITIONS.count
+ rLog  = add_rlog (ffs_id, rule_id, ' >>> Start bulk process - max_ary=' || TO_CHAR( max_ary )  )
+
+cntr = 0
+nidx = 0
+nxtRec = 1
+
+
+WHILE (cntr < max_ary ) LOOP
+(
+    cntr = cntr + 1
+    nidx = nidx + nxtRec
+
+	l_rec_pos = NullText
+	l_measure = 0
+	l_measureDay = 0
+    l_StartTime = NullDate
+    l_StopTime = NullDate
+
+	l_rec_pos   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+
+	if (MEASURE.exists(nidx) ) then (
+		l_measure  = MEASURE[nidx]
+	)
+
+	if (HWM_CTXARY_HWM_MEASURE_DAY.exists(nidx) ) then (
+		l_measureDay  = HWM_CTXARY_HWM_MEASURE_DAY[nidx]
+	)
+
+	if (STARTTIME.exists(nidx) ) then (
+		l_StartTime  = STARTTIME[nidx]
+	)
+
+	if (STOPTIME.exists(nidx) ) then (
+		l_StopTime  = STOPTIME[nidx]
+	)
+
+
+	 rLog = add_rlog (ffs_id, rule_id, '(In Rule Inputs number : '  ||    TO_CHAR( nidx )  ||
+				 ' , measure='  ||  TO_CHAR( l_measure ) ||
+				 ' ,  measureDay='  ||  TO_CHAR( l_measureDay ) ||
+				 ' ,  StartTime='  ||  TO_CHAR(l_StartTime) ||
+				  ' , StopTime='  ||  TO_CHAR(l_StopTime) ||
+				  ' , rec_pos='  || l_rec_pos ||
+				 ' ) ' )
+
+
+	oTSR = NullText
+	CALL_FORMULA ('WFM_TSR_SUBMIT_OR_SAVE_ON_NUMBER_OF_DEVICE_EVENTS_SUB'
+			  , ffs_id > 'ffs_id'
+			  , rule_id > 'rule_id'
+			  , l_measureDay   > 'cMEASURE_DAY'
+			  , l_measurePeriod  > 'cMEASURE_Period'
+			  , l_rec_pos > 'rec_position'
+			  , sumLvl > 'sum_lvl'
+			  , l_measure > 'measure'
+			  , l_StartTime > 'StartTime'
+			  , l_StopTime > 'StopTime'
+			  , minEntrySub > 'minEntrySub'
+			  , minEntrySave > 'minEntrySave'
+			  , oTSR     <  'OUT_FINAL_TSR'  DEFAULT  NullText   )
+
+	rLog  = add_rlog (ffs_id, rule_id, 'Call Output index' || TO_CHAR(nidx)  ||  ' - oTSR= '  || oTSR  )
+
+	if ( oTSR = TSR_SUBMIT  ) then (
+		OUT_FINAL_TSR  = oTSR
+		exit
+	) else if (oTSR = TSR_Save ) then (
+		OUT_FINAL_TSR  = oTSR
+	)
+
+	if (nidx >  1000 ) Then (
+		/* endless loop?  Stop process if more than max_loop records found */
+		ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+	)
+
+
+)
+if ( OUT_FINAL_TSR = NullText  ) then (
+		OUT_FINAL_TSR  =TSR_ENTER
+)
+
+	rLog  = add_rlog (ffs_id, rule_id, '-- end bulk process <<<< final OUT_FINAL_TSR = ' || OUT_FINAL_TSR )
+
+
+
+RETURN OUT_FINAL_TSR
+```
+
+### WFM_TDR_VALIDATE_SCHEDULE_DEVIATION_AP
+Type: WORKFORCE_MANAGEMENT_TIME_DEVICE_RULES
+Description: Compare start time, Stop time or duration to DBI scheduled times
+```
+     /* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_TDR_VALIDATE_SCHEDULE_DEVIATION_AP
+ *
+ * Formula Type:  Time Device Rules
+ *
+ * Description:  	Evaluates whether time entries reported using the time
+ *                  collection device are before or after the scheduled start
+ *                  and end times. The formula also validates number of hours
+ *                  for duration schedules.   Shifts to validate, override
+ *                  messages, and  specific time attribute results are inputs
+ *                  to the delivered formula.
+ *
+ *  Detail:         Compares reported shift start and end times to the assigned
+ *                  schedule. If the reported time entries are outside of the
+ *                  schedule time and grace period, a message appears. The
+ *                  formula validates the start time, end time, and scheduled
+ *                  duration with different messages appearing for early or
+ *                  late entries.
+ *
+ *
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who             Ver       Date         Description
+ *----------------  ------    -----------  -------------------------------
+ * David Cohanoff    114.0804  2014-FEB-19  Created.
+ * David Cohanoff    116.0912  2016-MAY-12  Update.
+ * David Cohanoff    107.1204  2017-NOV-29  Bug# 27205651.
+ * David Cohanoff    107.1205  2017-DEC-07  Updated .
+ * David Cohanoff    108.0131  2018-Jan-28  BUG 27471032 .
+ *
+ *
+***************************************************************************/
+
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS     is  EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY      is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR HWM_CTXARY_SUBRESOURCE_ID       is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure           is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime   is  EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime   is  EMPTY_DATE_NUMBER
+DEFAULT FOR TimeRecordType         is  EMPTY_TEXT_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  HWM_CTXARY_SUBRESOURCE_ID,
+  measure ,
+  StartTime,
+  StopTime,
+  TimeRecordType
+
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+
+ffName = 'WFM_TDR_VALIDATE_SCHEDULE_DEVIATION_AP  v120030.3 '
+rLog  = add_rlog (ffs_id, rule_id, '>>> Enter - ' || ffName  )
+
+
+NullDate =  '01-JAN-1900'(DATE)
+NullDateTime = '1900/01/01 00:00:00' (date)
+NullText = '**FF_NULL**'
+
+RecPositoinEoPeriod = 'END_PERIOD'
+RecPositoinEoDay = 'END_DAY'
+RecPositoinDetail = 'DETAIL'
+
+sumLvlTimeCard = 'TIMECARD'
+sumLvlDay = 'DAY'
+sumLvlDetail  = 'DETAIL'
+
+TimeRecordType_MEASURE = 'MEASURE'
+TimeRecordType_RANGE = 'RANGE'
+
+measure_period = GET_CONTEXT(HWM_MEASURE_PERIOD, 0)
+
+/* Fixed Values from Rule header  */
+hSumLvl= Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
+
+rLog = add_rlog (ffs_id, rule_id, 'In Context/Hdr: '  ||
+		' , ffs_id='  ||  TO_CHAR( ffs_id ) ||
+		' , measure_period='  ||  TO_CHAR( measure_period ) ||
+		' , hSumLvl='  ||  hSumLvl    )
+
+
+ /* Get context, inorder to makt available for util formula) */
+ctx_personId = GET_CONTEXT(HWM_RESOURCE_ID, 0)
+ctx_Resource = GET_CONTEXT(HWM_RESOURCE_ID, 0)
+ctx_subResource = GET_CONTEXT(HWM_SUBRESOURCE_ID, 0)
+ctx_start_date = GET_CONTEXT(HWM_CTX_SEARCH_START_DATE,  NullDate)
+ctx_end_date = GET_CONTEXT(HWM_CTX_SEARCH_END_DATE, NullDate)
+
+rLog = add_rlog (ffs_id , rule_id ,  'Context : '  ||
+			 ' , ctx_personId ='  ||  TO_CHAR( ctx_personId ) ||
+			 ' , ctx_Resource ='  ||  TO_CHAR( ctx_Resource ) ||
+			 ' , ctx_subResource ='  ||  TO_CHAR( ctx_subResource ) ||
+			 ' , ctx_start_date ='  ||  TO_CHAR( ctx_start_date ) ||
+			 ' , ctx_end_date ='  ||  TO_CHAR( ctx_end_date ) )
+
+pCategoryId  = get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+pIsValidateIn   = get_rvalue_text (rule_id  ,'VALIDATE_SCHEDULED_IN_TIME', 'Y')
+pIsValidateOut  = get_rvalue_text (rule_id  ,'VALIDATE_SCHEDULED_OUT_TIME', 'Y')
+pIsValidateDuration  = get_rvalue_text (rule_id  ,'VALIDATE_SCHEDULED_DURATION', 'Y')
+
+pMsgInLate         = get_rvalue_text (rule_id  ,'OVRD_MSG_IN_TIME_LATE', 'HWM_FF_TDR_LATE_IN_ERR')
+pMsgInEarly         = get_rvalue_text (rule_id  ,'OVRD_MSG_IN_TIME_EARLY', 'HWM_FF_TDR_EARLY_IN_ERR')
+pMsgOutLate        = get_rvalue_text (rule_id  ,'OVRD_MSG_OUT_TIME_LATE', 'HWM_FF_TDR_LATE_OUT_ERR')
+pMsgOutEarly        = get_rvalue_text (rule_id  ,'OVRD_MSG_OUT_TIME_EARLY', 'HWM_FF_TDR_EARLY_OUT_ERR')
+pMsgDurationLong   = get_rvalue_text (rule_id  ,'OVRD_MSG_DURATION_LONG', 'HWM_FF_TDR_LONG_DURATION_ERR')
+pMsgDurationShort   = get_rvalue_text (rule_id  ,'OVRD_MSG_DURATION_SHORT', 'HWM_FF_TDR_SHORT_DURATION_ERR')
+
+ rLog = add_rlog (ffs_id, rule_id, 'In Rule Parms: '  ||
+			  ' , pCategoryId='  ||  TO_CHAR( pCategoryId ) ||
+			  ' , ValidateIn='  || pIsValidateIn||
+			  ' , ValidateOut='  || pIsValidateOut||
+			  ' , ValidateDuration='  || pIsValidateDuration||
+			  ' , pMsgInLate='  || pMsgInLate ||
+			  ' , pMsgOutEarly='  || pMsgOutEarly ||
+			  ' , pMsgDurationShort='  || pMsgDurationShort  )
+
+
+
+if (pIsValidateIn = 'N' and  pIsValidateOut = 'N' and  pIsValidateDuration = 'N') then
+(
+	rLog = add_rlog (ffs_id , rule_id ,  'All Validation flags set to No. Exit without processing' )
+) else
+(
+
+	 OUT_MSG 	=	EMPTY_TEXT_NUMBER
+
+	 tcRecCount = HWM_CTXARY_RECORD_POSITIONS.count
+	 rLog  = add_rlog (ffs_id, rule_id, ' >>> Start bulk process - tcRecCount=' || TO_CHAR( tcRecCount )  )
+
+	nidx = 0
+	WHILE (nidx < tcRecCount ) LOOP
+	(
+		nidx = nidx + 1
+
+		tcRecPos = NullText
+		tcMeasure = 0
+		tcMeasureDay = 0
+		tcStartTime = NullDate
+		tcStopTime = NullDate
+		tcTimeRecordType = NullText
+		tcSubResource = ctx_subResource
+
+		tcRecPos   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+
+		if (HWM_CTXARY_SUBRESOURCE_ID.exists(nidx) ) then ( tcSubResource  = HWM_CTXARY_SUBRESOURCE_ID[nidx]    )
+		if (MEASURE.exists(nidx) ) then ( tcMeasure  = MEASURE[nidx]    )
+		if (HWM_CTXARY_HWM_MEASURE_DAY.exists(nidx) ) then ( tcMeasureDay  = HWM_CTXARY_HWM_MEASURE_DAY[nidx]  )
+		if (STARTTIME.exists(nidx) ) then ( tcStartTime  = STARTTIME[nidx]    )
+		if (STOPTIME.exists(nidx) ) then ( tcStopTime  = STOPTIME[nidx]  )
+		if (TimeRecordType.exists(nidx) )    then ( tcTimeRecordType = TimeRecordType[nidx] )
+
+		rLog = add_rlog (ffs_id, rule_id, 'In Rule Inputs number : '  ||    TO_CHAR( nidx )  ||
+								 ' , tcRecPos='  || tcRecPos ||
+								 ' , measure='  ||  TO_CHAR( tcMeasure ) ||
+								 ' ,  measureDay='  ||  TO_CHAR( tcMeasureDay ) ||
+								 ' ,  StartTime='  ||  TO_CHAR(tcStartTime) ||
+								 ' , StopTime='  ||  TO_CHAR(tcStopTime) ||
+								 ' ,tcTimeRecordType='  ||   tcTimeRecordType    ||
+								 ' , tcSubResource='  ||  TO_CHAR(tcSubResource)   )
+
+
+		oMsgStart = NullText
+		oMsgStop = NullText
+		oMsgDuration = NullText
+
+		if ( tcMeasure > 0 and tcTimeRecordType = TimeRecordType_RANGE) then
+			(
+			  CHANGE_CONTEXTS(HWM_SUBRESOURCE_ID = tcSubResource)
+				(
+						CALL_FORMULA ('WFM_TDR_VALIDATE_SCHEDULE_DEVIATION_SUB'
+							  , tcMeasure > 'measure'
+							  , ffs_id > 'ffs_id'
+							  , rule_id > 'rule_id'
+							  , tcRecPos > 'rec_position'
+							  , tcMeasureDay   > 'cMEASURE_DAY'
+							  , measure_period  > 'cMEASURE_Period'
+							  , tcStartTime > 'StartTime'
+							  , tcStopTime > 'StopTime'
+							  , pIsValidateIn        > 'pIsValidateIn'
+							  , pIsValidateOut       > 'pIsValidateOut'
+							  , pIsValidateDuration  > 'pIsValidateDuration'
+							  , pMsgInLate        > 'pMsgInLate'
+							  , pMsgInEarly       > 'pMsgInEarly'
+							  , pMsgOutLate       > 'pMsgOutLate'
+							  , pMsgOutEarly      > 'pMsgOutEarly'
+							  , pMsgDurationLong  > 'pMsgDurationLong'
+							  , pMsgDurationShort > 'pMsgDurationShort'
+							  , oMsgStart    <  'MSG_START_TIME'  DEFAULT  NullText
+							  , oMsgStop     <  'MSG_STOP_TIME'  DEFAULT  NullText
+							  , oMsgDuration <  'MSG_DURATION'  DEFAULT  NullText   )
+				)
+			)
+
+
+		if (oMsgStart <> NullText) Then (
+			  OUT_MSG_START_TIME[nidx] = oMsgStart
+			 rLog = add_rlog (ffs_id , rule_id ,  '**DEVIATION_ERR_msg oMsgStart= '  ||  oMsgStart  )
+		)
+
+		if (oMsgStop <> NullText) Then (
+			  OUT_MSG_STOP_TIME[nidx] = oMsgStop
+			 rLog = add_rlog (ffs_id , rule_id ,  '**DEVIATION_ERR_msg oMsgStop= '  ||  oMsgStop  )
+		)
+
+		 if (oMsgDuration <> NullText) Then (
+			  OUT_MSG_DURATION[nidx] = oMsgDuration
+			 rLog = add_rlog (ffs_id , rule_id ,  '**DEVIATION_ERR_msg oMsgDuration= '  ||  oMsgDuration  )
+		)
+
+		if (nidx >  1000 ) Then (
+			/* endless loop?  Stop process if more than max_loop records found */
+			ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+		)
+
+
+	)
+
+)  /*  if (pIsValidateIn = 'N' and.... */
+
+
+rLog  = add_rlog (ffs_id, rule_id, '<< Exit - ' || ffName   )
+
+RETURN    OUT_MSG_START_TIME, OUT_MSG_STOP_TIME, OUT_MSG_DURATION
+```
+
+### WFM_TSR_SUBMIT_OR_SAVE_ON_WORK_SCHEDULE_AP
+Type: WORKFORCE_MANAGEMENT_TIME_SUBMISSION_RULES
+Description: Compare total time to published and work schedule
+```
+/* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name :  WFM_TSR_SUBMIT_OR_SAVE_ON_WORK_SCHEDULE_AP
+ *
+ * Formula Type:  Time Submission Rules
+ *
+ * Description:    Submits or saves the time card when the time collection
+ *                 device Out event occurs within the range calculated using
+ *                 the defined threshold and the last scheduled work day and
+ *                 time. Save or submit variance and specific time attribute
+ *                 results are inputs to the delivered formula.
+ *
+ * Detail:         Submits or saves the time card based on the Out events
+ *                 received from the time collection device. The reported time
+ *                 category hours associated with the Out event are in the
+ *                 formula input.  The formula first compares the reported
+ *                 Out event to the submit range calculated using the defined
+ *                 threshold and last scheduled work day and time. If the Out
+ *                 event is within that range, it submits the time card.
+ *                 Otherwise, the formula compares the reported Out event to
+ *                 the save range.  If the Out event is within that range, it
+ *                 saves the time card. If neither condition is met, the time
+ *                 card status is set to Entered.
+ *
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who             Ver       Date         Description
+ *----------------  ------    -----------  -------------------------------
+ * David Cohanoff    114.0804  2014-FEB-19  Created.
+ *
+ *
+***************************************************************************/
+
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS     is  EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY      is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure           is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime   is  EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime   is  EMPTY_DATE_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  measure ,
+  StartTime,
+  StopTime
+
+ffName = 'WFM_TSR_SUBMIT_OR_SAVE_ON_WORK_SCHEDULE_AP'
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+rLog  = add_rlog (ffs_id, rule_id, ffName || ' -v 114.0804  '  )
+
+
+l_measurePeriod = GET_CONTEXT(HWM_MEASURE_PERIOD, 0)
+ rLog = add_rlog (ffs_id, rule_id, '(In Context: '  ||
+ ' , ffs_id='  ||  TO_CHAR( ffs_id ) ||   ' , rule_id='  ||  TO_CHAR( rule_id ) ||
+  ' , l_measurePeriod='  ||  TO_CHAR( l_measurePeriod ) ||
+ ' ) ' )
+
+
+NullDate =  '01-JAN-1900'(DATE)
+NullText =  '**FF_NULL**'
+
+/* must match Enum for  oracle.apps.hcm.wfm.core.publicModel.util.WfmCoreConstants.STATUS_VALUE */
+TSR_SUBMIT = 'SUBMITTED'
+TSR_SAVE  = 'SAVED'
+TSR_ENTER= 'ENTERED'
+
+
+ /* Get context, inorder to makt available for util formula) */
+ ctx_personId = GET_CONTEXT(HWM_RESOURCE_ID, 0)
+ctx_subResource = GET_CONTEXT(HWM_SUBRESOURCE_ID, 0)
+ctx_start_date = GET_CONTEXT(HWM_CTX_SEARCH_START_DATE,  NullDate)
+ctx_end_date = GET_CONTEXT(HWM_CTX_SEARCH_END_DATE, NullDate)
+
+ l_status = add_rlog (ffs_id , rule_id ,  '(context : '  ||
+ ' , ctx_personId ='  ||  TO_CHAR( ctx_personId ) ||
+ ' , ctx_subResource ='  ||  TO_CHAR( ctx_subResource ) ||
+ ' , ctx_start_date ='  ||  TO_CHAR( ctx_start_date ) ||
+ ' , ctx_end_date ='  ||  TO_CHAR( ctx_end_date ) ||
+ ' ) ' )
+
+
+/* Fixed Values from Rule header  */
+sumLvl= Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
+
+ rLog = add_rlog (ffs_id, rule_id, '(In Rule header: '  ||
+ ' , sumLvl='  ||  sumLvl   ||
+ ' ) ' )
+
+categoryId   = get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+ThresholdSub   = get_rvalue_number (rule_id ,'SUBMIT_THRESHOLD_IN_MINUTES', 0)
+ThresholdSave  = get_rvalue_number (rule_id ,'SAVE_THRESHOLD_IN_MINUTES', 0)
+
+ThMinuteSub = 0
+ThMinuteSave = 0
+if (ThresholdSub > 0 ) then (
+	 ThMinuteSub = ThresholdSub / 60
+)
+
+if (ThresholdSave > 0 ) then (
+	 ThMinuteSave = ThresholdSave / 60
+)
+ rLog = add_rlog (ffs_id, rule_id, '(In Rule Parms: '  ||
+  ' , category='  || TO_CHAR( categoryId )||
+  ' , ThresholdSub='  ||  TO_CHAR( ThresholdSub ) ||
+  ' , ThMinuteSub='  ||  TO_CHAR( ThMinuteSub ) ||
+  ' , ThresholdSave='  ||  TO_CHAR( ThresholdSave ) ||
+  ' , ThMinuteSave='  ||  TO_CHAR( ThMinuteSave ) ||
+ ' ) ' )
+
+
+OUT_FINAL_TSR = NullText
+
+ max_loop = 5000
+ max_ary = HWM_CTXARY_RECORD_POSITIONS.count
+ rLog  = add_rlog (ffs_id, rule_id, ' >>> Start bulk process - max_ary=' || TO_CHAR( max_ary )  )
+
+cntr = 0
+nidx = 0
+nxtRec = 1
+
+
+
+WHILE (cntr < max_ary ) LOOP
+(
+    cntr = cntr + 1
+    nidx = nidx + nxtRec
+
+	l_rec_pos = NullText
+	l_measure = 0
+	l_measureDay = 0
+    l_StartTime = NullDate
+    l_StopTime = NullDate
+
+	l_rec_pos   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+
+	if (MEASURE.exists(nidx) ) then (
+		l_measure  = MEASURE[nidx]
+	)
+
+	if (HWM_CTXARY_HWM_MEASURE_DAY.exists(nidx) ) then (
+		l_measureDay  = HWM_CTXARY_HWM_MEASURE_DAY[nidx]
+	)
+
+	if (STARTTIME.exists(nidx) ) then (
+		l_StartTime  = STARTTIME[nidx]
+	)
+
+	if (STOPTIME.exists(nidx) ) then (
+		l_StopTime  = STOPTIME[nidx]
+	)
+
+
+	 rLog = add_rlog (ffs_id, rule_id, '(In Rule Inputs number : '  ||    TO_CHAR( nidx )  ||
+				 ' , measure='  ||  TO_CHAR( l_measure ) ||
+				 ' ,  measureDay='  ||  TO_CHAR( l_measureDay ) ||
+				 ' ,  StartTime='  ||  TO_CHAR(l_StartTime) ||
+				  ' , StopTime='  ||  TO_CHAR(l_StopTime) ||
+				  ' , rec_pos='  || l_rec_pos ||
+				 ' ) ' )
+
+
+	oTSR = NullText
+	CALL_FORMULA ('WFM_TSR_SUBMIT_OR_SAVE_ON_WORK_SCHEDULE_SUB'
+			  , ffs_id > 'ffs_id'
+			  , rule_id > 'rule_id'
+			  , l_measureDay   > 'cMEASURE_DAY'
+			  , l_measurePeriod  > 'cMEASURE_Period'
+			  , l_rec_pos > 'rec_position'
+			  , sumLvl > 'sum_lvl'
+			  , l_measure > 'measure'
+			  , l_StartTime > 'StartTime'
+			  , l_StopTime > 'StopTime'
+			  , ThMinuteSub    > 'ThMinuteSub'
+			  , ThMinuteSave   > 'ThMinuteSave'
+			  , oTSR     <  'OUT_FINAL_TSR'  DEFAULT  NullText   )
+
+
+
+	rLog  = add_rlog (ffs_id, rule_id, 'Call Output index' || TO_CHAR(nidx)  ||  ' - oTSR= '  || oTSR  )
+
+	if ( oTSR != NullText) then (
+		OUT_FINAL_TSR  = oTSR
+		rLog  = add_rlog (ffs_id, rule_id, 'Exit 1- OUT_FINAL_TSR: '  || OUT_FINAL_TSR)
+		exit
+	)
+
+
+	if (nidx >  1000 ) Then (
+		/* endless loop?  Stop process if more than max_loop records found */
+		ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+	)
+
+
+)
+	rLog  = add_rlog (ffs_id, rule_id, '<<<<=== exit ' || ffName ||'Exit 1- OUT_FINAL_TSR: '  || OUT_FINAL_TSR)
+
+
+RETURN OUT_FINAL_TSR
+```
+
+### WFM_TSR_SUBMIT_OR_SAVE_ON_SPECIFIC_DAY_AP
+Type: WORKFORCE_MANAGEMENT_TIME_SUBMISSION_RULES
+Description: Compare time entries to a specific day of week.
+```
+/* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name :  WFM_TSR_SUBMIT_OR_SAVE_ON_SPECIFIC_DAY_AP
+ *
+ * Formula Type:  Time Submission Rules
+ *
+ * Description:   Submits or saves the time card when the time collection
+ *                device Out event is reported on a specific day to the week.
+ *                Day action and specific time attribute results are inputs
+ *                to the delivered formula.
+ *
+ * Detail:        Submits or saves the time card based on the Out events received
+ *                from the time collection device. The Save or Submit action
+ *                applies if an Out event is received on a specific day defined
+ *                as a formula input value.  If neither condition is met, the
+ *                time card status is set to Entered.
+ *
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who             Ver       Date         Description
+ *----------------  ------    -----------  -------------------------------
+ * David Cohanoff    114.0804  2014-FEB-19  Created.
+ *
+ *
+***************************************************************************/
+
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS     is  EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY      is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure           is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime   is  EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime   is  EMPTY_DATE_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  measure ,
+  StartTime,
+  StopTime
+
+ffName = 'WFM_TSR_SUBMIT_OR_SAVE_ON_SPECIFIC_DAY_AP'
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+rLog  = add_rlog (ffs_id, rule_id, ffName || ' -v 114.0804  '  )
+
+
+l_measurePeriod = GET_CONTEXT(HWM_MEASURE_PERIOD, 0)
+ rLog = add_rlog (ffs_id, rule_id, '(In Context: '  ||
+ ' , ffs_id='  ||  TO_CHAR( ffs_id ) ||   ' , rule_id='  ||  TO_CHAR( rule_id ) ||
+  ' , l_measurePeriod='  ||  TO_CHAR( l_measurePeriod ) ||
+ ' ) ' )
+
+
+NullDate =  '01-JAN-1900'(DATE)
+NullText =  '**FF_NULL**'
+
+/* must match Enum for  oracle.apps.hcm.wfm.core.publicModel.util.WfmCoreConstants.STATUS_VALUE */
+TSR_SUBMIT = 'SUBMITTED'
+TSR_SAVE  = 'SAVED'
+TSR_ENTER= 'ENTERED'
+
+
+
+/* Fixed Values from Rule header  */
+sumLvl= Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
+
+ rLog = add_rlog (ffs_id, rule_id, '(In Rule header: '  ||
+ ' , sumLvl='  ||  sumLvl   ||
+ ' ) ' )
+
+pCategoryId   = get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+pDActMon   = get_rvalue_text (rule_id ,'SAVE_SUBMIT_ON_MON', NullText)
+pDActTue   = get_rvalue_text (rule_id ,'SAVE_SUBMIT_ON_TUE', NullText)
+pDActWed   = get_rvalue_text (rule_id ,'SAVE_SUBMIT_ON_WED', NullText)
+pDActThu   = get_rvalue_text (rule_id ,'SAVE_SUBMIT_ON_THU', NullText)
+pDActFri   = get_rvalue_text (rule_id ,'SAVE_SUBMIT_ON_FRI', NullText)
+pDActSat   = get_rvalue_text (rule_id ,'SAVE_SUBMIT_ON_SAT', NullText)
+pDActSun   = get_rvalue_text (rule_id ,'SAVE_SUBMIT_ON_SUN', NullText)
+
+sSAV = 'SAV'
+sSUB = 'SUB'
+dowSub  =  ';'
+dowSave =  ';'
+if (pDActMon != NullText and length(pDActMon) => 3 ) then (
+	action = upper(substr( pDActMon, 1,3))
+	if (action = sSUB)      then (dowSub  = dowSub  + ';MON;')
+	else if (action = sSAV) then (dowSave = dowSave + ';MON;')
+)
+
+if (pDActTue != NullText and length(pDActTue) => 3 ) then (
+	action = upper(substr( pDActTue, 1,3))
+	if (action = sSUB )     then (dowSub  = dowSub  + ';TUE;')
+	else if (action = sSAV) then (dowSave = dowSave + ';TUE;')
+)
+
+if (pDActWed != NullText and length(pDActWed) => 3 ) then (
+	action = upper(substr( pDActWed, 1,3))
+	if (action = sSUB )     then (dowSub  = dowSub  + ';WED;')
+	else if (action = sSAV) then (dowSave = dowSave + ';WED;')
+)
+
+if (pDActThu != NullText and length(pDActThu) => 3 ) then (
+	action = upper(substr( pDActThu, 1,3))
+	if (action = sSUB )     then (dowSub  = dowSub  + ';THU;')
+	else if (action = sSAV) then (dowSave = dowSave + ';THU;')
+)
+
+
+if (pDActFri != NullText and length(pDActFri) => 3 ) then (
+	action = upper(substr( pDActFri, 1,3))
+	if (action = sSUB )     then (dowSub  = dowSub  + ';FRI;')
+	else if (action = sSAV) then (dowSave = dowSave + ';FRI;')
+)
+
+
+if (pDActSat != NullText and length(pDActSat) => 3 ) then (
+	action = upper(substr( pDActSat, 1,3))
+	if (action = sSUB )     then (dowSub  = dowSub  + ';SAT;')
+	else if (action = sSAV) then (dowSave = dowSave + ';SAT;')
+)
+
+
+if (pDActSun != NullText and length(pDActSun) => 3 ) then (
+	action = upper(substr( pDActSun, 1,3))
+	if (action = sSUB )     then (dowSub  = dowSub  + ';SUN;')
+	else if (action = sSAV) then (dowSave = dowSave + ';SUN;')
+)
+
+
+ rLog = add_rlog (ffs_id, rule_id, '(In Rule Parms: '  ||
+  ' , category='  || TO_CHAR( pCategoryId )||
+  ' , pDActMon='  ||  pDActMon  ||
+  ' , pDActTue='  ||  pDActTue  ||
+  ' , pDActWed='  ||  pDActWed  ||
+  ' , pDActThu='  ||  pDActThu  ||
+  ' , pDActFri='  ||  pDActFri  ||
+  ' , pDActSat='  ||  pDActSat  ||
+  ' , pDActSun='  ||  pDActSun  ||
+  ' , dowSub='    ||  dowSub   ||
+  ' , dowSave='   ||  dowSave  ||
+ ' ) ' )
+
+
+OUT_FINAL_TSR = TSR_ENTER
+
+ max_loop = 5000
+ max_ary = HWM_CTXARY_RECORD_POSITIONS.count
+ rLog  = add_rlog (ffs_id, rule_id, ' >>> Start bulk process - max_ary=' || TO_CHAR( max_ary )  )
+
+cntr = 0
+nidx = 0
+nxtRec = 1
+
+
+
+WHILE (cntr < max_ary ) LOOP
+(
+    cntr = cntr + 1
+    nidx = nidx + nxtRec
+
+	l_rec_pos = NullText
+	l_measure = 0
+    l_StartTime = NullDate
+    l_StopTime = NullDate
+
+	l_rec_pos   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+
+	if (MEASURE.exists(nidx) ) then (
+		l_measure  = MEASURE[nidx]
+	)
+
+	if (STARTTIME.exists(nidx) ) then (
+		l_StartTime  = STARTTIME[nidx]
+	)
+
+	if (STOPTIME.exists(nidx) ) then (
+		l_StopTime  = STOPTIME[nidx]
+	)
+
+	isTuesday =  get_is_date_same_as_dow(l_StartTime, 'TUE' )
+
+
+	 rLog = add_rlog (ffs_id, rule_id, '(In Rule Inputs number : '  ||    TO_CHAR( nidx )  ||
+				 ' , measure='  ||  TO_CHAR( l_measure ) ||
+				 ' ,  StartTime='  ||  TO_CHAR(l_StartTime) ||
+				  ' , StopTime='  ||  TO_CHAR(l_StopTime) ||
+				  ' , rec_pos='  || l_rec_pos ||
+				  ' , isTuesday='  || isTuesday ||
+				 ' ) ' )
+
+
+	oTSR = NullText
+	CALL_FORMULA ('WFM_TSR_SUBMIT_OR_SAVE_ON_SPECIFIC_DAY_SUB'
+			  , ffs_id > 'ffs_id'
+			  , rule_id > 'rule_id'
+			  , l_rec_pos > 'rec_position'
+			  , l_measure > 'measure'
+			  , l_StartTime > 'StartTime'
+			  , l_StopTime > 'StopTime'
+			  , dowSub    > 'dowSub'
+			  , dowSave   > 'dowSave'
+			  , oTSR     <  'OUT_FINAL_TSR'  DEFAULT  NullText   )
+
+
+
+	rLog  = add_rlog (ffs_id, rule_id, 'Call Output index' || TO_CHAR(nidx)  ||  ' - oTSR= '  || oTSR  )
+
+	if ( oTSR = TSR_SUBMIT) then (
+		OUT_FINAL_TSR  = oTSR
+		exit
+	) if ( oTSR = TSR_SAVE ) then (
+		OUT_FINAL_TSR  = oTSR
+	)
+
+	if (nidx >  1000 ) Then (
+		/* endless loop?  Stop process if more than max_loop records found */
+		ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+	)
+
+
+)
+
+
+
+	rLog  = add_rlog (ffs_id, rule_id, '<<<<=== exit ' || ffName ||'Exit 1- OUT_FINAL_TSR: '  || OUT_FINAL_TSR)
+
+
+RETURN OUT_FINAL_TSR
+```
+
+### WFM_TER_COMPARE_WRKR_HOLIDAY_TO_REPORTED_HOURS_AP
+Type: WORKFORCE_MANAGEMENT_TIME_ENTRY_RULES
+Description: Compare holiday to reported time
+```
+ /* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_TER_COMPARE_WRKR_HOLIDAY_TO_REPORTED_HOURS_AP
+ * Formula Type:  Time Entry Rules
+ *
+ * Description:    Evaluates whether reported time entries are on an assigned
+ *                 public holiday. Public holiday type and specific time
+ *                 attribute entries are inputs to the delivered formula.
+ *                 This formula uses an array to process time card data.
+ *
+ *
+ * Detail:         Compares the worker assigned public holiday defined in the
+ *                 lookup type to the reported time category hours for the day.
+ *                 If the reported time is on a public holiday, the defined
+ *                 message appears. If no message is defined, the default
+ *                 message appears.
+ *
+ *   Override public holiday Category must match fnd_lookup_values_vl
+ *   where  lookup_type  ='PER_CAL_EVENT_CATEGORY'
+ *
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who             Ver       Date         Description
+ *----------------  ------    -----------  -------------------------------
+ * David Cohanoff    114.0804  2014-FEB-19  Created.
+ *
+ *
+***************************************************************************/
+
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS     is  EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY      is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure           is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime         is  EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime          is  EMPTY_DATE_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  measure ,
+  StartTime,
+  StopTime
+
+ffName = 'WFM_TER_COMPARE_WRKR_HOLIDAY_TO_REPORTED_HOURS_AP'
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+rLog  = add_rlog (ffs_id, rule_id, ffName || ' -v 114.0804  '  )
+
+
+l_measurePeriod = GET_CONTEXT(HWM_MEASURE_PERIOD, 0)
+
+ rLog = add_rlog (ffs_id, rule_id, '(In Context: '  ||
+ ' , ffs_id='  ||  TO_CHAR( ffs_id ) ||   ' , rule_id='  ||  TO_CHAR( rule_id ) ||
+  ' , l_measurePeriod='  ||  TO_CHAR( l_measurePeriod ) ||
+ ' ) ' )
+
+
+NullDate =  '01-JAN-1900'(DATE)
+NullText =  '**FF_NULL**'
+RecPositoinEoPeriod = 'END_PERIOD'
+RecPositoinEoDay = 'END_DAY'
+RecPositoinDetail = 'DETAIL'
+
+/* Fixed Values from Rule header  */
+sumLvl= Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
+
+ rLog = add_rlog (ffs_id, rule_id, '(In Rule header: '  ||    ' , sumLvl='  ||  sumLvl   )
+
+
+
+ctx_personId = GET_CONTEXT(HWM_RESOURCE_ID, 0)
+ctx_subResource = GET_CONTEXT(HWM_SUBRESOURCE_ID, 0)
+ctx_start_date = GET_CONTEXT(HWM_CTX_SEARCH_START_DATE,  NullDate)
+ctx_end_date = GET_CONTEXT(HWM_CTX_SEARCH_END_DATE, NullDate)
+
+ l_status = add_rlog (ffs_id , rule_id ,  '(UTIL_ ...context : '  ||
+ ' , ctx_personId ='  ||  TO_CHAR( ctx_personId ) ||
+ ' , ctx_subResource ='  ||  TO_CHAR( ctx_subResource ) ||
+ ' , ctx_start_date ='  ||  TO_CHAR( ctx_start_date ) ||
+ ' , ctx_end_date ='  ||  TO_CHAR( ctx_end_date ) ||
+ ' ) ' )
+
+
+pCategoryId  = get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+pMsg         = get_rvalue_text (rule_id  ,'OVRD_MSG_CODE', 'HWM_FF_TER_EMP_HOL_WRN')
+
+/*  Ovrd_pub_holiday_Category - lookup_type  ='PER_CAL_EVENT_CATEGORY'*/
+pOvrdPubCat   = get_rvalue_text (rule_id  ,'OVRD_PUB_HOLIDAY_CATEGORY', 'PH')
+
+
+
+ rLog = add_rlog (ffs_id, rule_id, '(In Rule Parms: '  ||
+  ' , category='  || TO_CHAR( pCategoryId )||
+  ' , pMsg='  || pMsg||
+  ' , pOvrdPubCat='  || pOvrdPubCat||
+ ' ) ' )
+
+
+
+ OUT_MSG 	=	EMPTY_TEXT_NUMBER
+
+ max_loop = 5000
+ max_ary = HWM_CTXARY_RECORD_POSITIONS.count
+ rLog  = add_rlog (ffs_id, rule_id, ' >>> Fisrst loop - select workdays - max_ary=' || TO_CHAR( max_ary )  )
+
+cntr = 0
+nidx = 0
+nxtRec = 1
+
+ WorkDayStart =	NullDate
+ WorkDayEnd	= NullDate
+ workDays  	=	EMPTY_DATE_NUMBER
+ workIdx =	EMPTY_NUMBER_NUMBER
+ wdIdx = 0
+WHILE (cntr < max_ary ) LOOP
+(
+    cntr = cntr + 1
+    nidx = nidx + nxtRec
+
+	l_rec_pos = NullText
+	l_measure = 0
+    l_StartTime = NullDate
+    l_StopTime = NullDate
+
+	l_rec_pos   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+
+
+	if ( l_rec_pos = RecPositoinDetail) then
+	(
+		if (MEASURE.exists(nidx) ) then (
+			l_measure  = MEASURE[nidx]
+		)
+
+		if (STARTTIME.exists(nidx) ) then (
+			l_StartTime  = STARTTIME[nidx]
+		)
+
+		if (STOPTIME.exists(nidx) ) then (
+			l_StopTime  = STOPTIME[nidx]
+		)
+
+
+		 rLog = add_rlog (ffs_id, rule_id, '(timcard entry: '  ||    TO_CHAR( nidx )  ||
+							 ' , measure='  ||  TO_CHAR( l_measure ) ||
+							 ' ,  StartTime='  ||  TO_CHAR(l_StartTime) ||
+							  ' , StopTime='  ||  TO_CHAR(l_StopTime) ||
+							  ' , rec_pos='  || l_rec_pos ||
+							 ' ) ' )
+
+		if (l_measure > 0) then
+		(
+			if ( l_StartTime != NullDate) then (
+				if (WorkDayStart = NullDate ) then (
+				    WorkDayStart =  l_StartTime
+				) else (
+					WorkDayStart = LEAST(l_StartTime,WorkDayStart)
+				)
+			)
+			if ( l_StopTime != NullDate) then (
+				WorkDayEnd = GREATEST(WorkDayEnd, l_StopTime)
+			)
+			 wdIdx = wdIdx + 1
+			workDays[wdIdx] = l_StartTime
+			workIdx[wdIdx] = nidx
+			rLog = add_rlog (ffs_id, rule_id, 'In workdays : '  ||
+							 ' , WorkDayStart='  ||  TO_CHAR( WorkDayStart ) ||
+							 ' ,  WorkDayEnd='  ||  TO_CHAR(WorkDayEnd)  )
+		)
+    )
+
+	if (nidx >  1000 ) Then (
+		/* endless loop?  Stop process if more than max_loop records found */
+		ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+	)
+
+
+)
+
+
+ dbiHolidayCnt	=	0
+ dbiHolidays	=	EMPTY_DATE_NUMBER
+if ( WorkDayStart =  NullDate) then
+(
+  l_status = add_rlog (ffs_id , rule_id ,  'Timecard Start date not found. Exit holiday search')
+
+) else
+(
+	 CALL_FORMULA ('WFM_UTIL_GET_WRKR_HOLIDAY_SCHEDULE'
+		  , ffs_id        > 'ffs_id'
+		  , rule_id       > 'rule_id'
+		  , pOvrdPubCat   > 'pOvrdPubCat'
+		  , WorkDayStart  > 'start_date_override'
+		  , WorkDayEnd    > 'end_date_override'
+		  , dbiHolidayCnt   < 'OUT_HOLIDAY_COUNT'   DEFAULT 0
+		  , dbiHolidays     < 'OUT_HOLIDAY_DATES'   DEFAULT  EMPTY_DATE_NUMBER
+		  )
+
+	  l_status = add_rlog (ffs_id , rule_id ,  'Result from UTIL_GET_DBI call:  dbiHolidayCnt ='  ||  TO_CHAR( dbiHolidayCnt )  )
+
+    if (dbiHolidayCnt > 0 ) then
+	(
+		hIdx = 1
+		WHILE hIdx  <= dbiHolidayCnt LOOP
+		(
+			hDate = trunc(dbiHolidays[hIdx] )
+	       l_status = add_rlog (ffs_id , rule_id ,  'Loop Holiday hIdx='  ||  TO_CHAR( hIdx )  ||
+					' ,hDate ='  ||  TO_CHAR( hDate) )
+
+
+				msgHolidayIdx = -1
+				 wIdx = workDays.FIRST(-1)
+					WHILE workDays.EXISTS(wIdx) LOOP
+					(
+						wDate = workDays[wIdx]
+						diff = 	DAYS_BETWEEN(trunc(wDate), hDate)
+					    l_status = add_rlog (ffs_id , rule_id ,  'Loop workDays wIdx='  ||  TO_CHAR( wIdx )  ||
+												' ,wDate ='  ||  TO_CHAR( wDate) )
+						if (diff = 0 ) then (
+							msgHolidayIdx = wIdx
+							exit
+						)
+					  wIdx = workDays.NEXT(wIdx, -1)
+					)
+
+
+			if (msgHolidayIdx => 0) Then (
+				/* HWM_FF_TER_EMP_HOL_WRN
+					The hours entered for the day {HRS_ENTERED} are entered on {HOLIDAY} which is an
+					assigned holiday.  Do you want to continue?
+				*/
+				oIdx = workIdx[msgHolidayIdx]
+				 l_tkn1 = 'HRS_ENTERED'
+				 l_val1 =   TO_CHAR(  MEASURE[oIdx]  )
+				 l_tkn2 = 'HOLIDAY'
+				 l_val2 =  DATE_TO_TEXT( hDate , 'DD-Mon-YYYY'  )
+				 tm =  get_msg_attribute('StartTime') ||  get_output_msg2( 'HWM' ,pMsg ,l_tkn1 , l_val1 ,l_tkn2 , l_val2 )
+				 l_status = add_rlog (ffs_id , rule_id ,  ' out msg tm ='  ||  tm ||
+								 ' ,msgHolidayIdx ='  ||  TO_CHAR( msgHolidayIdx) ||
+								 ' ,oIdx ='  ||  TO_CHAR( oIdx)
+				 )
+				  OUT_MSG[oIdx] = tm
+			)
+
+		  hIdx = hIdx + 1
+		)  /* WHILE hIdx  <= dbiHolidayCnt */
+
+	)
+)
+
+	rLog  = add_rlog (ffs_id, rule_id, '-- end bulk process <<<<' )
+
+
+RETURN    OUT_MSG
+```
+
+### WFM_TCR_THRESHOLD_TWO_TIER_SEVEN_DAY_AP
+Type: WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES
+Description: Divides reported daily, period, and seventh-consecutive-day time entries into calculated time attributes for hours above and below defined threshold hours.
+```
+    /* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_TCR_THRESHOLD_TWO_TIER_SEVEN_DAY_AP
+ *
+ * Formula Type:  Time Calculation rule
+ *
+ * Description:   Divides reported daily, period, and seventh-consecutive-day
+ *                time entries into calculated time attributes for hours above
+ *                and below defined threshold hours. Reported time and specific
+ *                time attribute results are inputs to the delivered formula.
+ *
+ *  Detail:      Compares the total time category hours for the day, period,
+ *                and seventh consecutive day to the threshold values for the
+ *                day, period, or seventh consecutive day. Hours above the
+ *                threshold are converted to a single pay time type. Hours under
+ *                the threshold either remain the same pay time type value or are
+ *                converted into a new pay time type attribute.
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who               Ver           Date        Description
+ *-----------------  ------      ------------   -----------------------------------------
+ * David Cohanoff     114.1012    2014-NOV-10   Created.
+ * David Cohanoff     115.0817    2015-AUG-10   Created.
+ * David Cohanoff     118.0402    2018-MAR-27   Updated .
+ *
+ *
+***************************************************************************/
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS   is  EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY    is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure    is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime  is  EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime   is  EMPTY_DATE_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  measure ,
+  StartTime,
+  StopTime
+
+
+/*  Following 2 lines are required right after inputs for all OTL and HWM formulas */
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+
+NullDate =  '01-JAN-1900'(DATE)
+NullText =  '**FF_NULL**'
+ffName = 'WFM_THRESHOLD_TIME_CALCULATION_RULE_AP' || ' -118.0402   '
+rLog  = add_rlog (ffs_id, rule_id, '>>> Enter - ' || ffName  )
+
+
+measure_period = GET_CONTEXT(HWM_MEASURE_PERIOD, 0)
+
+/* Fixed Values from Rule header  */
+hSumLvl= Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
+hExecType  = Get_Hdr_Text(rule_id,'RULE_EXEC_TYPE', 'CREATE')
+
+hCreateYn  = 'N'
+if (upper(hExecType) = 'CREATE'  ) then (
+  hCreateYn  = 'Y'
+)
+
+ l_status = add_rlog (ffs_id , rule_id ,'Rule Header and Context:'  ||
+ ' , ffs_id ='  ||  TO_CHAR( ffs_id ) ||
+ ' , rule_id ='  ||  TO_CHAR( rule_id ) ||
+ ' , measure_period='  ||  TO_CHAR( measure_period ) ||
+ ' , hSumLvl='  ||   hSumLvl ||
+ ' , hExecType='  ||   hExecType ||
+ ' , hCreateYn='  ||   hCreateYn ||
+ ' ) ' )
+
+/* Fixed Values from Rule Input parameters */
+pCategoryId  = get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+pDaythold1  = get_rvalue_number (rule_id ,'DAILY_THRESHOLD_1', 0)
+pDaythold2  = get_rvalue_number (rule_id ,'DAILY_THRESHOLD_2', 0)
+pDaySevenThold  = get_rvalue_number (rule_id ,'SEVENTH_DAY_THRESHOLD', 0)
+pWeeklyThold  = get_rvalue_number (rule_id ,'WEEKLY_THRESHOLD', 0)
+
+
+l_status = add_rlog (ffs_id , rule_id , 'Rule Parameters: '   ||
+ ' , pDaythold1 ='  ||  TO_CHAR( pDaythold1 ) ||
+ ' , pDaythold2 ='  ||  TO_CHAR( pDaythold2 ) ||
+ ' , pDaySevenThold ='  ||  TO_CHAR( pDaySevenThold ) ||
+ ' , pWeeklyThold ='  ||  TO_CHAR( pWeeklyThold ) ||
+ ' , pCategoryId ='  ||  TO_CHAR( pCategoryId )   )
+
+
+wMaAry = HWM_CTXARY_RECORD_POSITIONS.count
+rLog  = add_rlog (ffs_id, rule_id, 'Start bulk process - wMaAry=' || TO_CHAR( wMaAry )  )
+
+
+OUT_MEASURE_UNDER 	=	EMPTY_NUMBER_NUMBER
+OUT_MEASURE_OVER_1 	=	EMPTY_NUMBER_NUMBER
+OUT_MEASURE_OVER_2 	=	EMPTY_NUMBER_NUMBER
+
+wkLastSartTime = NullDate
+wkDayCount = 0
+wkTotalRegHrsWeek  = 0
+wkTotalRegHrsDay  = 0
+wkTotalOver1HrsDay  = 0
+
+nidx = 0
+WHILE (nidx < wMaAry ) LOOP
+(
+    nidx = nidx + 1
+
+	aiRecPosition = NullText
+	aiMeasure = 0
+	aiMeasureDay = 0
+    aiStartTime = NullDate
+    aiStopTime = NullDate
+
+	aiRecPosition   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+
+	if (MEASURE.exists(nidx) ) then (
+		aiMeasure  = MEASURE[nidx]
+	)
+
+	if (HWM_CTXARY_HWM_MEASURE_DAY.exists(nidx) ) then (
+		aiMeasureDay  = HWM_CTXARY_HWM_MEASURE_DAY[nidx]
+	)
+
+
+	If ( aiRecPosition =  'DETAIL'  and aiMeasure > 0 ) Then
+	(
+		if (STARTTIME.exists(nidx) ) then (
+			aiStartTime  = STARTTIME[nidx]
+		)
+
+		if (STOPTIME.exists(nidx) ) then (
+			aiStopTime  = STOPTIME[nidx]
+		)
+
+	     dBtwn  =   days_between(trunc(aiStartTime),trunc(wkLastSartTime) )
+	   if (wkLastSartTime = NullDate or dBtwn = 1 ) then (
+		   wkDayCount = wkDayCount + 1
+	   ) else if (  dBtwn > 1 ) then (
+		   wkDayCount =  1
+	   )
+
+			 rLog = add_rlog (ffs_id, rule_id, 'Rule Input index: '  ||    TO_CHAR( nidx )  ||
+								  ' , aiRecPosition='  || aiRecPosition ||
+								  ' , measureDay='  ||  TO_CHAR( aiMeasureDay ) ||
+								  ' , wkLastSartTime='  ||  TO_CHAR(wkLastSartTime) ||
+								  ' , StartTime='  ||  TO_CHAR(aiStartTime) ||
+								  ' , StopTime='  ||  TO_CHAR(aiStopTime) ||
+								  ' , dBtwn='  ||  TO_CHAR( dBtwn ) ||
+								  ' , wkDayCount='  ||  TO_CHAR( wkDayCount ) ||
+								  ' , wkTotalRegHrsWeek='  ||  TO_CHAR( wkTotalRegHrsWeek ) ||
+								  ' , wkTotalRegHrsDay='  ||  TO_CHAR( wkTotalRegHrsDay ) ||
+								  ' , wkTotalOver1HrsDay='  ||  TO_CHAR( wkTotalOver1HrsDay ) ||
+								  '<<' )
+
+
+				wkMeasureUnder  = 0
+				wkMeasureOver1  = 0
+				wkMeasureOver2  = 0
+				CALL_FORMULA ('WFM_TCR_THRESHOLD_TWO_TIER_SEVEN_DAY_SUB'
+							  , ffs_id        > 'ffs_id'
+							  , rule_id       > 'rule_id'
+							  , measure_period  > 'measurePeriod'
+							  , hSumLvl         > 'hSumLvl'
+							  , hCreateYn       > 'hCreateYn'
+							  , pDaythold1      > 'pDaythold1'
+							  , pDaythold2      > 'pDaythold2'
+							  , pDaySevenThold  > 'pDaySevenThold'
+							  , pWeeklyThold    > 'pWeeklyThold'
+							  , wkTotalRegHrsWeek     > 'wkTotalRegHrsWeek'
+							  , wkTotalRegHrsDay      > 'wkTotalRegHrsDay'
+							  , wkTotalOver1HrsDay    > 'wkTotalOver1HrsDay'
+							  , wkDayCount      > 'wkDayCount'
+							  , aiMeasureDay    > 'measureDay'
+							  , aiRecPosition   > 'recPosition'
+							  , aiMeasure       > 'measure'
+							  , aiStartTime     > 'startTime'
+							  , aiStopTime      > 'stopTime'
+							  , wkMeasureUnder     <  'oMeasureUnder'   DEFAULT 0
+							  , wkMeasureOver1     <  'oMeasureOver1'   DEFAULT 0
+							  , wkMeasureOver2     <  'oMeasureOver2'   DEFAULT 0 )
+
+				rLog  = add_rlog (ffs_id, rule_id, '>>> FF CALL result: '  ||
+								 ' , wkMeasureUnder ='  ||  TO_CHAR( wkMeasureUnder ) ||
+								 ' ,  wkMeasureOver1 ='  ||  TO_CHAR(  wkMeasureOver1 ) ||
+								 ' ,  wkMeasureOver2 ='  ||  TO_CHAR(  wkMeasureOver2 ) )
+
+				wkLastSartTime =  aiStartTime
+
+				if (wkMeasureUnder >  0 ) Then (
+					wkTotalRegHrsWeek  = wkTotalRegHrsWeek + wkMeasureUnder
+					wkTotalRegHrsDay  = wkTotalRegHrsDay + wkMeasureUnder
+					if ( hCreateYn  =   'Y') then (
+						out_measure_ary_under[nidx]   =  aiMeasure
+					) else  (
+						out_measure_ary_under[nidx]   = wkMeasureUnder
+					)
+				)
+
+				if (wkMeasureOver1 >  0 ) Then (
+					out_measure_over_1[nidx]   = wkMeasureOver1
+			     	wkTotalOver1HrsDay  = wkTotalOver1HrsDay + wkMeasureOver1
+				)
+
+				if (wkMeasureOver2 > 0 ) Then (
+					out_measure_over_2[nidx]   = wkMeasureOver2
+				)
+
+
+
+	)
+
+	If ( aiRecPosition !=  'DETAIL'  ) Then(
+	   wkTotalRegHrsDay  = 0
+	   wkTotalOver1HrsDay = 0
+	)
+
+	if (nidx >  500 ) Then (
+			/* endless loop?  Stop process if more than max_loop records found */
+			ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+	)
+
+)
+
+rLog  = add_rlog (ffs_id, rule_id, '<< Exit - ' || ffName   )
+
+
+RETURN  out_measure_ary_under, out_measure_over_1, out_measure_over_2
+```
+
+### ORA_WFM_TCR_ALLOCATION_TIME_AP
+Type: WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES
+Description: The formula will use Time Allocation to distribute and calculate time based on the defined time category and allocation.
+```
+  /* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : ORA_WFM_TCR_ALLOCATION_TIME_AP
+ *
+ * Formula Type:  Time Calculation rule
+ *
+ * Description:  Allocates either the reported or calculated time based on
+ *               the processing sequence of the allocation rule in the rule
+ *               set. Also allocates the time according to the time allocation
+ *               created using the Manage Time Allocations task and assigned
+ *               to the worker using the Manage Allocation Assignments task.
+ *               If there is no assigned time allocation, it allocates time
+ *               according to the time allocation selected in the allocation
+ *               rule.
+ *
+ * Detail:       If there is a time allocation assigned to the worker using the
+ *               Manage Allocation Assignments task, then apply this allocation.
+ *               Otherwise, apply the allocation selected in the rule
+ *               configuration. In both cases, the allocation formula uses either
+ *               reported or calculated time, based on the processing sequence
+ *               of the allocation rule in the rule set. It allocates the time
+ *               identified by the source time category across the output time
+ *               attributes.
+ *
+ *  Rule Template Parameters
+ *    Parameter Name	        Parameter Type	  Description
+ *    ------------------------  ---------------   -----------------------------
+ *    ASSIGN_FRACTION_TO_LAST_ROW   Y/N         Indicates whether to adjust the last row
+ *                                              of the time allocation output so that
+ *                                              total calculated hours match the reported
+ *                                              hours. This parameter is used by time
+ *                                              allocations of type Percent and Equally.
+ *
+ *
+ *  Rule Template Output Parameters
+ *   N/A. Use Time allocation
+ *
+ *
+ * Rule Values:
+ * --------------
+ *   ASSIGN_FRACTION_TO_LAST_ROW
+ *   Value:    Select Yes, to indicate that Rules needs to adjust the last row
+ *             of the time allocation output so that total calculated hours match the
+ *             reported hours. Otherwise, select No.
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who               Ver         Date          Description
+ *-----------------  --------    ------------  ------------------------
+ * David Cohanoff     136.0218   2016-FEB-27    Created.
+ *
+ *
+***************************************************************************/
+
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS   is  EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY    is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure                       is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime                     is  EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime                      is  EMPTY_DATE_NUMBER
+DEFAULT FOR PayrollTimeType               is  EMPTY_TEXT_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  measure,
+  StartTime,
+  StopTime  ,
+  PayrollTimeType
+
+ffName = 'ORA_WFM_TCR_ALLOCATION_TIME_AP' || ' - v136.1012 '
+NullDate =  '01-JAN-1900'(DATE)
+NullText =  '**FF_NULL**'
+FF_UTIL = 'ORA_WFM_UTIL_ALLOCATION_LINE_DBI'
+FF_SUB_PCT =  'ORA_WFM_TCR_ALLOCATION_TIME_PCT_SUB'
+FF_SUB_HRS =  'ORA_WFM_TCR_ALLOCATION_TIME_HRS_SUB'
+FF_SUB_EQL =  'ORA_WFM_TCR_ALLOCATION_TIME_PCT_SUB'
+FF_SUB     =   NullText
+
+RecPositoinEoPeriod = 'END_PERIOD'
+RecPositoinEoDay = 'END_DAY'
+RecPositoinDetail = 'DETAIL'
+
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+rLog  = add_rlog (ffs_id, rule_id, 'ALC_AP_IN1 >>> Enter - ' || ffName   )
+
+
+ /* Get context, in order to make available for utility formula) */
+ctxAllocationDataLevel = GET_CONTEXT(HWM_ALLOCATION_DATA_LEVEL,  1)
+ctxResourceId = GET_CONTEXT(HWM_RESOURCE_ID, 0)
+ctxSubResourceId = GET_CONTEXT(HWM_SUBRESOURCE_ID, 0)
+ctxAllocationId = GET_CONTEXT(HWM_ALLOCATION_ID, 0)
+ctxAllocationRuleId = GET_CONTEXT(HWM_ALLOCATION_RULE_ID, 0)
+ctxAllocationStartDdate = GET_CONTEXT(HWM_ALLOCATION_START_DATE,  NullDate)
+ctxMeasurePeriod = GET_CONTEXT(HWM_MEASURE_PERIOD, 0)
+
+
+rLog = add_rlog (ffs_id , rule_id ,  'ALC_AP_IN2 Context: '  ||
+			 ' , ctxAllocationDataLevel='     ||  TO_CHAR( ctxAllocationDataLevel ) ||
+			 ' , ctxResourceId='     ||  TO_CHAR( ctxResourceId ) ||
+			 ' , ctxSubResourceId='  ||  TO_CHAR( ctxSubResourceId ) ||
+			 ' , ctxAllocationId='  ||  TO_CHAR( ctxAllocationId ) ||
+			 ' , ctxAllocationRuleId='  ||  TO_CHAR( ctxAllocationRuleId ) ||
+			 ' , ctxAllocationStartDdate='     ||  TO_CHAR( ctxAllocationStartDdate ) ||
+			 ' , ctxMeasurePeriod='  ||  TO_CHAR( ctxMeasurePeriod )   )
+
+
+/* Fixed Values from Rule header  */
+/*  hDfltAllocationId= Get_Hdr_num(rule_id, 'DFLT_ALLOCATION_ID', -1)  */
+
+/* Fixed Values from Rule Input parameters */
+pAdjustFraction  = get_rvalue_text  (rule_id ,'ASSIGN_FRACTION_TO_LAST_ROW', 'N')
+pAdjustHours  = 'N'
+
+if (upper(pAdjustFraction) = 'YES' or upper(pAdjustFraction) = 'Y' or upper(pAdjustFraction) = 'TRUE'  ) then (
+  pAdjustFraction  = 'Y'
+)
+
+rLog = add_rlog (ffs_id , rule_id , 'ALC_AP_IN3 Rule Parameters: '   ||
+ ' , pAdjustFraction ='  ||  pAdjustFraction    )
+
+
+CostDistRows            =   0
+dbiAllocationId             = EMPTY_NUMBER_NUMBER
+dbiAllocationRuleId         = EMPTY_NUMBER_NUMBER
+dbiAllocationType           = EMPTY_TEXT_NUMBER
+dbiRunSummationLevel        = EMPTY_TEXT_NUMBER
+dbiAllocationLineId         = EMPTY_NUMBER_NUMBER
+dbiAllocationLinePriority   = EMPTY_NUMBER_NUMBER
+dbiAllocationValue          = EMPTY_NUMBER_NUMBER
+
+rLog = add_rlog (ffs_id, rule_id, 'ALC_AP_IN4 CALL_FORMULA---' || FF_UTIL || ':  ctxResourceId='  ||  TO_CHAR( ctxResourceId )   )
+
+CALL_FORMULA (FF_UTIL
+			,ffs_id           > 'ffs_id'
+			,rule_id          > 'rule_id'
+			,NullDate         > 'startDateOverride'
+			,CostDistRows               <  'CostDistRows'               DEFAULT 0
+			,dbiAllocationId            <  'dbiAllocationId'            DEFAULT  EMPTY_NUMBER_NUMBER
+			,dbiAllocationRuleId        <  'dbiAllocationRuleId'        DEFAULT  EMPTY_NUMBER_NUMBER
+			,dbiAllocationType          <  'dbiAllocationType'          DEFAULT  EMPTY_TEXT_NUMBER
+			,dbiRunSummationLevel       <  'dbiRunSummationLevel'       DEFAULT  EMPTY_TEXT_NUMBER
+			,dbiAllocationLineId        <  'dbiAllocationLineId'        DEFAULT  EMPTY_NUMBER_NUMBER
+			,dbiAllocationLinePriority  <  'dbiAllocationLinePriority'  DEFAULT  EMPTY_NUMBER_NUMBER
+			,dbiAllocationValue         <  'dbiAllocationValue'         DEFAULT  EMPTY_NUMBER_NUMBER
+			)
+
+
+rLog = add_rlog (ffs_id , rule_id ,  'ALC_AP_IN5 Result of ' || FF_UTIL || ' - Total Allocation Rows: ' ||  TO_CHAR( CostDistRows )  )
+
+
+OUT_ALLOCATION_ID	 = 0
+OUT_ALLOCATION_RULE_ID = 0
+OUT_ALLOCATION_LINE_ID_ARY =	EMPTY_NUMBER_NUMBER
+OUT_MEASURE_ARY       =	EMPTY_NUMBER_NUMBER
+OUT_FF_KEY_IDX_ARY    =	EMPTY_NUMBER_NUMBER
+
+OAR_DBI_COST_ATTR_VALUE_ID 	=	EMPTY_NUMBER_NUMBER
+
+allocationType =   NullText
+summationLevel =   NullText
+isValidAllocation = 'N'
+
+ allocationLinecount = dbiAllocationLineId.count
+ rLog = add_rlog (ffs_id , rule_id ,'ALC_AP_S1 -Total AllocationLineId count='  ||  TO_CHAR( allocationLinecount ) )
+
+if (CostDistRows > 0  and allocationLinecount > 0  ) then
+(
+	isValidAllocation = 'Y'
+	OUT_ALLOCATION_ID	 = dbiAllocationId[1]
+	OUT_ALLOCATION_RULE_ID = dbiAllocationRuleId[1]
+	allocationType = dbiAllocationType[1]
+	summationLevel = dbiRunSummationLevel[1]
+
+    rLog = add_rlog (ffs_id , rule_id ,'ALC_AP_S2 CHECK_Uique_id: OUT_ALLOCATION_ID='  ||  TO_CHAR( OUT_ALLOCATION_ID ) ||
+										';OUT_ALLOCATION_RULE_ID='  ||  TO_CHAR( OUT_ALLOCATION_RULE_ID ) )
+
+	hIdx = 0
+	WHILE ( hIdx  < CostDistRows ) LOOP (
+	     hIdx = hIdx + 1
+		 allocationId       = dbiAllocationId[hIdx]
+		 allocationRuleId   = dbiAllocationRuleId[hIdx]
+		 if  (allocationId <> OUT_ALLOCATION_ID ) then (
+			isValidAllocation = 'N'
+		       rLog  = add_rlog (ffs_id, rule_id, 'ALC_AP_S3 ***ERROR- Duplicate Allocation ID: ' || TO_CHAR(OUT_ALLOCATION_ID) ||
+							' <- and -> ' ||  TO_CHAR(allocationId)  )
+		 )
+
+		if  (allocationRuleId <> OUT_ALLOCATION_RULE_ID ) then (
+			isValidAllocation = 'N'
+		       rLog  = add_rlog (ffs_id, rule_id, 'ALC_AP_S4 ***ERROR- Duplicate Allocation Rule ID: ' || TO_CHAR(OUT_ALLOCATION_RULE_ID) ||
+							' <- and -> ' ||  TO_CHAR(allocationRuleId)  )
+		)
+
+
+	    if  (allocationType = 'ORA_HWM_EQL'  ) then  (
+			eqlValue = 100/ CostDistRows
+			lnValue = 0
+			if   (dbiAllocationValue.EXISTS(hIdx)) then (
+				lnValue  = dbiAllocationValue[hIdx]
+			)
+			  dbiAllocationValue[hIdx] = eqlValue
+		       rLog  = add_rlog (ffs_id, rule_id, 'ALC_AP_S5 Adjusted Equal Line value from: ' || TO_CHAR(lnValue) ||  ' to: ' ||  TO_CHAR(eqlValue) )
+
+		)
+
+
+
+		if (hIdx  > 500 ) then (
+			rLog =  add_rlog (ffs_id , rule_id , 'ALC_AP_S6 **ERROR - Infinite loop - Allocation loope exceeds maximum loop of 500' )
+			ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible Infinite  loop.' )
+		 )
+
+	)  /*  WHILE hIdx  <= CostDistRows   */
+
+
+	if  (allocationType = 'ORA_HWM_PCT'  ) then (
+		FF_SUB =   FF_SUB_PCT
+	) else if  (allocationType = 'ORA_HWM_HRS'  ) then  (
+		FF_SUB =   FF_SUB_HRS
+	) else if  (allocationType = 'ORA_HWM_EQL'  ) then  (
+		FF_SUB =   FF_SUB_EQL
+	) else (
+		isValidAllocation = 'N'
+		rLog  = add_rlog (ffs_id, rule_id, 'ALC_AP_S7 ***ERROR- Exit program. Invalid allocation type. ' || allocationType  )
+	)
+) else  (  /*  if  CostDistRows <= 0   */
+	  log  = add_rlog (ffs_id, rule_id, 'ALC_AP_S8 ***NOT_FOUND- Exit program. No Time Allocation was found for current resource ID or default Allocation')
+)
+
+
+if (isValidAllocation = 'Y' ) then
+(
+	wMaAry = HWM_CTXARY_RECORD_POSITIONS.count
+	rLog  = add_rlog (ffs_id, rule_id, 'ALC_AP_S9 -Start bulk process - wMaAry=' || TO_CHAR( wMaAry )  )
+
+	totalDay = 0
+	totalTC  = 0
+	tcidx = 0
+	outIdx = 0
+	WHILE (tcidx < wMaAry ) LOOP
+	 (
+		tcidx = tcidx + 1
+		aMeasure = 0
+		aRecPosition   = HWM_CTXARY_RECORD_POSITIONS[tcidx]
+
+		if (MEASURE.exists(tcidx) ) then ( aMeasure  = MEASURE[tcidx]   )
+		if (aRecPosition = RecPositoinEoDay ) then ( totalDay = 0)
+		if (aRecPosition = RecPositoinEoPeriod ) then ( totalTC  = 0)
+		if (aRecPosition = RecPositoinDetail and aMeasure > 0) then (
+			totalDay = totalDay + aMeasure
+			totalTC  = totalTC + aMeasure
+		 )
+
+
+		if (aRecPosition = RecPositoinDetail and aMeasure > 0 ) then
+		(
+			rLog = add_rlog (ffs_id, rule_id, 'ALC_AP_LP1 TCRow: '  ||  TO_CHAR( tcidx ) ||  ' -CALL_FORMULA---' || FF_SUB    )
+
+
+			CALL_FORMULA (FF_SUB
+							,ffs_id           > 'ffs_id'
+							,rule_id          > 'rule_id'
+							,aMeasure         > 'measure'
+							,pAdjustFraction  > 'pAdjustFraction'
+							,pAdjustHours     > 'pAdjustHours'
+							,tcidx            > 'tcidx'
+							,totalDay         > 'totalDay'
+							,totalTC          > 'totalTC'
+							,CostDistRows                >  'CostDistRows'
+							,allocationType              > 'allocationType'
+							,summationLevel              > 'sumLvl'
+							,dbiAllocationLineId         >  'dbiAllocationLineId'
+							,dbiAllocationLinePriority   >  'dbiAllocationLinePriority'
+							,dbiAllocationValue          >  'dbiAllocationValue'
+							,outIdx                      >  'outIdx'
+							,OUT_ALLOCATION_LINE_ID_ARY  >  'OUT_ALLOCATION_LINE_ID_ARY'
+							,OUT_MEASURE_ARY             >  'OUT_MEASURE_ARY'
+							,OUT_FF_KEY_IDX_ARY          >  'OUT_FF_KEY_IDX_ARY'
+							,outIdx                          <  'outIdx'   DEFAULT 0
+							,OUT_ALLOCATION_LINE_ID_ARY      <  'OUT_ALLOCATION_LINE_ID_ARY'     DEFAULT  EMPTY_NUMBER_NUMBER
+							,OUT_MEASURE_ARY                 <  'OUT_MEASURE_ARY'    DEFAULT  EMPTY_NUMBER_NUMBER
+							,OUT_FF_KEY_IDX_ARY              <  'OUT_FF_KEY_IDX_ARY'    DEFAULT  EMPTY_NUMBER_NUMBER
+						)
+			rLog = add_rlog (ffs_id , rule_id ,  'ALC_AP_LP2 TCRow: '  ||  TO_CHAR( tcidx ) || 'Result from FF call:  outIdx ='  ||  TO_CHAR( outIdx )  )
+
+		)
+
+
+		if (tcidx >  1000 ) Then (  /*  If endless loop, stop the process  */
+				ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+		)
+
+	 ) /* end WHILE  tcidx < wMaAry */
+
+
+
+
+
+	rLog =  add_rlog (ffs_id , rule_id , '**** Show All_outputs before AP EXIT: ')
+	mx = OUT_FF_KEY_IDX_ARY.count
+	rIdx = 0
+	WHILE (rIdx < mx )  LOOP (
+		rIdx = rIdx + 1
+		rLog =  add_rlog (ffs_id , rule_id , 'out_row: ' ||  TO_CHAR(rIdx)  ||
+				' ,TimeCard Index= ' || TO_CHAR( OUT_FF_KEY_IDX_ARY[rIdx]) ||
+				' ,ALLOCATION_LINE_ID= ' || TO_CHAR(OUT_ALLOCATION_LINE_ID_ARY[rIdx] ) ||
+				' ,Measure= ' || TO_CHAR(OUT_MEASURE_ARY[rIdx] )    )
+	)
+
+)  /* end if  isValidAllocation = 'Y */
+
+
+rLog  = add_rlog (ffs_id, rule_id, '<< Exit - ' || ffName   )
+
+
+/* Important:  Do NOT change name or sequence of outputs parameters for Time allocation Formulas  */
+RETURN  OUT_ALLOCATION_ID, OUT_ALLOCATION_RULE_ID,
+  OUT_ALLOCATION_LINE_ID_ARY, OUT_MEASURE_ARY, OUT_FF_KEY_IDX_ARY
+```
+
+### ORA_WFM_TCR_COST_OVERRIDE_AP
+Type: WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES
+Description: Apply cost overrides to calculated time entries
+```
+ /* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name :    ORA_WFM_TCR_COST_OVERRIDE_AP
+ *
+ * Formula Type:     Time Calculation rule
+ *
+ * Description:      Apply cost overrides to calculated time entries.
+ *
+ *
+ * Detail:           Cost overrides are enabled for specific payroll time type
+ *                   attributes measured in hours. But, if the time calculation
+ *                   formula generates a time entry measured in units from an
+ *                   enabled payroll attribute measured in hours, the formula
+ *                   does apply the cost override. Also if the formula generates
+ *                   an entry with a payroll attribute that isn't enabled for
+ *                   cost override, then the formula doesn't apply the cost
+ *                   override to the generated time entry. For example, you enable
+ *                   cost override for the Regular payroll time type, but not for
+ *                   Overtime. The formula input includes reported Regular time
+ *                   and returns generated time entries for Regular and Overtime.
+ *                   The cost override applies only to the calculated Regular entry.
+ *
+ *
+ *
+ *  Rule Template Parameters
+ *    Parameter Name	        Parameter Type	  Description
+ *    ------------------------  ---------------   -----------------------------
+ *    ORA_HWM_FF_COST_OVERRIDE    invisible	  Internal Flag.
+ *
+ *
+ *
+ *  Rule Template Output Parameters
+ *   Output   	        Output   Time
+ *   Name	            Group    Attribute 	    Description
+ *   ----------------  --------  ------------   -----------------------------
+ *    N/A
+ *
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who             Ver       Date         Description
+ *----------------  --------  -----------  -------------------------------
+ * David Cohanoff   139.1103  2019-NOV-12  Created.
+ *
+ *
+***************************************************************************/
+
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS     is  EMPTY_TEXT_NUMBER
+DEFAULT FOR measure           is  EMPTY_NUMBER_NUMBER
+
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  measure
+
+
+ffName  = 'ORA_WFM_TCR_COST_OVERRIDE_AP - 139.1103'
+ffs_id  = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+rLog    = add_rlog (ffs_id, rule_id, 'Enter >>' || ffName   )
+
+NullDate =  '01-JAN-1900'(DATE)
+NullText =  '**FF_NULL**'
+
+ctxResource = GET_CONTEXT(HWM_RESOURCE_ID, 0)
+ctxPeriodStartTime = GET_CONTEXT(HWM_CTX_PERIOD_START_DATE, NullDate)
+ctxPeriodEndTime = GET_CONTEXT(HWM_CTX_PERIOD_END_DATE, NullDate)
+
+rlog = add_rlog (ffs_id , rule_id ,'Context:'  ||
+				 ' , ctxResource='  ||  TO_CHAR( ctxResource ) ||
+				 ' , ctxPeriodStartTime='  ||  TO_CHAR( ctxPeriodStartTime ) ||
+				 ' , ctxPeriodEndTime='  ||  TO_CHAR( ctxPeriodEndTime )  )
+
+pInternalFlag  = get_rvalue_text (rule_id ,'ORA_HWM_FF_COST_OVERRIDE', NullText)
+
+
+rLog = add_rlog (ffs_id, rule_id, 'Rule Parameters:  pInternalFlag='      ||  pInternalFlag   )
+
+
+rLog    = add_rlog (ffs_id, rule_id, 'Exit >>>' || ffName   )
+
+
+RETURN
+     
+```
+
+### WFM_TER_SIMPLE_BREAK_RULE_AP
+Type: WORKFORCE_MANAGEMENT_TIME_ENTRY_RULES
+Description: Evaluates the type of validation message to show when a day’s reported time entries total to more than the specified threshold, and there’s no break reported for the day.
+```
+ /* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_TER_SIMPLE_BREAK_RULE_AP
+ *
+ * Formula Type:  Time Entry Rule (TER)
+ *
+ * Description:   Compares the day’s total reported hours identified by time category to the defined threshold.
+ *
+ *
+ * Detail:        If the day’s reported hours are more than the defined threshold and there’s no corresponding break, or the break duration is less than the specified minimum, the selected alternate message appears
+ *                If there’s no alternate message selected, the default message appears. This formula and template rule don’t consider gaps between start and end time pairs to be breaks. Break entries must have the expected time attribute.
+ *
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who               Ver      Date          Description
+ *-----------------  ------   ------------  -------------------------------------
+ * saviswan          						  Created.
+ *
+***************************************************************************/
+
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS   is  EMPTY_TEXT_NUMBER
+DEFAULT FOR measure  is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime   is  EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime   is  EMPTY_DATE_NUMBER
+DEFAULT FOR PayrollTimeType   is  EMPTY_TEXT_NUMBER
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  measure ,
+  StartTime,
+  StopTime,
+  PayrollTimeType
+
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+
+ffName = 'WFM_TER_SIMPLE_BREAK_RULE_AP'
+rLog  = add_rlog (ffs_id, rule_id, 'Enter: ' || ffName  )
+
+/* ----------- constant values   -------- */
+/* ------------------------------------- */
+NullDate =  '01-JAN-1900'(DATE)
+NullDateTime = '1900/01/01 00:00:00' (date)
+NullText = '**FF_NULL**'
+nullNumber = -99999
+TimeRecordType_MEASURE = 'MEASURE'
+TimeRecordType_RANGE = 'RANGE'
+sumLvlTimeCard = 'TIMECARD'
+sumLvlDay = 'DAY'
+sumLvlDetail  = 'DETAIL'
+RecPositionEoPeriod = 'END_PERIOD'
+RecPositionEoDay = 'END_DAY'
+RecPositionDetail = 'DETAIL'
+
+sum_lvl= Get_Hdr_Text(rule_id ,'RUN_SUMMATION_LEVEL', 'DAY')
+rpt_lvl= Get_Hdr_Text(rule_id ,'RUN_TBB_LEVEL', 'DAY')
+process_empty_tc  = Get_Hdr_Text(rule_id,'INCLUDE_EMPTY_TC', 'Y')
+empty_tc = 'N'
+if (upper(process_empty_tc) = 'YES' or upper(process_empty_tc) = 'Y' ) then (
+   empty_tc = 'Y'
+)
+
+
+pThreshold  = get_rvalue_number (rule_id  ,'THRESHOLD_IN_HOURS', 0)
+pMsgcd  = get_rvalue_text (rule_id  ,'CODE_FOR_ALTERNATE_MESSAGE', 'HWM_FF_TER_SIMPLE_BREAK_WRNING')
+pTimeCatId  =  get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+pBreakType  = get_rvalue_text (rule_id ,'BREAK_TIME_ENTRY', NullText)
+pBreakTypeWithLdgId=pBreakType
+pMinBreakDurationInMins =   get_rvalue_number (rule_id  ,'MIN_BREAK_DUR_IN_MINUTES', 0)
+pMinBreakDuration = pMinBreakDurationInMins / 60
+pos = instr(pBreakType,'_')
+pBreakTypeLength = LENGTH(pBreakType)
+pBreakType = substr(pBreakType,pos+1,pBreakTypeLength)
+
+
+rLog = add_rlog (ffs_id, rule_id, '(Rule parameters: '  ||
+							'; ffs_id='  ||  TO_CHAR( ffs_id ) ||
+							'; pThreshold='  ||  TO_CHAR( pThreshold )  ||
+							'; pMsgcd='  ||  pMsgcd ||
+							'; pTimeCatId='  ||  TO_CHAR( pTimeCatId ) ||
+                                                        '; pBreakTypeWithLDG='  ||  pBreakTypeWithLdgId ||
+							'; pBreakType='  ||  pBreakType ||
+							'; pMinBreakDuration='  ||  TO_CHAR( pMinBreakDuration ) )
+
+
+hrs = 0
+minutes = 0
+total_day_hrs  = 0
+total_break_hrs_per_day = 0
+OUT_MSG = NullText
+is_create_msg = 'N'
+
+max_ary = HWM_CTXARY_RECORD_POSITIONS.count
+out_msg_ary 	=	EMPTY_TEXT_NUMBER
+
+nidx = 0
+WHILE (nidx < max_ary ) LOOP
+(
+    nidx = nidx + 1
+	entryMeasure = 0
+    entryStartTime = NullDate
+    entryStopTime = NullDate
+	entryPayrollTimeType = NullText
+	breakMeasure = 0
+
+	entryRecPos   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+	if (MEASURE.exists(nidx) ) then ( entryMeasure  = MEASURE[nidx] )
+   	if (STARTTIME.exists(nidx) ) then (entryStartTime  = STARTTIME[nidx]  )
+   	if (STOPTIME.exists(nidx) )  then (entryStopTime  = STOPTIME[nidx]  )
+	if (PayrollTimeType.exists(nidx) ) then ( entryPayrollTimeType  = PayrollTimeType[nidx]  )
+
+    rLog  = add_rlog (ffs_id, rule_id,  'TIMECARD_INPUT Row:='  ||  TO_CHAR( nidx )  ||
+							'; entryRecPos='  ||entryRecPos  ||
+							'; entryMeasure='  ||  TO_CHAR( entryMeasure )  ||
+							'; entryStartTime='  ||  TO_CHAR( entryStartTime )  ||
+							'; entryStopTime='  ||  TO_CHAR( entryStopTime )  ||
+							'; entryPayrollTimeType='  ||  entryPayrollTimeType  )
+
+
+
+	if (entryMeasure <> 0 and entryPayrollTimeType <> pBreakType) then (
+		total_day_hrs  = total_day_hrs + entryMeasure
+	)
+	else if(entryMeasure <> 0 and entryPayrollTimeType = pBreakType) then (
+	    total_break_hrs_per_day = total_break_hrs_per_day + entryMeasure
+	)
+
+	if (entryRecPos = RecPositionEoDay ) then (
+	    if ( total_day_hrs >= pThreshold and total_break_hrs_per_day < pMinBreakDuration ) then
+		(
+		  is_create_msg = 'Y'
+		  rLog  = add_rlog (ffs_id , rule_id ,'total_day_hrs=' || TO_CHAR (total_day_hrs) ||
+		                                      '; total_break_hrs_per_day=' || TO_CHAR (total_break_hrs_per_day) ||
+					              '; is_create_msg=' || is_create_msg )
+                 hrs = trunc(total_day_hrs,0)
+                 minutes = (total_day_hrs - hrs) * 60
+                 rLog  = add_rlog (ffs_id , rule_id ,'hrs=' || to_char(hrs) || '; minutes=' || to_char(minutes) )
+                 l_tkn1 = 'TOTAL_TIME_WORKED'
+                 l_tkn2 = 'ENTRY_DATE'
+                 l_tkn3 = 'MIN_BREAK_DUR_MINS_NUM'
+                 l_val1 = TO_CHAR( hrs )  || 'h'
+                 if( minutes > 0) THEN (
+                  l_val1 = l_val1 || ' ' || to_char(trunc(minutes,0)) || 'm'
+                 )
+                 l_val2 = to_char(entryStartTime,'dd-mm-yyyy')
+                 l_val3 = TO_CHAR( pMinBreakDurationInMins )
+                 l_msg_cd = pMsgcd
+                 OUT_MSG = get_output_msg3 ( 'HWM' ,l_msg_cd ,l_tkn1 , l_val1 ,l_tkn2 , l_val2, l_tkn3 , l_val3 )
+		)
+		total_day_hrs  = 0
+		total_break_hrs_per_day = 0
+                hrs = 0
+                minutes = 0
+	) else if (entryRecPos = RecPositionEoPeriod ) then (
+		total_day_hrs  = 0
+		total_break_hrs_per_day = 0
+	)
+
+	if (OUT_MSG <> NullText) Then (
+		out_msg_ary[nidx]   = OUT_MSG
+		rLog  = add_rlog (ffs_id, rule_id, 'OUT_MSG text:'  || OUT_MSG)
+	)
+
+	if (nidx >  100 ) Then (
+		/* endless loop?  Stop process if more than max_loop records found */
+		ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+	)
+
+	/* reset */
+	is_create_msg = 'N'
+	OUT_MSG = NullText
+
+)
+
+rLog  = add_rlog (ffs_id, rule_id, 'Exit: ' || ffName  )
+
+RETURN  out_msg_ary
+```
+
+### ORA_WFM_TCR_UNPAID_BREAK_DURATION_AP
+Type: WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES
+Description: Formula that subtracts the time not worked entry for the scheduled shift from a reported time entry's calculated duration if the entries match shift.
+```
+/* +======================================================================+
+ |                      Copyright (c) 2009 Oracle Corporation           |
+ |                         Redwood Shores, California, USA              |
+ |                              All rights reserved.                    |
+ +======================================================================+
+ *
+ * Formula Name : ORA_WFM_TCR_UNPAID_BREAK_DURATION_AP
+ *
+ * Formula Type:  Time Calculation Rules
+ *
+ * Description:   When a schedule time entry matches a reported time entry,
+ *                subtracts the time not worked from the calculated duration.
+ *
+ * Detail:        The formula iterates through each time entry and checks
+ *                to see if there's a scheduled shift. When if finds
+ *                the corresponding shift, it subtracts scheduled time
+ *                not worked from the calculated time entry duration.
+ *                The formula assumes the time not worked value is measured
+ *                in minutes and converts the duration to hours.
+ *
+ * Change History
+ * --------------
+ * Who                   Ver      Date           Description
+ *-----------------      ------   ------------   -----------------------------------------
+ * Dario Vincent         1.0      2025-AUG-19    Initial development
+ *
+ *
+ ***************************************************************************/
+
+/*
+ * Block 1: Default Declarations
+ */
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS IS EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY IS EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime IS EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime IS EMPTY_DATE_NUMBER
+DEFAULT FOR measure IS EMPTY_NUMBER_NUMBER
+DEFAULT FOR UnitOfMeasure IS EMPTY_TEXT_NUMBER
+DEFAULT_DATA_VALUE FOR HWM_DTL_SCHD_START_TIME IS '01-JAN-1900'(DATE)
+DEFAULT_DATA_VALUE FOR HWM_DTL_SCHD_END_TIME IS '01-JAN-1900'(DATE)
+DEFAULT_DATA_VALUE FOR HWM_DTL_SCHD_SCHEDULED_REF_DATE IS '01-JAN-1900'(DATE)
+DEFAULT_DATA_VALUE FOR HWM_DTL_SCHD_SCHEDULED_TIME_NOT_WORKED IS 0
+
+/*
+ * Block 2: Inputs
+ */
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  StartTime,
+  StopTime,
+  measure,
+  UnitOfMeasure
+
+/*
+ * Block 3: Context and Parameter Setup
+ */
+NullDate = '01-JAN-1900'(DATE)
+NullDateTime = '1900/01/01 00:00:00'(DATE)
+NullText = '**FF_NULL**'
+sTrue = 'Y'
+sFalse = 'N'
+RecPositionEndPeriod = 'END_PERIOD'
+RecPositionEndDay = 'END_DAY'
+RecPositionDetail = 'DETAIL'
+
+
+
+
+
+ctx_personId = GET_CONTEXT(HWM_RESOURCE_ID, 0)
+ctx_subResource = GET_CONTEXT(HWM_SUBRESOURCE_ID, 0)
+ctx_SearchStartDate = GET_CONTEXT(HWM_CTX_SEARCH_START_DATE, NullDate)
+ctx_SearchEndDate = GET_CONTEXT(HWM_CTX_SEARCH_END_DATE, NullDate)
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+ffName = 'ORA_WFM_TCR_UNPAID_BREAK_DURATION_AP'
+rLog = add_rlog (ffs_id, rule_id, '>>> Enter - ' || ffName )
+
+
+pDisplayUnpaidBreak   = get_rvalue_text (rule_id ,'DISPLAY_UNPAID_BREAK', 'N')
+
+
+
+/* ----------- Rule Header parameters  -------- */
+/* -------------------------------------------- */
+hSumLvl= Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
+hExecType  = Get_Hdr_Text(rule_id,'RULE_EXEC_TYPE', 'CREATE')
+
+hCreateYn  = 'N'
+if (upper(hExecType) = 'CREATE'  ) then (
+  hCreateYn  = 'Y'
+)
+
+ l_status = add_rlog (ffs_id , rule_id ,'Rule Header and Context:'  ||
+					 ' , ffs_id ='  ||  TO_CHAR( ffs_id ) ||
+					 ' , rule_id ='  ||  TO_CHAR( rule_id ) ||
+					 ' , hSumLvl='  ||   hSumLvl ||
+					 ' , hExecType='  ||   hExecType ||
+					 ' , hCreateYn='  ||   hCreateYn   )
+
+/*
+ * Block 4: Processing Logic
+ */
+tcRecordCount = HWM_CTXARY_RECORD_POSITIONS.count
+hours_not_worked_measure = EMPTY_NUMBER_NUMBER
+OUT_MEASURE = EMPTY_NUMBER_NUMBER
+
+rec_idx = 0
+WHILE (rec_idx < tcRecordCount) LOOP
+(
+  rec_idx = rec_idx + 1
+
+  rec_start_time = NullDate
+  rec_stop_time = NullDate
+  rec_measure = 0
+  recPos = NullText
+
+  if (StartTime.exists(rec_idx) ) then ( rec_start_time = StartTime[rec_idx] )
+  if (StopTime.exists(rec_idx) ) then ( rec_stop_time = StopTime[rec_idx] )
+  if (measure.exists(rec_idx) ) then ( rec_measure = measure[rec_idx] )
+  if (HWM_CTXARY_RECORD_POSITIONS.exists(rec_idx) ) then ( recPos = HWM_CTXARY_RECORD_POSITIONS[rec_idx] )
+
+  rLog = add_rlog(ffs_id, rule_id, 'Processing Entry ' || TO_CHAR(rec_idx) ||
+                  'recPos ' || recPos ||
+                  'measure ' || TO_CHAR(rec_measure) ||
+                  ' from ' || TO_CHAR(rec_start_time) ||
+                  ' to ' || TO_CHAR(rec_stop_time))
+
+  /* Change context using the time entry's start and stop times for detail position only*/
+  if (recPos = RecPositionDetail) then
+  (
+    CHANGE_CONTEXTS(HWM_CTX_SEARCH_START_DATE = trunc(rec_start_time), HWM_CTX_SEARCH_END_DATE = ADD_DAYS(trunc(rec_stop_time),1))
+    (
+        /* Initialize output to the original measure, will be updated if a match is found */
+        match_found_flag = sFalse
+
+        sched_rec_count = HWM_DTL_SCHD_SCHEDULED_REF_DATE.count
+        sched_idx = 0
+        WHILE (sched_idx < sched_rec_count) LOOP
+        (
+            sched_idx = sched_idx + 1
+            sch_start_time = HWM_DTL_SCHD_START_TIME[sched_idx]
+            sch_stop_time = HWM_DTL_SCHD_END_TIME[sched_idx]
+
+            rLog = add_rlog(ffs_id, rule_id, 'Checking Schedule Shift ' || TO_CHAR(sched_idx) ||
+                            ' from ' || TO_CHAR(sch_start_time) ||
+                            ' to ' || TO_CHAR(sch_stop_time) ||
+                            'pDisplayUnpaidBreak: ' || pDisplayUnpaidBreak )
+
+            /* Find a scheduled shift that matches the time card entry */
+            IF (match_found_flag = sFalse AND sch_start_time = rec_start_time AND sch_stop_time = rec_stop_time) THEN
+            (
+                sch_time_not_worked_minutes = HWM_DTL_SCHD_SCHEDULED_TIME_NOT_WORKED[sched_idx]
+                rLog = add_rlog(ffs_id, rule_id, 'Matching schedule found. Scheduled time not worked is ' || TO_CHAR(sch_time_not_worked_minutes))
+
+                /* Convert scheduled time not worked from minutes to hours */
+                time_not_worked_hrs = sch_time_not_worked_minutes / 60
+
+		OUT_MEASURE[rec_idx] = rec_measure - time_not_worked_hrs
+		if(pDisplayUnpaidBreak = 'Y' AND time_not_worked_hrs > 0) THEN
+		(
+		   hours_not_worked_measure[rec_idx] = time_not_worked_hrs
+                   rLog = add_rlog(ffs_id, rule_id, 'Unpaid break measure is ' || TO_CHAR(hours_not_worked_measure[rec_idx]))
+		)
+                match_found_flag = sTrue
+                rLog = add_rlog(ffs_id, rule_id, 'New measure is ' || TO_CHAR(OUT_MEASURE[rec_idx]))
+            )
+        )
+          rLog = add_rlog(ffs_id, rule_id, 'match_found_flag ' || match_found_flag )
+    )
+  )
+)
+rLog = add_rlog(ffs_id, rule_id, '<<< Exit - ' || ffName)
+
+/*
+ * Block 5: Outputs
+ */
+RETURN OUT_MEASURE,hours_not_worked_measure
+```
+
+
+### ORA_WFM_SHIFT_PREMIUM_CALCULATION_AP
+Type: WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES
+Description: Defines shift hours between a start and end time that receive an additional time attribute
+```
+/* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : ORA_WFM_SHIFT_PREMIUM_CALCULATION_AP
+ *
+ * Formula Type:  Time Calculation Rules
+ *
+ * Description:   Defines shift hours between a start and end time that
+ *                receive an additional time attribute.  Reported time
+ *                and specific time attribute results are inputs to the
+ *                delivered formula. This formula
+ *                uses an array to process time card data.
+ *
+ * Detail:        Compares the start and end time for the detailed entries
+ *                to the defined time range. Time entries that fall within
+ *                the defined time range receive an additional time
+ *                attribute. This formula requires start and end time entries.
+ *                Entries that span midnight are entered separately on each
+ *                day and the summation level is set to Detailed.
+ *                Enter rule template parameters in the format text 24hr,
+ *                such as PREM_START_TIME  = 18:00 and PREM_STOP_TIME = 23:20.
+ *
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who               Ver         Date          Description
+ *-----------------  ------      ------------  -----------------------------------------
+ * David Cohanoff     117.0918   2017-DEC-07    Created.
+ * David Cohanoff     108.0906   2018-SEP-27   Updated .
+ * David Cohanoff     108.0906   2020-Feb-12   Updated .
+ * David Cohanoff     108.0906   2021-AUG-17   Updated .
+ *
+ *
+***************************************************************************/
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS   is  EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY    is  EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure  is  EMPTY_NUMBER_NUMBER
+
+
+DEFAULT FOR PayrollTimeType   is  EMPTY_TEXT_NUMBER
+DEFAULT FOR StartTime   is  EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime   is  EMPTY_DATE_NUMBER
+DEFAULT FOR TimeRecordType   is  EMPTY_TEXT_NUMBER
+
+
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  measure,
+  PayrollTimeType,
+  StartTime,
+  StopTime,
+  TimeRecordType
+
+/*  Following 2 lines are required right after inputs for all OTL and HWM formulas */
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+ffName = 'ORA_WFM_SHIFT_PREMIUM_CALCULATION_AP -13-2108.14 '
+rLog  = add_rlog (ffs_id, rule_id, '>>> Enter - ' || ffName  )
+
+
+/* ----------- constant value   -------- */
+/* ------------------------------------- */
+NullDate =  '01-JAN-1900'(DATE)
+NullDateTime = '1900/01/01 00:00:00' (date)
+NullText = '**FF_NULL**'
+CTIME_MULTI_HOURS   =  (24*60*60)/3600
+CTIME_NEG_ONE_MINUTE =  ((1/60)/ -24 )
+sTrue  = 'Y'
+sFalse = 'N'
+CreateExecType = 'CREATE'
+
+RecPositoinEoPeriod = 'END_PERIOD'
+RecPositoinEoDay = 'END_DAY'
+RecPositoinDetail = 'DETAIL'
+
+sumLvlTimeCard = 'TIMECARD'
+sumLvlDay = 'DAY'
+sumLvlDetail  = 'DETAIL'
+
+TimeRecordType_MEASURE = 'MEASURE'
+TimeRecordType_RANGE = 'RANGE'
+
+fmtDateToTxtMM = 'YYYY-MM-DD'
+
+/* ----------- Rule Header parameters  -------- */
+/* --------------------------------------------- */
+/* Fixed Values from Rule header  */
+hExecType  = Get_Hdr_Text(rule_id,'RULE_EXEC_TYPE', 'UPDATE ')
+rLog = add_rlog (ffs_id , rule_id ,'Rule Header:'  ||
+ ' , ffs_id ='  ||  TO_CHAR( ffs_id ) ||
+ ' , rule_id ='  ||  TO_CHAR( rule_id ) ||
+ ' , hExecType='  ||   hExecType    )
+
+
+/* ----------- Rule input parameters  -------- */
+/* --------------------------------------------- */
+/* Fixed Values from Rule Input parameters */
+pMaxHrs = 24
+pPremStartIn  = get_rvalue_text (rule_id ,'PREM_START_TIME', 'NULL')
+pPremStopIn =  get_rvalue_text (rule_id ,'PREM_STOP_TIME', 'NULL')
+categoryId  = get_rvalue_number (rule_id ,'WORKED_TIME_CONDITION', 0)
+
+pPremStart = pPremStartIn
+pPremStop = pPremStopIn
+if ( pPremStartIn = '24:00') then ( pPremStart = '00:00' )
+if ( pPremStopIn = '24:00') then ( pPremStop = '00:00' )
+
+rLog =  add_rlog (ffs_id, rule_id,'Rule Parameters: '  ||
+				 ' , pMaxHrs='  ||  TO_CHAR( pMaxHrs ) ||
+				 ' , pPremStartIn='  ||   pPremStartIn  ||
+				 ' , pPremStopIn='  ||   pPremStopIn ||
+				 ' , pPremStart='  ||   pPremStart  ||
+				 ' , pPremStop='  ||   pPremStop ||
+				  ' , category='  || TO_CHAR( categoryId ) )
+
+
+/* ----------- initialize output variables  -------- */
+/* ------------------------------------------------- */
+out_measure_under 	=	EMPTY_NUMBER_NUMBER
+out_measure_over 	=	EMPTY_NUMBER_NUMBER
+
+
+
+/* ----------- Temp Workarea variables  -------- */
+/* --------------------------------------------- */
+
+grp1Set = sFalse
+grp1Start = nullDate
+grp1Stop = nullDate
+grp2Set = sFalse
+grp2Start = nullDate
+grp2Stop = nullDate
+grp3Set = sFalse
+grp3Start = nullDate
+grp3Stop = nullDate
+
+
+/* ----------- Loop through current Time Card(POJO) Main Logic -------- */
+/* -------------------------------------------------------------------- */
+tcReCount = HWM_CTXARY_RECORD_POSITIONS.count
+rLog  = add_rlog (ffs_id, rule_id, 'Total time cards records to process = ' || TO_CHAR( tcReCount )  )
+
+nidx = 0
+WHILE (nidx &lt; tcReCount ) LOOP
+ (
+	if (nidx >  1000 ) Then (   /* endless loop?  Stop process if more than max_loop records found */
+			ex = raise_error (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
+	)
+	nidx = nidx + 1
+	tcMeasure = 0
+	tcPayrollTimeType = nullText
+	tcStartTime = nullDate
+	tcStopTime = nullDate
+	tcTimeRecordType = nullText
+	tcRecPosition   = HWM_CTXARY_RECORD_POSITIONS[nidx]
+	if (MEASURE.exists(nidx) ) then ( tcMeasure  = MEASURE[nidx]   )
+	if (PayrollTimeType.exists(nidx) ) then ( tcPayrollTimeType  = PayrollTimeType[nidx]  )
+	if (StartTime.exists(nidx) ) then ( tcStartTime  = StartTime[nidx]  )
+	if (StopTime.exists(nidx) ) then ( tcStopTime  = StopTime[nidx]  )
+	if (TimeRecordType.exists(nidx) ) then ( tcTimeRecordType  = TimeRecordType[nidx]  )
+
+
+	rLog  = add_rlog (ffs_id, rule_id, 'INPUTS_ARE : '  ||
+					 '; tcRecPosition='  ||  tcRecPosition   ||
+					 '; tcTimeRecordType='  ||  tcTimeRecordType   ||
+					 '; tcMeasure='  ||  TO_CHAR( tcMeasure ) ||
+					 '; tcStartTime='  ||  TO_CHAR( tcStartTime ) ||
+					 '; tcStopTime='  ||  TO_CHAR( tcStopTime ))
+
+	if ( tcMeasure &lt;> 0  and  tcTimeRecordType = TimeRecordType_RANGE ) Then
+	(
+		grp1Set = sFalse
+		grp2Set = sFalse
+		grp3Set = sFalse
+		StartDtCharYMD  =  DATE_TO_TEXT(tcStartTime, fmtDateToTxtMM)
+		DtA = StartDtCharYMD || ' ' || pPremStart
+		DtB = StartDtCharYMD || ' ' || pPremStop
+		rLog  = add_rlog (ffs_id, rule_id, 'StartDtCharYMD ='  ||  StartDtCharYMD  )
+		rLog  = add_rlog (ffs_id, rule_id, 'DtA-->'  || DtA  || '&lt;-')
+		rLog  = add_rlog (ffs_id, rule_id, 'DtB-->'  || DtB || '&lt;--')
+
+
+		premDtStart = TO_DATE (DtA, 'YYYY-MM-DD HH24:MI')
+		premDtStop  = TO_DATE (DtB, 'YYYY-MM-DD HH24:MI')
+		if (premDtStop &lt; premDtStart) then (
+			premDtStop   = add_days(premDtStop,1)
+		)
+
+		if (tcStartTime > premDtStop) then (
+			premDtStart   = add_days(premDtStart,1)
+			premDtStop   = add_days(premDtStop,1)
+		)
+
+		rLog  = add_rlog (ffs_id, rule_id, 'Premium_Shift Start='  ||  TO_CHAR( premDtStart )  )
+		rLog  = add_rlog (ffs_id, rule_id, 'Premium_Shift Stop='  ||  TO_CHAR( premDtStop ) )
+
+
+		if (tcStartTime &lt; premDtStart ) then
+		(
+			if (tcStopTime =&lt; premDtStart ) then
+			(
+				rLog = add_rlog (ffs_id, rule_id,'Block A100 - tcStartTime &lt; premDtStart  and tcStopTime &lt;= premDtStart -- No Premium ' )
+
+			) else if (tcStopTime =&lt; premDtStop ) then
+			(
+				rLog = add_rlog (ffs_id, rule_id,'Block A110 - tcStartTime &lt; premDtStart  and tcStopTime &lt;= premDtStop ' )
+
+				grp1Set = sTrue
+				grp1Start  = tcStartTime
+				grp1StOP  =  premDtStart
+
+				grp3Set = sTrue
+				grp3Start = premDtStart
+				grp3StOP  =  tcStopTime
+
+			) else
+			(
+
+				if (tcStartTime &lt;> premDtStart ) then
+				(
+					rLog = add_rlog (ffs_id, rule_id,'Block A120- tcStartTime = premDtStart  and tcStopTime > premDtStop ' )
+					grp1Set = sTrue
+					grp1Start  = tcStartTime
+					grp1StOP  =  premDtStart
+
+				)
+					rLog = add_rlog (ffs_id, rule_id,'Block A121- tcStartTime =&lt; premDtStart  and tcStopTime > premDtStop ' )
+
+					grp3Set = sTrue
+					grp3Start  = premDtStart
+					grp3StOP  =  premDtStop
+
+					grp2Set = sTrue
+					grp2Start  = premDtStop
+					grp2StOP  =  tcStopTime
+
+
+			)
+
+		) else	if (tcStartTime &lt; premDtStop ) then
+		(
+			 if (tcStopTime =&lt; premDtStop ) then
+			(
+				rLog = add_rlog (ffs_id, rule_id,'Block B100 - tcStopTime &lt; premDtStop  and tcStopTime &lt; premDtStop ' )
+				grp3Set = sTrue
+				grp3Start  = tcStartTime
+				grp3StOP  =  tcStopTime
+
+			) else
+			(
+				rLog = add_rlog (ffs_id, rule_id,'Block B110 - tcStopTime &lt; premDtStop  and tcStopTime > premDtStop ' )
+				grp3Set = sTrue
+				grp3Start  = tcStartTime
+				grp3StOP  =  premDtStop
+
+				grp1Set = sTrue
+				grp1Start  = premDtStop
+				grp1StOP  =  tcStopTime
+
+			)
+
+		 )
+
+
+		grp1Hrs = 0
+		grp2Hrs = 0
+		grp3Hrs = 0
+		if (  grp1Set = sTrue ) then
+		(
+			grp1Hrs =  round((days_between(grp1StOP, grp1Start ) * CTIME_MULTI_HOURS), 2)
+			rLog = add_rlog (ffs_id, rule_id,'-->>>>grp1_hrs: [' || to_char(grp1Hrs) ||'] ' )
+		)
+
+		if (  grp2Set = sTrue ) then
+		(
+			grp2Hrs =  round((days_between( grp2StOP, grp2Start) * CTIME_MULTI_HOURS), 2)
+			rLog = add_rlog (ffs_id, rule_id,'-->>>>grp2_hrs: [' || to_char(grp2Hrs) ||'] ' )
+		)
+
+		if (  grp3Set = sTrue ) then
+		(
+			grp3Hrs =  round((days_between(grp3StOP, grp3Start) * CTIME_MULTI_HOURS), 2)
+			rLog = add_rlog (ffs_id, rule_id,'-->>>>grp3_hrs: [' || to_char(grp3Hrs) ||'] ' )
+		)
+
+
+		/* if (hExecType = CreateExecType and grp3Set = sTrue ) then */
+		hrReg = grp1Hrs + grp2Hrs
+		if (hExecType = CreateExecType  ) then
+		(
+			hrReg= tcMeasure
+			rLog = add_rlog (ffs_id, rule_id,'-->>>Add Create group1 tcMeasure/hrReg: ' ||  to_char(  hrReg) )
+		)
+
+
+		if ( grp1Set = sTrue  or  grp2Set = sTrue  or  grp3Set = sTrue ) then (
+			out_measure_under[nidx] = hrReg
+			rLog = add_rlog (ffs_id, rule_id,'-->>>out_measure_under: ' ||  to_char(  out_measure_under[nidx]) )
+
+			if ( grp3Set = sTrue  ) then (
+				out_measure_over[nidx] = grp3Hrs
+				rLog = add_rlog (ffs_id, rule_id,'-->>>out_measure_over: ' ||  to_char(  out_measure_over[nidx]) )
+			)
+		)
+
+	) /* end if  tcMeasure > 0  and.... */
+
+
+
+
+
+
+ ) /* End while */
+
+rLog  = add_rlog (ffs_id, rule_id, '&lt;&lt; Exit - ' || ffName   )
+
+
+   rLog  = add_rlog (ffs_id, rule_id,   '>>Exit '   || ffName   )
+
+
+RETURN  out_measure_under, out_measure_over
+```
+### WFM_UTIL_GET_EMPLOYMENT_SCHEDULE
+Type: WORKFORCE_MANAGEMENT_UTILITY - Workforce Management Utility
+Description: Helper utility for Time and Labor Employment Schedule DBI's
+```
+/* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_UTIL_GET_EMPLOYMENT_SCHEDULE
+ *
+ * Description:   Helper utility for Time and Labor Employment Schedule DBI's
+ *
+ * Formula Type:  WORKFORCE_MANAGEMENT_UTILITY - Workforce Management Utility
+ *
+ * Detail:
+ *
+ *  DBI's
+ *  --------------
+ *	 	HWM_EMP_SCHD_AVAILABILITY_CODE
+ *	 	HWM_EMP_SCHD_END_DATE_TIME
+ *	 	HWM_EMP_SCHD_MEASURE
+ *	 	HWM_EMP_SCHD_OBJECT_CATEGORY
+ *	 	HWM_EMP_SCHD_OBJECT_ID
+ * 		HWM_EMP_SCHD_OBJECT_NAME
+ * 		HWM_EMP_SCHD_OBJECT_TYPE
+ * 		HWM_EMP_SCHD_PERSON_ID
+ * 		HWM_EMP_SCHD_START_DATE_TIME
+ * 		HWM_EMP_SCHD_SUBRESOURCE_ID
+ *
+ *	 	HWM_PUB_SCHD_ACTIVITY_TYPE
+ *		HWM_PUB_SCHD_DATE_FROM
+ *		HWM_PUB_SCHD_DATE_TO
+ *		HWM_PUB_SCHD_MEASURE
+ *		HWM_PUB_SCHD_ORDER_ENTERED
+ *		HWM_PUB_SCHD_START_TIME
+ *		HWM_PUB_SCHD_STOP_TIME
+ *		HWM_PUB_SCHD_SUBRESOURCE_ID
+ *		HWM_PUB_SCHD_TCSMR_CONFIG_SET_ID
+ *		HWM_PUB_SCHD_TCSMR_SET_ID
+ *		HWM_PUB_SCHD_TM_REC_ID
+ *		HWM_PUB_SCHD_TM_REC_TYPE
+ *		HWM_PUB_SCHD_TM_REC_VERSION
+ *
+ *  Context
+ *  --------------
+ * 		HWM_CTX_SEARCH_START_DATE
+ * 		HWM_CTX_SEARCH_END_DATE
+ * 		HWM_SUBRESOURCE_ID
+ * 		HWM_RESOURCE_ID
+ *
+ *
+ *
+ *  Change History
+ *  --------------
+ *
+ *  Who               Ver        Date           Description
+ *-----------------  ------      ------------   -----------------------------------------
+ * David Cohanoff     104.0525  2014-MAR-19     Created.
+ * David Cohanoff     105.0831  2015-SEP-01     Modify end date timestamps.
+ *
+ *
+ *
+ **************************************************************************/
+
+ default for start_date_override(Date)  is   '01-JAN-1900'(DATE)
+ default for end_date_override(Date)   is   '01-JAN-1900'(DATE)
+
+  DEFAULT_DATA_VALUE FOR HWM_PUB_SCHD_MEASURE             IS 0
+  DEFAULT_DATA_VALUE FOR HWM_PUB_SCHD_START_TIME          IS   '01-JAN-1900'(DATE)
+  DEFAULT_DATA_VALUE FOR HWM_PUB_SCHD_STOP_TIME           IS   '01-JAN-1900'(DATE)
+
+  DEFAULT_DATA_VALUE FOR HWM_EMP_SCHD_MEASURE             IS 0
+  DEFAULT_DATA_VALUE FOR HWM_EMP_SCHD_START_DATE_TIME     IS  '01-JAN-1900'(DATE)
+  DEFAULT_DATA_VALUE FOR HWM_EMP_SCHD_END_DATE_TIME       IS  '01-JAN-1900'(DATE)
+
+
+INPUTS ARE
+  start_date_override(DATE) ,
+  end_date_override(DATE)
+
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+
+ffName = 'WFM_UTIL_GET_EMPLOYMENT_SCHEDULE'
+rLog  = add_rlog (ffs_id, rule_id, '>>> Enter: ' || ffName || ' - v105.1202 '  )
+
+ rLog = add_rlog (ffs_id, rule_id, '(INPUTS : '  ||  ' , start_date_override='  ||  TO_CHAR( start_date_override ) ||
+ ' , end_date_override='  ||  TO_CHAR( end_date_override ) ||   ' ) ' )
+
+
+NullDate =  '01-JAN-1900'(DATE)
+NullText =  '**FF_NULL**'
+
+
+ctx_personId = GET_CONTEXT(HWM_RESOURCE_ID, 0)
+ctx_subResource = GET_CONTEXT(HWM_SUBRESOURCE_ID, 0)
+ctx_start_date = GET_CONTEXT(HWM_CTX_SEARCH_START_DATE,  NullDate)
+ctx_end_date = GET_CONTEXT(HWM_CTX_SEARCH_END_DATE, NullDate)
+
+ l_status = add_rlog (ffs_id , rule_id ,  '(UTIL_ ...context : '  ||
+ ' , ctx_personId ='  ||  TO_CHAR( ctx_personId ) ||
+ ' , ctx_subResource ='  ||  TO_CHAR( ctx_subResource ) ||
+ ' , ctx_start_date ='  ||  TO_CHAR( ctx_start_date ) ||
+ ' , ctx_end_date ='  ||  TO_CHAR( ctx_end_date ) ||
+ ' ) ' )
+
+
+stDate  = trunc(start_date_override)
+endDate = trunc(end_date_override )
+IF (start_date_override WAS DEFAULTED )   THEN (
+	stDate = trunc(ctx_start_date)
+)
+
+
+IF (end_date_override WAS DEFAULTED )  THEN (
+	endDate = trunc(ctx_end_date)
+)
+endDate = ADD_DAYS(trunc(endDate  ),1)
+
+
+max_loop = 5000
+pubCount = -1
+empCount = -1
+
+pubHrs = 0
+EmpHrs = 0
+TotalHrs = 0
+HrsSource = NullText
+nidx = 1
+
+CHANGE_CONTEXTS(HWM_CTX_SEARCH_START_DATE = stDate,  HWM_CTX_SEARCH_END_DATE =  endDate)
+(
+	rLog  = add_rlog (ffs_id, rule_id, 'Final_Context:  subResource= '   || TO_CHAR( ctx_subResource ) ||
+									'; personId ='  ||  TO_CHAR( ctx_personId ) ||
+									'; stDate= '   || TO_CHAR( stDate ) ||
+									'; endDate= '   || TO_CHAR( endDate ) )
+
+		pubCount = HWM_PUB_SCHD_MEASURE.count
+		rLog  = add_rlog (ffs_id, rule_id, '->Start_loop HWM_PUB_SCHD_MEASURE pubCount=' || TO_CHAR( pubCount )  )
+		if (pubCount > 0 ) Then
+		(
+			nidx = 1
+			HrsSource = 'PUB'
+			 WHILE (HWM_PUB_SCHD_MEASURE.EXISTS(nidx))LOOP
+			 (
+				pubHrs = HWM_PUB_SCHD_MEASURE[nidx]
+				TotalHrs = TotalHrs + pubHrs
+
+
+				empPubDateStart = NullDate
+				empPubDateEnd = NullDate
+				if (HWM_PUB_SCHD_START_TIME.exists(nidx) ) then (
+					empPubDateStart = HWM_PUB_SCHD_START_TIME[nidx]
+				)
+
+				if (HWM_PUB_SCHD_STOP_TIME.exists(nidx) ) then (
+					empPubDateEnd = HWM_PUB_SCHD_STOP_TIME[nidx]
+				)
+
+
+
+
+					 rLog  = add_rlog (ffs_id, rule_id, 'HWM_PUB_SCHD__Row_number: '   || TO_CHAR( nidx ) ||
+								  '; pubHrs= '   || TO_CHAR( pubHrs ) ||
+								  '; TotalHrs= '   || TO_CHAR( TotalHrs ) ||
+								  '; start_date_time= '   || TO_CHAR( empPubDateStart )  ||
+								  '; end_date_time= '   || TO_CHAR( empPubDateEnd  )
+							)
+
+				nidx = nidx + 1
+				if (nidx >  max_loop) Then (
+					ex = raise_error (ffs_id, rule_id, 'WFM_UTIL_GET_EMPLOYMENT_SCHEDULE terminated due to possible end-less loop. ' ||
+														'Number of rows for HWM_PUB_SCHD_MEASURE exceeds' ||  TO_CHAR(max_loop) )
+				)
+
+			)
+
+		) else
+		(
+			empCount = HWM_EMP_SCHD_MEASURE.count
+			rLog  = add_rlog (ffs_id, rule_id, '--------- start  HWM_EMP_SCHD_MEASURE loop no Change Contexts '   || 	';  empCount=' || TO_CHAR( empCount )  )
+			nidx = 1
+			HrsSource = 'EMP'
+			 WHILE (HWM_EMP_SCHD_MEASURE.EXISTS(nidx))LOOP
+			(
+				EmpHrs = HWM_EMP_SCHD_MEASURE[nidx]
+				TotalHrs = TotalHrs + EmpHrs
+
+				empSchDateStart = NullDate
+				empSchDateEnd = NullDate
+				if (HWM_EMP_SCHD_START_DATE_TIME.exists(nidx) ) then (
+					empSchDateStart = HWM_EMP_SCHD_START_DATE_TIME[nidx]
+				)
+
+				if (HWM_EMP_SCHD_END_DATE_TIME.exists(nidx) ) then (
+					empSchDateEnd = HWM_EMP_SCHD_END_DATE_TIME[nidx]
+				)
+
+					 rLog  = add_rlog (ffs_id, rule_id, 'HWM_EMP_SCHD_MEASURE__Row_number: '   || TO_CHAR( nidx ) ||
+								  '; EmpHrs= '   || TO_CHAR( EmpHrs ) ||
+								  '; TotalHrs= '   || TO_CHAR( TotalHrs ) ||
+								  '; start_date_time= '   || TO_CHAR( empSchDateStart  )  ||
+								  '; end_date_time= '   || TO_CHAR( empSchDateEnd  )
+							)
+
+
+				nidx = nidx + 1
+				if (nidx >  max_loop) Then (
+				 ex = raise_error (ffs_id, rule_id, 'WFM_UTIL_GET_EMPLOYMENT_SCHEDULE terminated due to possible end-less loop. ' ||
+													'Number of rows for HWM_EMP_SCHD_MEASURE exceeds' ||  TO_CHAR(max_loop) )
+				)
+			)
+
+		)
+
+
+)
+
+
+rLog  = add_rlog (ffs_id, rule_id, '&lt;&lt;&lt; Exit:  ' || ffName ||
+	' -  HrsSource=' || HrsSource || ' - TotalHrs=' || TO_CHAR( TotalHrs )  )
+
+
+RETURN  TotalHrs, HrsSource
+```

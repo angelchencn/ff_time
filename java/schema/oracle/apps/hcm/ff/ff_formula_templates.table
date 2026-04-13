@@ -243,6 +243,32 @@ Dependent Objects' Information :
                   </CUSTOMER_AREA>
                </COL_LIST_ITEM>
                <COL_LIST_ITEM>
+                  <NAME>SYSTEMPROMPT_FLAG</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>1</LENGTH>
+                  <DEFAULT>'N'</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>System Prompt Flag. Y indicates this row holds the AI system prompt text in FORMULA_TEXT. At most one row should have this flag set to Y. When Y and ACTIVE_FLAG is also Y, AiService loads the FORMULA_TEXT as the LLM system prompt instead of the hardcoded default. FORMULA_TYPE_ID should be NULL for system prompt rows.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>SYSTEMPROMPT_FLAG</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
                   <NAME>SORT_ORDER</NAME>
                   <DATATYPE>NUMBER</DATATYPE>
                   <PRECISION>9</PRECISION>

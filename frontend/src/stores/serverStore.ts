@@ -7,7 +7,7 @@ export interface ServerConfig {
   auth?: { username: string; password: string };
 }
 
-const SERVERS: ServerConfig[] = [
+const DEFAULT_SERVERS: ServerConfig[] = [
   {
     name: 'Payroll VP DEV',
     baseUrl: '/fusion-proxy',
@@ -21,35 +21,90 @@ const SERVERS: ServerConfig[] = [
   },
 ];
 
+const STORAGE_KEY = 'ff_servers';
+const INDEX_KEY = 'ff_server_index';
+
+function loadServers(): ServerConfig[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved) as ServerConfig[];
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_SERVERS;
+}
+
+function saveServers(servers: ServerConfig[]) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(servers)); } catch { /* ignore */ }
+}
+
+function loadSavedIndex(maxLen: number): number {
+  try {
+    const saved = localStorage.getItem(INDEX_KEY);
+    if (saved !== null) {
+      const idx = parseInt(saved, 10);
+      if (idx >= 0 && idx < maxLen) return idx;
+    }
+  } catch { /* ignore */ }
+  return 0;
+}
+
 interface ServerState {
   servers: ServerConfig[];
   selectedIndex: number;
   current: ServerConfig;
   select: (index: number) => void;
+  addServer: (config: ServerConfig) => void;
+  updateServer: (index: number, config: ServerConfig) => void;
+  removeServer: (index: number) => void;
   getApiUrl: (path: string) => string;
 }
 
-function loadSavedIndex(): number {
-  try {
-    const saved = localStorage.getItem('ff_server_index');
-    if (saved !== null) {
-      const idx = parseInt(saved, 10);
-      if (idx >= 0 && idx < SERVERS.length) return idx;
-    }
-  } catch (e) { /* ignore */ }
-  return 0;
-}
-
-const initialIndex = loadSavedIndex();
+const initialServers = loadServers();
+const initialIndex = loadSavedIndex(initialServers.length);
 
 export const useServerStore = create<ServerState>((set, get) => ({
-  servers: SERVERS,
+  servers: initialServers,
   selectedIndex: initialIndex,
-  current: SERVERS[initialIndex],
+  current: initialServers[initialIndex],
+
   select: (index: number) => {
-    localStorage.setItem('ff_server_index', String(index));
-    set({ selectedIndex: index, current: SERVERS[index] });
+    const { servers } = get();
+    if (index >= 0 && index < servers.length) {
+      localStorage.setItem(INDEX_KEY, String(index));
+      set({ selectedIndex: index, current: servers[index] });
+    }
   },
+
+  addServer: (config: ServerConfig) => {
+    const { servers } = get();
+    const updated = [...servers, config];
+    saveServers(updated);
+    const newIndex = updated.length - 1;
+    localStorage.setItem(INDEX_KEY, String(newIndex));
+    set({ servers: updated, selectedIndex: newIndex, current: config });
+  },
+
+  updateServer: (index: number, config: ServerConfig) => {
+    const { servers, selectedIndex } = get();
+    const updated = [...servers];
+    updated[index] = config;
+    saveServers(updated);
+    const newCurrent = index === selectedIndex ? config : servers[selectedIndex];
+    set({ servers: updated, current: newCurrent });
+  },
+
+  removeServer: (index: number) => {
+    const { servers, selectedIndex } = get();
+    if (servers.length <= 1) return; // keep at least one
+    const updated = servers.filter((_, i) => i !== index);
+    saveServers(updated);
+    const newIndex = selectedIndex >= updated.length ? updated.length - 1 : selectedIndex;
+    localStorage.setItem(INDEX_KEY, String(newIndex));
+    set({ servers: updated, selectedIndex: newIndex, current: updated[newIndex] });
+  },
+
   getApiUrl: (path: string) => {
     const { current } = get();
     return `${current.baseUrl}${current.apiPrefix}${path}`;

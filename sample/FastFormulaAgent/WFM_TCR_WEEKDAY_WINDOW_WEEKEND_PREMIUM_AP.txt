@@ -1,0 +1,236 @@
+/* +======================================================================+
+   |                Copyright (c) 2009 Oracle Corporation                 |
+   |                   Redwood Shores, California, USA                    |
+   |                        All rights reserved.                          |
+   +======================================================================+
+ *
+ * Formula Name : WFM_TCR_WEEKDAY_WINDOW_WEEKEND_PREMIUM_AP
+ *
+ * Formula Type:  Time Calculation Rules
+ *
+ * Description:   Generates premium hours based on:
+ *                - Weekdays (Mon-Fri): 1 premium hour for every hour worked
+ *                  between 15:00 and 17:00.
+ *                - Weekends (Sat-Sun): 2 premium hours for every hour worked.
+ *
+ * Outputs:
+ *   out_measure_under[] = time reported (original measure)
+ *   out_measure_over[]  = calculated premium hours
+ *
+ * Change History
+ * --------------
+ * Who                  Ver      Date         Description
+ *-----------------     ------   ----------   -----------------------------------------
+ * OpenAI (Codex)       1.0      2026-04-01   Initial development
+ *
+ ***************************************************************************/
+
+/*
+ * Block 1: Default Declarations
+ */
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS IS EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY IS EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure IS EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime IS EMPTY_DATE_NUMBER
+DEFAULT FOR StopTime IS EMPTY_DATE_NUMBER
+DEFAULT FOR TimeRecordType IS EMPTY_TEXT_NUMBER
+
+/*
+ * Block 2: Inputs
+ */
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  measure,
+  StartTime,
+  StopTime,
+  TimeRecordType
+
+/* Required contexts immediately after INPUTS ARE */
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+
+/*
+ * Block 3: Context and Parameter Setup
+ */
+ffName = 'WFM_TCR_WEEKDAY_WINDOW_WEEKEND_PREMIUM_AP'
+
+NullDate = '01-JAN-1900'(DATE)
+NullDateTime = '1900/01/01 00:00:00'(DATE)
+NullText = '**FF_NULL**'
+
+sTrue  = 'Y'
+sFalse = 'N'
+
+RecPositionDetail = 'DETAIL'
+TimeRecordType_RANGE = 'RANGE'
+
+CTIME_MULTI_HOURS = (24*60*60)/3600  /* days_between * 24 = hours */
+fmtDateYMD = 'YYYY-MM-DD'
+fmtDateTime = 'YYYY-MM-DD HH24:MI'
+
+/* Rule header metadata */
+hSumLvl   = Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
+hExecType = Get_Hdr_Text(rule_id, 'RULE_EXEC_TYPE', 'CREATE')
+
+/* Parameters (defaults satisfy this requirement out-of-the-box) */
+pWeekdayPremStart = get_rvalue_text(rule_id, 'WEEKDAY_PREM_START_TIME', '15:00')
+pWeekdayPremStop  = get_rvalue_text(rule_id, 'WEEKDAY_PREM_STOP_TIME',  '17:00')
+pWeekdayMultiplier = get_rvalue_number(rule_id, 'WEEKDAY_PREM_MULTIPLIER', 1)
+pWeekendMultiplier = get_rvalue_number(rule_id, 'WEEKEND_PREM_MULTIPLIER', 2)
+
+rLog = add_rlog(ffs_id, rule_id, '>>> Enter - ' || ffName ||
+  '; hSumLvl=' || hSumLvl ||
+  '; hExecType=' || hExecType ||
+  '; pWeekdayPremStart=' || pWeekdayPremStart ||
+  '; pWeekdayPremStop=' || pWeekdayPremStop ||
+  '; pWeekdayMultiplier=' || TO_CHAR(pWeekdayMultiplier) ||
+  '; pWeekendMultiplier=' || TO_CHAR(pWeekendMultiplier))
+
+/*
+ * Block 4: Processing Logic
+ */
+out_measure_under = EMPTY_NUMBER_NUMBER  /* time reported */
+out_measure_over  = EMPTY_NUMBER_NUMBER  /* premium hours */
+
+max_ary = HWM_CTXARY_RECORD_POSITIONS.count
+rLog = add_rlog(ffs_id, rule_id, 'Start bulk process; max_ary=' || TO_CHAR(max_ary))
+
+nidx = 0
+WHILE (nidx < max_ary) LOOP
+(
+  nidx = nidx + 1
+
+  if (nidx > 1000) then (
+    ex = raise_error(ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.')
+  )
+
+  tcRecPos = NullText
+  tcMeasure = 0
+  tcStartTime = NullDate
+  tcStopTime = NullDate
+  tcTimeRecordType = NullText
+
+  if (HWM_CTXARY_RECORD_POSITIONS.exists(nidx)) then (tcRecPos = HWM_CTXARY_RECORD_POSITIONS[nidx])
+  if (measure.exists(nidx)) then (tcMeasure = measure[nidx])
+  if (StartTime.exists(nidx)) then (tcStartTime = StartTime[nidx])
+  if (StopTime.exists(nidx)) then (tcStopTime = StopTime[nidx])
+  if (TimeRecordType.exists(nidx)) then (tcTimeRecordType = TimeRecordType[nidx])
+
+  rLog = add_rlog(ffs_id, rule_id, 'Row ' || TO_CHAR(nidx) ||
+    '; recPos=' || tcRecPos ||
+    '; recordType=' || tcTimeRecordType ||
+    '; measure=' || TO_CHAR(tcMeasure) ||
+    '; start=' || TO_CHAR(tcStartTime) ||
+    '; stop=' || TO_CHAR(tcStopTime))
+
+  /* Always output the reported time as provided (for DETAIL rows with measure) */
+  if (tcRecPos = RecPositionDetail and tcMeasure > 0) then (
+    out_measure_under[nidx] = tcMeasure
+  )
+
+  premiumHrsTotal = 0
+
+  /* Only calculate premium for ranged detail entries with start/stop */
+  if (tcRecPos = RecPositionDetail
+      and tcMeasure > 0
+      and tcTimeRecordType = TimeRecordType_RANGE
+      and tcStartTime <> NullDate
+      and tcStopTime <> NullDate
+      and tcStopTime > tcStartTime) then
+  (
+    segStart = tcStartTime
+    segStop = tcStopTime
+
+    dayLoopGuard = 0
+
+    WHILE (segStart < segStop) LOOP
+    (
+      dayLoopGuard = dayLoopGuard + 1
+      if (dayLoopGuard > 50) then (
+        ex = raise_error(ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible day-split end-less loop.')
+      )
+
+      dayStart = trunc(segStart)
+      nextDayStart = add_days(dayStart, 1)
+
+      daySegStart = segStart
+      daySegStop = LEAST(segStop, nextDayStart)
+
+      isSat = get_is_date_same_as_dow(dayStart, 'SAT')
+      isSun = get_is_date_same_as_dow(dayStart, 'SUN')
+      isWeekend = sFalse
+      if (isSat = sTrue or isSun = sTrue) then (isWeekend = sTrue)
+
+      dayHrs = round((days_between(daySegStop, daySegStart) * CTIME_MULTI_HOURS), 2)
+
+      if (isWeekend = sTrue) then
+      (
+        /* Weekend: 2 premium hours for every hour worked (default multiplier = 2) */
+        premiumHrsTotal = premiumHrsTotal + round((dayHrs * pWeekendMultiplier), 2)
+
+        rLog = add_rlog(ffs_id, rule_id, 'Weekend segment ' ||
+          '; dayStart=' || TO_CHAR(dayStart) ||
+          '; segStart=' || TO_CHAR(daySegStart) ||
+          '; segStop=' || TO_CHAR(daySegStop) ||
+          '; dayHrs=' || TO_CHAR(dayHrs) ||
+          '; premiumAdd=' || TO_CHAR(round((dayHrs * pWeekendMultiplier), 2)) ||
+          '; premiumTotal=' || TO_CHAR(premiumHrsTotal))
+      )
+      else
+      (
+        /* Weekday: premium only for overlap with 15:00-17:00 (default) */
+        dayYmd = DATE_TO_TEXT(dayStart, fmtDateYMD)
+        premTxtStart = dayYmd || ' ' || pWeekdayPremStart
+        premTxtStop  = dayYmd || ' ' || pWeekdayPremStop
+
+        premDtStart = TO_DATE(premTxtStart, fmtDateTime)
+        premDtStop  = TO_DATE(premTxtStop,  fmtDateTime)
+
+        /* Handle ranges that cross midnight if configured */
+        if (premDtStop < premDtStart) then (
+          premDtStop = add_days(premDtStop, 1)
+        )
+
+        ovStart = GREATEST(daySegStart, premDtStart)
+        ovStop  = LEAST(daySegStop,  premDtStop)
+
+        if (ovStop > ovStart) then
+        (
+          ovHrs = round((days_between(ovStop, ovStart) * CTIME_MULTI_HOURS), 2)
+          premAdd = round((ovHrs * pWeekdayMultiplier), 2)
+          premiumHrsTotal = premiumHrsTotal + premAdd
+
+          rLog = add_rlog(ffs_id, rule_id, 'Weekday overlap ' ||
+            '; dayStart=' || TO_CHAR(dayStart) ||
+            '; ovStart=' || TO_CHAR(ovStart) ||
+            '; ovStop=' || TO_CHAR(ovStop) ||
+            '; ovHrs=' || TO_CHAR(ovHrs) ||
+            '; premiumAdd=' || TO_CHAR(premAdd) ||
+            '; premiumTotal=' || TO_CHAR(premiumHrsTotal))
+        )
+        else
+        (
+          rLog = add_rlog(ffs_id, rule_id, 'Weekday no-overlap ' ||
+            '; dayStart=' || TO_CHAR(dayStart) ||
+            '; segStart=' || TO_CHAR(daySegStart) ||
+            '; segStop=' || TO_CHAR(daySegStop))
+        )
+      )
+
+      /* Advance */
+      segStart = daySegStop
+    )
+
+    if (premiumHrsTotal > 0) then (
+      out_measure_over[nidx] = premiumHrsTotal
+    )
+  )
+)
+
+/*
+ * Block 5: Outputs
+ */
+rLog = add_rlog(ffs_id, rule_id, '<<< Exit - ' || ffName)
+RETURN out_measure_under, out_measure_over
+

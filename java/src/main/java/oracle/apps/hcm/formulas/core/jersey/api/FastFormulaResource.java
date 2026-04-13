@@ -486,11 +486,31 @@ public class FastFormulaResource {
     @GET
     @Path("/formula-types")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response listFormulaTypes() {
+    public Response listFormulaTypes(@QueryParam("all") Boolean all) {
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
-            AppsLogger.write(this, "GET /formula-types", AppsLogger.INFO);
+            AppsLogger.write(this,
+                    "GET /formula-types" + (Boolean.TRUE.equals(all) ? "?all=true" : ""),
+                    AppsLogger.INFO);
         }
-        return Response.ok(formulaTypesService.listAll()).build();
+        try {
+            if (Boolean.TRUE.equals(all)) {
+                // All formula types from FF_FORMULA_TYPES — used by the
+                // Manage Templates detail panel so the user can assign
+                // any type to a new template.
+                return Response.ok(templateService.listAllFormulaTypes()).build();
+            }
+            // Default: distinct types from the templates table (only types
+            // that actually have templates).
+            return Response.ok(templateService.listDistinctFormulaTypes()).build();
+        } catch (Exception e) {
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "formula-types from DB failed, falling back to JSON registry: "
+                                + e.getMessage(),
+                        AppsLogger.WARNING);
+            }
+            return Response.ok(formulaTypesService.listAll()).build();
+        }
     }
 
     // ── Templates (GET, GET by id, POST, PUT, DELETE) ─────────────────────
@@ -623,6 +643,170 @@ public class FastFormulaResource {
             return templateDbError(e);
         }
     }
+
+    // ── Formula Lookup (FF_FORMULAS_VL) ─────────────────────────────────────
+    //
+    // Used by the Manage Templates UI to let users pick an existing formula
+    // as the reference body for a new template.
+
+    @GET
+    @Path("/formulas/lookup")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response searchFormulas(@QueryParam("formula_type") String formulaType,
+                                   @QueryParam("search") String search,
+                                   @QueryParam("limit") Integer limit,
+                                   @QueryParam("offset") Integer offset) {
+        int lim = limit != null ? limit : 50;
+        int off = offset != null ? offset : 0;
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(this,
+                    "GET /formulas/lookup: type=" + formulaType
+                            + " search=" + search + " limit=" + lim,
+                    AppsLogger.INFO);
+        }
+        try {
+            return Response.ok(templateService.searchFormulas(formulaType, search, lim, off)).build();
+        } catch (SQLException e) {
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of("error", "Formula lookup failed", "detail", e.getMessage()))
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/formulas/lookup/{id}/text")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getFormulaText(@PathParam("id") long id) {
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(this, "GET /formulas/lookup/" + id + "/text", AppsLogger.INFO);
+        }
+        try {
+            String text = templateService.getFormulaText(id);
+            if (text == null) {
+                return Response.status(Response.Status.NOT_FOUND)
+                        .entity(Map.of("error", "Formula not found: " + id))
+                        .build();
+            }
+            return Response.ok(Map.of("formula_id", id, "formula_text", text)).build();
+        } catch (SQLException e) {
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of("error", "Formula text fetch failed", "detail", e.getMessage()))
+                    .build();
+        }
+    }
+
+    // ── Extract Prompt from URL ─────────────────────────────────────────────
+
+    @POST
+    @Path("/templates/extract-prompt")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response extractPrompt(Map<String, Object> request) {
+        String url = (String) request.get("url");
+        String formulaType = (String) request.get("formula_type");
+        if (url == null || url.isBlank()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "url is required"))
+                    .build();
+        }
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(this,
+                    "POST /templates/extract-prompt: url=" + url
+                            + " formulaType=" + formulaType,
+                    AppsLogger.INFO);
+        }
+        try {
+            // 1. Fetch the URL content (respects https_proxy / http_proxy)
+            java.net.http.HttpRequest httpReq = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(url))
+                    .header("User-Agent", "FF-Time-PromptExtractor/1.0")
+                    .GET()
+                    .timeout(java.time.Duration.ofSeconds(30))
+                    .build();
+            java.net.http.HttpClient.Builder clientBuilder = java.net.http.HttpClient.newBuilder();
+            String proxyEnv = System.getenv("https_proxy");
+            if (proxyEnv == null) proxyEnv = System.getenv("http_proxy");
+            if (proxyEnv == null) proxyEnv = System.getenv("HTTPS_PROXY");
+            if (proxyEnv == null) proxyEnv = System.getenv("HTTP_PROXY");
+            if (proxyEnv != null && !proxyEnv.isBlank()) {
+                java.net.URI proxyUri = java.net.URI.create(proxyEnv);
+                clientBuilder.proxy(java.net.ProxySelector.of(
+                        new java.net.InetSocketAddress(proxyUri.getHost(), proxyUri.getPort())));
+            }
+            java.net.http.HttpResponse<String> httpResp = clientBuilder.build()
+                    .send(httpReq, java.net.http.HttpResponse.BodyHandlers.ofString());
+
+            if (httpResp.statusCode() != 200) {
+                return Response.status(Response.Status.BAD_GATEWAY)
+                        .entity(Map.of("error", "URL returned status " + httpResp.statusCode()))
+                        .build();
+            }
+
+            // 2. Strip HTML tags to get plain text
+            String rawHtml = httpResp.body();
+            String text = rawHtml
+                    .replaceAll("<script[^>]*>[\\s\\S]*?</script>", "")
+                    .replaceAll("<style[^>]*>[\\s\\S]*?</style>", "")
+                    .replaceAll("<[^>]+>", " ")
+                    .replaceAll("&nbsp;", " ")
+                    .replaceAll("&amp;", "&")
+                    .replaceAll("&lt;", "<")
+                    .replaceAll("&gt;", ">")
+                    .replaceAll("\\s+", " ")
+                    .trim();
+            // Limit to ~8000 chars to stay within LLM context
+            if (text.length() > 8000) {
+                text = text.substring(0, 8000);
+            }
+
+            // 3. Ask the LLM to extract a prompt from the documentation.
+            //    Use provider.complete() directly with a dedicated system
+            //    prompt — NOT aiService.chatOnce() which injects the full
+            //    Fast Formula system prompt and causes the LLM to generate
+            //    a formula instead of extracting documentation rules.
+            String typeHint = formulaType != null && !formulaType.isBlank()
+                    ? " for the formula type \"" + formulaType + "\""
+                    : "";
+
+            String sysMsg = "You are a documentation analyst for Oracle Fusion Cloud HCM Fast Formula. "
+                    + "Your job is to read Oracle online help pages and extract clear, actionable rules "
+                    + "that an AI code generator should follow when creating formulas. "
+                    + "You do NOT generate formulas yourself. You output plain-text instructions only.";
+
+            String userMsg =
+                    "Below is the text extracted from an Oracle Fusion Cloud HCM online help page"
+                    + typeHint + ".\n\n"
+                    + "Based on this documentation, generate a concise ADDITIONAL PROMPT TEXT "
+                    + "that will be appended to an AI system prompt when generating Fast Formulas "
+                    + "of this type. The output should:\n"
+                    + "- Summarize the key rules, constraints, and business logic\n"
+                    + "- List the expected input variables, output/return variables, and DBIs if mentioned\n"
+                    + "- Note any naming conventions or patterns\n"
+                    + "- Be written as instructions to an AI (e.g. 'You MUST...', 'Always include...', 'RETURN variables must be...')\n"
+                    + "- Be concise but comprehensive (under 2000 words)\n"
+                    + "- Do NOT generate any Fast Formula code — output rules/instructions only\n\n"
+                    + "Documentation text:\n\n" + text;
+
+            List<Map<String, String>> messages = List.of(
+                    Map.of("role", "system", "content", sysMsg),
+                    Map.of("role", "user", "content", userMsg)
+            );
+
+            String generated = aiService.getProvider().complete(messages, 4096);
+
+            return Response.ok(Map.of("prompt", generated)).build();
+
+        } catch (Exception e) {
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of("error", "Extract failed: " + e.getMessage()))
+                    .build();
+        }
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────
 
     /** Persist incoming rule (if any) and return the effective rule for this session. */
     private String resolveEffectiveRule(String sessionId, String templateRule) {

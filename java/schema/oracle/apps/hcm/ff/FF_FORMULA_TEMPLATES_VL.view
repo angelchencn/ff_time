@@ -127,6 +127,17 @@ Dependent Objects' Information : None
          </CUSTOMER_AREA>
       </COL_LIST_ITEM>
       <COL_LIST_ITEM>
+         <NAME>SYSTEMPROMPT_FLAG</NAME>
+         <CUSTOMER_AREA>
+            <UDP_LIST>
+               <UDP_LIST_ITEM>
+                  <NAME>shortName</NAME>
+                  <VALUE>SYSTEMPROMPT_FLAG</VALUE>
+               </UDP_LIST_ITEM>
+            </UDP_LIST>
+         </CUSTOMER_AREA>
+      </COL_LIST_ITEM>
+      <COL_LIST_ITEM>
          <NAME>SORT_ORDER</NAME>
          <CUSTOMER_AREA>
             <UDP_LIST>
@@ -268,6 +279,7 @@ Dependent Objects' Information : None
     fft.SOURCE_TYPE SOURCE_TYPE,
     fft.ACTIVE_FLAG ACTIVE_FLAG,
     fft.SEMANTIC_FLAG SEMANTIC_FLAG,
+    fft.SYSTEMPROMPT_FLAG SYSTEMPROMPT_FLAG,
     fft.SORT_ORDER SORT_ORDER,
     fft.SEED_DATA_SOURCE SEED_DATA_SOURCE,
     fft.CREATED_BY CREATED_BY,

@@ -1,0 +1,582 @@
+[
+  {
+    "BaseFormulaName": "WFM_PERIOD_MINIMUM_TIME_ENTRY_RULE_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_ENTRY_RULES",
+    "Description": "Formula that validates if reported time entries are less than a defined minimum hours value.",
+    "TemplateName": "Period Minimum Hours AP Template",
+    "Inputs":[ {
+             "name": "DEFINED_LIMIT",
+             "description": ""
+         },
+         {
+             "name": "MESSAGE_CODEE_PERIOD",
+             "description": "Message displayed when reported hours are less than minimum hours"
+         },
+         {
+             "name": "WORKED_TIME_CONDITION",
+             "description": "Time category for reported hours to compare to minimum hours"
+        }
+    ],
+    "Outputs": [
+        {
+            "name": "OUT_MSG_ARY",
+            "description": "Severity of the output message"
+        }
+    ]
+  }, 
+  {
+    "BaseFormulaName": "WFM_PERIOD_MAXIMUM_TIME_ENTRY_RULE_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_ENTRY_RULES",
+    "Description": "Formula that validates if reported time entries are greater than a defined maximum hours value.",
+    "TemplateName": "Period Maximum Hours AP Template",
+    "Inputs":[ {
+             "name": "DEFINED_LIMIT",
+             "description": ""
+         },
+         {
+             "name": "MESSAGE_CODEE_PERIOD",
+             "description": "Message displayed when reported hours are less than minimum hours"
+         },
+         {
+             "name": "WORKED_TIME_CONDITION",
+             "description": "Time category for reported hours to compare to minimum hours"
+        }
+    ],
+    "Outputs": [
+        {
+            "name": "OUT_MSG_ARY",
+            "description": "Severity of the output message"
+        }
+    ]
+  },
+  {
+    "BaseFormulaName": "WFM_THRESHOLD_W_ABS_TIME_CALCULATION_RULE_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES",
+    "Description": "Formula that divides defined daily or weekly reported and absence time into calculated time attributes for values above and below a defined threshold hours value.",
+    "TemplateName": "Daily Threshold with Absences AP Template | Weekly Threshold with Absences AP Template",
+    "Inputs":[ {
+             "name": "DEFINED_LIMIT",
+             "description": ""
+         },
+         {
+             "name": "RESTRICTED_ABSENCE_TYPE1",
+             "description": "Specific absence entry to maintain"
+        },
+        {
+             "name": "RESTRICTED_ABSENCE_TYPE2",
+             "description": "Specific absence entry to maintain"
+        },
+        {
+             "name": "RESTRICTED_ABSENCE_TYPE3",
+             "description": "Specific absence entry to maintain"
+        },
+        {
+             "name": "RESTRICTED_ALL_ABSENCE_YN",
+             "description": "Maintain all absence entries"
+        },
+        {
+             "name": "WORKED_TIME_CONDITION",
+             "description": "Time category for reported hours to compare to threshold hours"
+        }
+    ],
+    "Outputs": [
+        {
+            "name": "MEASURE_OVER",
+            "description": "Calculated hours above the threshold"
+        },
+        {
+            "name": "MEASURE_UNDER",
+            "description": "Calculated hours below the threshold"
+        },
+        {
+            "name": "OUT_PAY_TYPE_OVER",
+            "description": "Pay Time Type attribute for calculated hours above the threshold"
+        },
+        {
+            "name": "OUT_PAY_TYPE_UNDER",
+            "description": "Pay Time Type attribute for calculated hours below the threshold"
+        }
+    ]
+  },
+  {
+    "BaseFormulaName": "WFM_THRESHOLD_TIME_CALCULATION_RULE_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES",
+    "Description": "Formula that divides defined daily or weekly reported time into calculated time attributes for values above and below a defined threshold hours value.",
+    "TemplateName": "Daily Threshold AP Template | Weekly Threshold AP Template",
+    "Inputs":[ {
+             "name": "DEFINED_LIMIT",
+             "description": ""
+         },
+         {
+             "name": "WORKED_TIME_CONDITION",
+             "description": "Time category for reported hours to compare to threshold hours"
+        }
+    ],
+    "Outputs": [
+        {
+            "name": "MEASURE_OVER",
+            "description": "Calculated hours above the threshold"
+        },
+        {
+            "name": "MEASURE_UNDER",
+            "description": "Calculated hours below the threshold"
+        },
+        {
+            "name": "OUT_PAY_TYPE_OVER",
+            "description": "Pay Time Type attribute for calculated hours above the threshold"
+        },
+        {
+            "name": "OUT_PAY_TYPE_UNDER",
+            "description": "Pay Time Type attribute for calculated hours below the threshold"
+        }
+    ]
+  },
+  {
+    "BaseFormulaName": "WFM_TER_VALIDATE_REST_PERIOD_DURATION_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_ENTRY_RULES",
+    "Description": "Back to back shift which have insufficient rest periods between shifts",
+    "TemplateName": "Compare Rest Between Shifts Template",
+    "Inputs":[ {
+             "name": "OVERRIDE_MESSAGE_CODE",
+             "description": "Message displayed when the rest period is too short"
+         },
+         {
+             "name": "REST_PERIOD_IN_MINUTES",
+             "description": "Minimum time, in minutes, between consecutive entries"
+         },
+         {
+             "name": "WORKED_TIME_CONDITION",
+             "description": "Time category for reported time entries to compare to the rest period"
+        }
+    ],
+    "Outputs": [
+        {
+            "name": "OUT_MSG_ARY",
+            "description": ""
+        }
+    ]
+  },
+  {
+    "BaseFormulaName": "WFM_TDR_VALIDATE_REST_PERIOD_DURATION_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_DEVICE_RULES",
+    "Description": "Back to back shift which have insufficient rest periods between shifts",
+    "TemplateName": "Compare Rest Between Time Events Template",
+    "Inputs":[ {
+             "name": "OVERRIDE_MESSAGE_CODE",
+             "description": "Message displayed when the rest period is too short"
+         },
+         {
+             "name": "REST_PERIOD_IN_MINUTES",
+             "description": "Minimum time, in minutes, between consecutive entries"
+         },
+         {
+             "name": "WORKED_TIME_CONDITION",
+             "description": "Time category for reported time entries to compare to the rest period"
+        }
+    ],
+    "Outputs": [
+        {
+            "name": "OUT_MSG_ARY",
+            "description": "Severity of the output message"
+        }
+    ]
+  },
+  {
+    "BaseFormulaName": "WFM_TCR_INSUFFICIENT_REST_PERIOD_PREMIUM_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES",
+    "Description": "Back to back shift which have insufficient rest periods between shifts",
+    "TemplateName": "Insufficient Rest Premium Template",
+    "Inputs":[ {
+             "name": "IS_ENTIRE_SHIFT_PREMIUM",
+             "description": "Pay entire shift at premium rate"
+         },
+         {
+             "name": "REST_PERIOD_IN_MINUTES",
+             "description": "Minimum time, in minutes, between consecutive entries"
+         },
+         {
+             "name": "WORKED_TIME_CONDITION",
+             "description": "Time category for reported time entries to compare to the rest period"
+        }
+    ],
+    "Outputs": [
+        {
+            "name": "MEASURE_OVER",
+            "description": "Calculated premium hours"
+        },
+        {
+            "name": "MEASURE_UNDER",
+            "description": "Calculated base hours"
+        },
+        {
+            "name": "OUT_PAY_TYPE_OVER",
+            "description": "Pay Time Type attribute for calculated premium hour"
+        },
+        {
+            "name": "OUT_PAY_TYPE_UNDER",
+            "description": "Pay Time Type attribute for calculated premium hour"
+        }
+    ]
+  },
+  {
+    "BaseFormulaName": "WFM_TDR_VALIDATE_SUPPLIER_EVENT_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_DEVICE_RULES",
+    "Description": "Ensure that specific time device events are reviewed prior to acceptance.",
+    "TemplateName": "Validate Time Event Template",
+    "Inputs":[ {
+             "name": "OVERRIDE_MESSAGE_CODE",
+             "description": "Message displayed when the rest period is too short"
+         },
+         {
+             "name": "SUPPLIER_EVENT_OUT_EXCEPTION_1",
+             "description": "First automatically-generated time event to identify"
+         },
+         {
+             "name": "SUPPLIER_EVENT_OUT_EXCEPTION_2",
+             "description": "Optional second automatically-generated time event to identify"
+         },
+         {
+             "name": "SUPPLIER_EVENT_OUT_EXCEPTION_3",
+             "description": "Optional third automatically-generated time event to identify"
+         },
+         {
+             "name": "WORKED_TIME_CONDITION",
+             "description": "Time category that defines the reported time entries to evaluate"
+        }
+    ],
+    "Outputs": [
+        {
+            "name": "OUT_MSG_ARY",
+            "description": "Severity of the output message"
+        }
+    ]
+  },
+  {
+    "BaseFormulaName": "WFM_TSR_SUBMIT_OR_SAVE_ON_NUMBER_OF_HOURS_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_SUBMISSION_RULES",
+    "Description": "Compare total time to rule parameters. Send Submit or Save Action code.",
+    "TemplateName": "Number of Hours Submission Template",
+    "Inputs":[ {
+             "name": "MIN_HOURS_SAVE",
+             "description": "Minimum reported hours required to save time card"
+         },
+         {
+             "name": "MIN_HOURS_SUBMIT",
+             "description": "Minimum reported hours required to submit time card"
+         },
+         {
+             "name": "WORKED_TIME_CONDITION",
+             "description": "Time category for reported hours to compare to the defined minimum values"
+        }
+    ],
+    "Outputs": [
+        {
+            "name": "OUT_FINAL_TSR",
+            "description": "Final time card action"
+        }
+    ]
+  },
+  {
+    "BaseFormulaName": "WFM_TSR_SUBMIT_OR_SAVE_ON_NUMBER_OF_DEVICE_EVENTS_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_SUBMISSION_RULES",
+    "Description": "Compare total entries to rule parameters. Send Submit Action Code, Save Action.",
+    "TemplateName": "Number of Time Entries Template",
+    "Inputs":[ {
+             "name": "MIN_ENTRY_SAVE",
+             "description": "Minimum time entries required to save time card"
+         },
+         {
+             "name": "MIN_ENTRY_SUBMIT",
+             "description": "Minimum time entries required to submit time card"
+         },
+         {
+             "name": "WORKED_TIME_CONDITION",
+             "description": "Time category for time Out entries to compare to the defined minimum values"
+        }
+    ],
+    "Outputs": [
+        {
+            "name": "OUT_FINAL_TSR",
+            "description": "Final time card action"
+        }
+    ]
+  },
+  {
+    "BaseFormulaName": "WFM_TDR_VALIDATE_SCHEDULE_DEVIATION_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_DEVICE_RULES",
+    "Description": "Compare start time, Stop time or duration to DBI scheduled times",
+    "TemplateName": "Validate Schedule Deviation Template",
+    "Inputs":[ {
+             "name": "OVRD_MSG_DURATION_LONG",
+             "description": "Message displayed when the reported duration is too long"
+         },
+         {
+             "name": "OVRD_MSG_DURATION_SHORT",
+             "description": "Message displayed when the reported duration is too short"
+         },
+         {
+             "name": "OVRD_MSG_IN_TIME_EARLY",
+             "description": "Message displayed when the reported In time entry is early"
+         },
+         {
+             "name": "OVRD_MSG_IN_TIME_LATE",
+             "description": "Message displayed when the reported In time entry is late"
+         },
+         {
+             "name": "OVRD_MSG_OUT_TIME_EARLY",
+             "description": "Message displayed when the reported Out time entry is early"
+         },
+         {
+             "name": "OVRD_MSG_OUT_TIME_LATE",
+             "description": "Message displayed when the reported Out time entry is late"
+         },
+         {
+             "name": "VALIDATE_SCHEDULED_DURATION",
+             "description": "Evaluate reported time duration, yes or no"
+         },
+         {
+             "name": "VALIDATE_SCHEDULED_IN_TIME",
+             "description": "Evaluate the reported In time entry, yes or no"
+         },
+         {
+             "name": "VALIDATE_SCHEDULED_OUT_TIME",
+             "description": "Evaluate the reported Out time entry, yes or no"
+         },
+         {
+             "name": "WORKED_TIME_CONDITION",
+             "description": "Time category that defines the reported time entries to compare to the schedule"
+        }
+    ],
+    "Outputs": [
+        {
+            "name": "OUT_MSG_DURATION",
+            "description": "Severity of the duration output message"
+        },
+        {
+            "name": "OUT_MSG_START_TIME",
+            "description": "Severity of the start time output message"
+        },
+        {
+            "name": "OUT_MSG_STOP_TIME",
+            "description": "Severity of the stop time output message"
+        }
+    ]
+  },
+  {
+    "BaseFormulaName": "WFM_TSR_SUBMIT_OR_SAVE_ON_WORK_SCHEDULE_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_SUBMISSION_RULES",
+    "Description": "Compare total time to published and work schedule",
+    "TemplateName": "Work Schedule Submission Template",
+    "Inputs":[ {
+             "name": "SAVE_THRESHOLD_IN_MINUTES",
+             "description": "Minutes used with last schedule day and time to define time card save"
+         },
+         {
+             "name": "SUBMIT_THRESHOLD_IN_MINUTES",
+             "description": "Minutes used with last schedule day and time to define time card submission"
+         },
+         {
+             "name": "WORKED_TIME_CONDITION",
+             "description": "Time category that defines the time entries to compare to submit and save ranges"
+        }
+    ],
+    "Outputs": [
+        {
+            "name": "OUT_FINAL_TSR",
+            "description": "Final time card action"
+        }
+    ]
+  },
+  {
+    "BaseFormulaName": "WFM_TSR_SUBMIT_OR_SAVE_ON_SPECIFIC_DAY_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_SUBMISSION_RULES",
+    "Description": "Compare time entries to a specific day of week.",
+    "TemplateName": "Specific Day Submission Template",
+    "Inputs":[ {
+             "name": "SAVE_SUBMIT_ON_FRI",
+             "description": "Submit or save time cards with entries on or after Friday"
+         },
+         {
+             "name": "SAVE_SUBMIT_ON_MON",
+             "description": "Submit or save time cards with entries on or after Monday"
+         },
+         {
+             "name": "SAVE_SUBMIT_ON_SAT",
+             "description": "Submit or save time cards with entries on or after Saturday"
+         },
+         {
+             "name": "SAVE_SUBMIT_ON_SUN",
+             "description": "Submit or save time cards with entries on or after Sunday"
+         },
+         {
+             "name": "SAVE_SUBMIT_ON_THU",
+             "description": "Submit or save time cards with entries on or after Thursday"
+         },
+         {
+             "name": "SAVE_SUBMIT_ON_TUE",
+             "description": "Submit or save time cards with entries on or after Tuesday"
+         },
+         {
+             "name": "SAVE_SUBMIT_ON_WED",
+             "description": "Submit or save time cards with entries on or after Wednesday"
+         },
+         {
+             "name": "WORKED_TIME_CONDITION",
+             "description": "Time category that defines the time entries to compare against the selected day"
+        }
+    ],
+    "Outputs": [
+        {
+            "name": "OUT_FINAL_TSR",
+            "description": "Final time card action"
+        }
+    ]
+  },
+  {
+    "BaseFormulaName": "WFM_TER_COMPARE_WRKR_HOLIDAY_TO_REPORTED_HOURS_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_ENTRY_RULES",
+    "Description": "Compare holiday to reported time",
+    "TemplateName": "Holiday Reported Hours Template",
+    "Inputs":[ {
+             "name": "OVRD_MSG_CODE",
+             "description": "Message displayed when time category hours are entered on the assigned holiday"
+         },
+         {
+             "name": "OVRD_PUB_HOLIDAY_CATEGORY",
+             "description": "Optional holiday classification to compare"
+         },
+         {
+             "name": "WORKED_TIME_CONDITION",
+             "description": "Time category for reported hours to compare to the public holiday"
+        }
+    ],
+    "Outputs": [
+        {
+            "name": "OUT_MSG",
+            "description": "Severity of the output message"
+        }
+    ]
+  },
+  {
+    "BaseFormulaName": "WFM_TCR_THRESHOLD_TWO_TIER_SEVEN_DAY_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES",
+    "Description": "Divides reported daily, period, and seventh-consecutive-day time entries into calculated time attributes for hours above and below defined threshold hours.",
+    "TemplateName": "Day Periods and Seventh Day Threshold Template",
+    "Inputs":[ {
+             "name": "DAILY_THRESHOLD_1",
+             "description": "First daily threshold hours"
+         },
+         {
+             "name": "DAILY_THRESHOLD_2",
+             "description": "Second daily threshold hours"
+         },
+         {
+             "name": "SEVENTH_DAY_THRESHOLD",
+             "description": "Seventh-day threshold hours"
+         },
+         {
+             "name": "WEEKLY_THRESHOLD",
+             "description": "Period threshold hours"
+         },
+         {
+             "name": "WORKED_TIME_CONDITION",
+             "description": "Time category for reported hours to compare to the threshold"
+        }
+    ],
+    "Outputs": [
+        {
+            "name": "OUT_MEASURE_ARY_UNDER",
+            "description": "Calculated hours below the first daily threshold"
+        },
+         {
+            "name": "OUT_MEASURE_OVER_1",
+            "description": "Calculated hours between first and second thresholds"
+        },
+         {
+            "name": "OUT_MEASURE_OVER_2",
+            "description": "Calculated hours above second daily threshold"
+        },
+         {
+            "name": "PAY_TYPE_OVER_1",
+            "description": "Pay Time Type attribute for calculated hours between daily thresholds"
+        },
+        {
+            "name": "PAY_TYPE_OVER_2",
+            "description": "Pay Time Type attribute for calculated hours above second threshold"
+        },
+        {
+            "name": "PAY_TYPE_UNDER",
+            "description": "Pay Time Type attribute for calculated hours below first threshold"
+        }
+    ]
+  },
+  {
+    "BaseFormulaName": "ORA_WFM_TCR_COST_OVERRIDE_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES",
+    "Description": "Apply cost overrides to calculated time entries",
+    "TemplateName": "Apply Cost Overrides to Calculated Entries",
+    "Inputs":[ {
+             "name": "ORA_HWM_FF_COST_OVERRIDE",
+             "description": "Delivered time calculation rule template to apply cost overrides to calculated"
+         }
+    ]
+  },
+  {
+    "BaseFormulaName": "WFM_TER_SIMPLE_BREAK_RULE_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_ENTRY_RULES",
+    "Description": "Evaluates the type of validation message to show when a day’s reported time entries total to more than the specified threshold, and there’s no break reported for the day.",
+    "TemplateName": "BREAK_TAKEN_WITH_ERROR_VALIDATION | BREAK_TAKEN_WITH_WARNING_VALIDATION",
+    "Inputs":[ {
+             "name": "BREAK_TIME_ENTRY",
+             "description": "Payroll time type that identifies a break entry, such as Break, Tea, or Meal."
+         },
+         {
+             "name": "CODE_FOR_ALTERNATE_MESSAGE",
+             "description": "Message to display if the worker doesn't record a break and the total reported entries exceeds the break threshold."
+         },
+         {
+             "name": "MIN_BREAK_DUR_IN_MINUTES",
+             "description": "Duration a worker needs to take for their break before it counts as a break."
+         },
+         {
+             "name": "THRESHOLD_IN_HOURS",
+             "description": "How many hours the worker can work before they should take a break."
+         },
+         {
+             "name": "WORKED_TIME_CONDITION",
+             "description": "Time category that identifies the reported time entries to use to evaluate whether there should be a corresponding break."
+        }
+    ],
+    "Outputs": [
+        {
+            "name": "OUT_MSG",
+            "description": "Severity of the output message"
+        }
+    ]
+  },
+  {
+    "BaseFormulaName": "ORA_WFM_TCR_UNPAID_BREAK_DURATION_AP",
+    "FormulaType": "WORKFORCE_MANAGEMENT_TIME_CALCULATION_RULES",
+    "Description": "Formula that subtracts the time not worked entry for the scheduled shift from a reported time entry's calculated duration if the entries match shift.",
+    "TemplateName": "SUBTRACT_UNPAID_BREAK_IN_SHIFT_FROM_CALCULATED_DURATION",
+    "Inputs":[ {
+             "name": "DISPLAY_UNPAID_BREAK",
+             "description": "Create and Display Unpaid Duration"
+         }
+    ],
+    "Outputs": [
+        {
+            "name": "HOURS_NOT_WORKED_MEASURE",
+            "description": "Unpaid Break"
+        },
+         {
+            "name": "OUT_MEASURE",
+            "description": "Adjusted Measure Time Worked"
+        },
+         {
+            "name": "Payroll Time Type",
+            "description": "Pay Time Type for unpaid break"
+        }
+    ]
+  }
+]

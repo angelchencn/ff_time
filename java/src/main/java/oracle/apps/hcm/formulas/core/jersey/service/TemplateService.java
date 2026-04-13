@@ -59,7 +59,7 @@ public class TemplateService {
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT v.TEMPLATE_ID, v.FORMULA_TYPE_ID, v.TEMPLATE_CODE, ")
            .append("       v.FORMULA_TEXT, v.ADDITIONAL_PROMPT_TEXT, v.SOURCE_TYPE, ")
-           .append("       v.ACTIVE_FLAG, v.SEMANTIC_FLAG, v.SORT_ORDER, ")
+           .append("       v.ACTIVE_FLAG, v.SEMANTIC_FLAG, v.SYSTEMPROMPT_FLAG, v.SORT_ORDER, ")
            .append("       v.NAME, v.DESCRIPTION, v.OBJECT_VERSION_NUMBER, ")
            .append("       ft.FORMULA_TYPE_NAME ")
            .append("  FROM FF_FORMULA_TEMPLATES_VL v ")
@@ -110,6 +110,96 @@ public class TemplateService {
         return listByFormulaType(formulaTypeName, false);
     }
 
+    /**
+     * Returns the distinct formula types that have at least one active,
+     * non-system-prompt template row. Used by the frontend Type dropdown
+     * so it only shows types the user can actually pick a template from.
+     * "Custom" is synthesised for rows with {@code FORMULA_TYPE_ID IS NULL}.
+     */
+    public List<Map<String, Object>> listDistinctFormulaTypes() throws SQLException {
+        String sql =
+            "SELECT DISTINCT " +
+            "  CASE WHEN v.FORMULA_TYPE_ID IS NULL THEN 'Custom' ELSE ft.FORMULA_TYPE_NAME END AS TYPE_NAME, " +
+            "  CASE WHEN v.FORMULA_TYPE_ID IS NULL THEN 'Custom Formula' ELSE ft.FORMULA_TYPE_NAME END AS DISPLAY_NAME " +
+            "FROM FF_FORMULA_TEMPLATES_VL v " +
+            "LEFT JOIN FF_FORMULA_TYPES ft ON v.FORMULA_TYPE_ID = ft.FORMULA_TYPE_ID " +
+            "WHERE v.ACTIVE_FLAG = 'Y' " +
+            "  AND (v.SYSTEMPROMPT_FLAG IS NULL OR v.SYSTEMPROMPT_FLAG = 'N') " +
+            "ORDER BY TYPE_NAME";
+
+        try (Connection conn = DbConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            List<Map<String, Object>> out = new ArrayList<>();
+            while (rs.next()) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("type_name", rs.getString("TYPE_NAME"));
+                m.put("display_name", rs.getString("DISPLAY_NAME"));
+                m.put("formula_count", 0);
+                m.put("sample_prompts", List.of());
+                out.add(m);
+            }
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(this,
+                        "listDistinctFormulaTypes returned " + out.size() + " types",
+                        AppsLogger.FINER);
+            }
+            return out;
+        } catch (SQLException e) {
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
+            throw e;
+        }
+    }
+
+    /**
+     * Fetch the active system prompt template — the single row with
+     * {@code SYSTEMPROMPT_FLAG='Y'} and {@code ACTIVE_FLAG='Y'}. Returns
+     * {@code null} when no such row exists or the row is inactive.
+     */
+    /**
+     * Returns all active system prompt templates, ordered by
+     * {@code SORT_ORDER}. The caller (AiService) concatenates their
+     * {@code FORMULA_TEXT} values to build the final system prompt, so
+     * multiple rows can each contribute a section (e.g. base rules,
+     * formula-type contracts, anti-hallucination rules) and their
+     * display order is controlled by the {@code SORT_ORDER} column in
+     * the Manage Templates UI.
+     *
+     * @return ordered list of template maps, or an empty list when no
+     *         active system prompt rows exist.
+     */
+    public List<Map<String, Object>> findSystemPrompts() throws SQLException {
+        String sql =
+            "SELECT v.TEMPLATE_ID, v.FORMULA_TYPE_ID, v.TEMPLATE_CODE, " +
+            "       v.FORMULA_TEXT, v.ADDITIONAL_PROMPT_TEXT, v.SOURCE_TYPE, " +
+            "       v.ACTIVE_FLAG, v.SEMANTIC_FLAG, v.SYSTEMPROMPT_FLAG, v.SORT_ORDER, " +
+            "       v.NAME, v.DESCRIPTION, v.OBJECT_VERSION_NUMBER, " +
+            "       ft.FORMULA_TYPE_NAME " +
+            "  FROM FF_FORMULA_TEMPLATES_VL v " +
+            "  LEFT JOIN FF_FORMULA_TYPES ft ON v.FORMULA_TYPE_ID = ft.FORMULA_TYPE_ID " +
+            " WHERE v.SYSTEMPROMPT_FLAG = 'Y' " +
+            "   AND v.ACTIVE_FLAG = 'Y' " +
+            " ORDER BY v.SORT_ORDER NULLS LAST, v.TEMPLATE_ID";
+
+        try (Connection conn = DbConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            List<Map<String, Object>> out = new ArrayList<>();
+            while (rs.next()) {
+                out.add(rowToMap(rs));
+            }
+            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                AppsLogger.write(this,
+                        "findSystemPrompts: " + out.size() + " active row(s) found",
+                        AppsLogger.INFO);
+            }
+            return out;
+        } catch (SQLException e) {
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
+            throw e;
+        }
+    }
+
     /** Fetch a single template by id; returns {@code null} when the row does not exist. */
     public Map<String, Object> findById(long templateId) throws SQLException {
         if (AppsLogger.isEnabled(AppsLogger.FINER)) {
@@ -139,7 +229,7 @@ public class TemplateService {
         String sql =
             "SELECT v.TEMPLATE_ID, v.FORMULA_TYPE_ID, v.TEMPLATE_CODE, " +
             "       v.FORMULA_TEXT, v.ADDITIONAL_PROMPT_TEXT, v.SOURCE_TYPE, " +
-            "       v.ACTIVE_FLAG, v.SEMANTIC_FLAG, v.SORT_ORDER, " +
+            "       v.ACTIVE_FLAG, v.SEMANTIC_FLAG, v.SYSTEMPROMPT_FLAG, v.SORT_ORDER, " +
             "       v.NAME, v.DESCRIPTION, v.OBJECT_VERSION_NUMBER, " +
             "       ft.FORMULA_TYPE_NAME " +
             "  FROM FF_FORMULA_TEMPLATES_VL v " +
@@ -294,6 +384,115 @@ public class TemplateService {
         }
     }
 
+    /**
+     * Returns ALL formula types from {@code FF_FORMULA_TYPES}, not just
+     * those with templates. Used by the Manage Templates detail panel so
+     * users can assign any type to a new template.
+     */
+    public List<Map<String, Object>> listAllFormulaTypes() throws SQLException {
+        String sql =
+            "SELECT FORMULA_TYPE_ID, FORMULA_TYPE_NAME " +
+            "  FROM FF_FORMULA_TYPES " +
+            " ORDER BY FORMULA_TYPE_NAME";
+        try (Connection conn = DbConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            List<Map<String, Object>> out = new ArrayList<>();
+            // Always include Custom at position 0
+            out.add(Map.of("type_name", "Custom", "display_name", "Custom Formula"));
+            while (rs.next()) {
+                String name = rs.getString("FORMULA_TYPE_NAME");
+                out.add(Map.of("type_name", name, "display_name", name));
+            }
+            return out;
+        } catch (SQLException e) {
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
+            throw e;
+        }
+    }
+
+    // ── Formula lookup (FF_FORMULAS_VL) ─────────────────────────────────────
+
+    /**
+     * Search existing formulas in {@code FF_FORMULAS_VL} by formula type
+     * and name keyword. Used by the Manage Templates UI to let users pick
+     * an existing formula as the basis for a new template's FORMULA_TEXT.
+     *
+     * @return list of maps with {@code formula_id}, {@code formula_name},
+     *         {@code formula_type_name} — no FORMULA_TEXT (large CLOB,
+     *         fetched separately via {@link #getFormulaText}).
+     */
+    public List<Map<String, Object>> searchFormulas(String formulaType, String search,
+                                                    int limit, int offset) throws SQLException {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT f.FORMULA_ID, f.FORMULA_NAME, ft.FORMULA_TYPE_NAME ");
+        sql.append("  FROM FF_FORMULAS_VL f ");
+        sql.append("  JOIN FF_FORMULA_TYPES ft ON f.FORMULA_TYPE_ID = ft.FORMULA_TYPE_ID ");
+        sql.append(" WHERE 1=1 ");
+
+        List<Object> params = new ArrayList<>();
+        if (formulaType != null && !formulaType.isBlank()) {
+            sql.append("   AND ft.FORMULA_TYPE_NAME = ? ");
+            params.add(formulaType);
+        }
+        if (search != null && !search.isBlank()) {
+            sql.append("   AND UPPER(f.FORMULA_NAME) LIKE UPPER(?) ");
+            params.add("%" + search + "%");
+        }
+        sql.append(" ORDER BY f.FORMULA_NAME ");
+        sql.append(" OFFSET ? ROWS FETCH NEXT ? ROWS ONLY");
+        params.add(offset);
+        params.add(limit);
+
+        try (Connection conn = DbConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+            int idx = 1;
+            for (Object p : params) {
+                if (p instanceof Integer) {
+                    ps.setInt(idx++, (Integer) p);
+                } else {
+                    ps.setString(idx++, p.toString());
+                }
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                List<Map<String, Object>> out = new ArrayList<>();
+                while (rs.next()) {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("formula_id", rs.getLong("FORMULA_ID"));
+                    m.put("formula_name", rs.getString("FORMULA_NAME"));
+                    m.put("formula_type_name", rs.getString("FORMULA_TYPE_NAME"));
+                    out.add(m);
+                }
+                return out;
+            }
+        } catch (SQLException e) {
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
+            throw e;
+        }
+    }
+
+    /**
+     * Fetch the full FORMULA_TEXT CLOB for a single formula from
+     * {@code FF_FORMULAS_VL}. Called when the user picks a formula in
+     * the Manage Templates UI to use as the template body.
+     */
+    public String getFormulaText(long formulaId) throws SQLException {
+        String sql = "SELECT FORMULA_TEXT FROM FF_FORMULAS_VL WHERE FORMULA_ID = ?";
+        try (Connection conn = DbConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, formulaId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return readClob(rs, "FORMULA_TEXT");
+                }
+                return null;
+            }
+        } catch (SQLException e) {
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
+            throw e;
+        }
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────
 
     private long nextTemplateId(Connection conn) throws SQLException {
@@ -345,14 +544,14 @@ public class TemplateService {
             "INSERT INTO FF_FORMULA_TEMPLATES ( " +
             "  TEMPLATE_ID, FORMULA_TYPE_ID, TEMPLATE_CODE, FORMULA_TEXT, " +
             "  ADDITIONAL_PROMPT_TEXT, SOURCE_TYPE, ACTIVE_FLAG, SEMANTIC_FLAG, " +
-            "  SORT_ORDER, OBJECT_VERSION_NUMBER, " +
+            "  SYSTEMPROMPT_FLAG, SORT_ORDER, OBJECT_VERSION_NUMBER, " +
             "  CREATED_BY, CREATION_DATE, LAST_UPDATED_BY, LAST_UPDATE_DATE, " +
-            "  ENTERPRISE_ID, SEED_DATA_SOURCE, MODULE_ID, ORA_SEED_SET1, ORA_SEED_SET2 " +
+            "  ENTERPRISE_ID, SEED_DATA_SOURCE, MODULE_ID " +
             ") VALUES ( " +
-            "  ?, ?, ?, ?, ?, 'USER_CREATED', 'Y', 'Y', ?, 1, " +
+            "  ?, ?, ?, ?, ?, 'USER_CREATED', 'Y', 'Y', 'N', ?, 1, " +
             "  ?, SYSTIMESTAMP, ?, SYSTIMESTAMP, " +
             "  nvl(SYS_CONTEXT('FND_VPD_CTX','FND_ENTERPRISE_ID'), 0), " +
-            "  'USER_CREATED', 'HXT', 'Y', 'Y' " +
+            "  'USER_CREATED', 'HXT' " +
             ")";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, templateId);
@@ -377,12 +576,12 @@ public class TemplateService {
             "INSERT INTO FF_FORMULA_TEMPLATES_TL ( " +
             "  TEMPLATE_ID, LANGUAGE, SOURCE_LANG, NAME, DESCRIPTION, OBJECT_VERSION_NUMBER, " +
             "  CREATED_BY, CREATION_DATE, LAST_UPDATED_BY, LAST_UPDATE_DATE, " +
-            "  ENTERPRISE_ID, SEED_DATA_SOURCE, ORA_SEED_SET1, ORA_SEED_SET2 " +
+            "  ENTERPRISE_ID, SEED_DATA_SOURCE " +
             ") VALUES ( " +
             "  ?, ?, ?, ?, ?, 1, " +
             "  ?, SYSTIMESTAMP, ?, SYSTIMESTAMP, " +
             "  nvl(SYS_CONTEXT('FND_VPD_CTX','FND_ENTERPRISE_ID'), 0), " +
-            "  'USER_CREATED', 'Y', 'Y' " +
+            "  'USER_CREATED' " +
             ")";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, templateId);
@@ -425,6 +624,10 @@ public class TemplateService {
         if (updates.containsKey("semantic_flag")) {
             sets.add("SEMANTIC_FLAG = ?");
             params.add(str(updates.get("semantic_flag"), "Y"));
+        }
+        if (updates.containsKey("systemprompt_flag")) {
+            sets.add("SYSTEMPROMPT_FLAG = ?");
+            params.add(str(updates.get("systemprompt_flag"), "N"));
         }
         if (updates.containsKey("formula_type")) {
             Long ftId = resolveFormulaTypeId(conn, str(updates.get("formula_type"), null));
@@ -511,6 +714,7 @@ public class TemplateService {
         m.put("source_type", rs.getString("SOURCE_TYPE"));
         m.put("active_flag", rs.getString("ACTIVE_FLAG"));
         m.put("semantic_flag", rs.getString("SEMANTIC_FLAG"));
+        m.put("systemprompt_flag", rs.getString("SYSTEMPROMPT_FLAG"));
         int sort = rs.getInt("SORT_ORDER");
         m.put("sort_order", rs.wasNull() ? 0 : sort);
         m.put("name", rs.getString("NAME"));
@@ -564,12 +768,18 @@ public class TemplateService {
     }
 
     /** Generate a TEMPLATE_CODE from the human name when the caller doesn't supply one. */
+    private static final String TEMPLATE_CODE_PREFIX = "ORA_HCM_FF_";
+
     private static String generateTemplateCode(String name) {
         String base = (name == null ? "TEMPLATE" : name)
                 .toUpperCase()
                 .replaceAll("[^A-Z0-9]+", "_")
                 .replaceAll("^_+|_+$", "");
         if (base.isEmpty()) base = "TEMPLATE";
+        // Prepend the standard prefix if not already present.
+        if (!base.startsWith(TEMPLATE_CODE_PREFIX)) {
+            base = TEMPLATE_CODE_PREFIX + base;
+        }
         // TEMPLATE_CODE is VARCHAR2(150); add a short suffix to reduce collisions.
         String suffix = "_" + (System.currentTimeMillis() % 1_000_000L);
         int max = 150 - suffix.length();
