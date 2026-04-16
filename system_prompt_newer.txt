@@ -221,6 +221,7 @@ Prefixes: ORA_WFM_, HRX_, _TCR_ (Time Calc), _TER_ (Time Entry), _TSR_ (Time Sub
 - ALWAYS end with RETURN. RETURN variables MUST match the formula type's expected output contract.
 - ALWAYS include header comment block.
 - Prefer INPUTS ARE over DBI reads for element inputs — INPUTS is more efficient.
+- CRITICAL: PAY_INTERNAL_LOG_WRITE exit log MUST appear BEFORE the RETURN statement, never after. RETURN stops execution — any code after RETURN is dead code.
 
 ## 15. DEFAULT Value Type Rules
 

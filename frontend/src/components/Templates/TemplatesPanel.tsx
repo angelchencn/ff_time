@@ -71,6 +71,7 @@ interface FormulaLookupProps {
 function FormulaLookup({ formulaType, serverConfig, onSelect }: FormulaLookupProps) {
   const PAGE_SIZE = 25;
   const [options, setOptions] = useState<{ value: number; label: string }[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const offsetRef = useRef(0);
@@ -109,6 +110,7 @@ function FormulaLookup({ formulaType, serverConfig, onSelect }: FormulaLookupPro
   useEffect(() => {
     offsetRef.current = 0;
     searchTermRef.current = undefined;
+    setSelectedId(null);
     fetchFormulas();
   }, [formulaType]);
 
@@ -131,6 +133,7 @@ function FormulaLookup({ formulaType, serverConfig, onSelect }: FormulaLookupPro
   }
 
   async function handleSelect(formulaId: number) {
+    setSelectedId(formulaId);
     try {
       const url = `${serverConfig.baseUrl}${serverConfig.apiPrefix}/formulas/lookup/${formulaId}/text`;
       const res = await axios.get<{ formula_text: string }>(url, { headers });
@@ -159,8 +162,62 @@ function FormulaLookup({ formulaType, serverConfig, onSelect }: FormulaLookupPro
         fontSize: 13,
       }}
       allowClear
-      value={null}
+      value={selectedId}
+      onChange={(val) => { if (val === undefined || val === null) setSelectedId(null); }}
     />
+  );
+}
+
+// ─── Generate Name & Description ──────────────────────────────────────────
+
+interface GenerateMetaButtonProps {
+  formulaText: string;
+  formulaName: string;
+  serverConfig: import('../../stores/serverStore').ServerConfig;
+  onGenerated: (name: string, description: string) => void;
+}
+
+function GenerateMetaButton({ formulaText, formulaName, serverConfig, onGenerated }: GenerateMetaButtonProps) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleClick() {
+    if (!formulaText && !formulaName) {
+      message.warning('Load a formula first');
+      return;
+    }
+    setLoading(true);
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (serverConfig.auth) {
+        headers['Authorization'] = `Basic ${btoa(`${serverConfig.auth.username}:${serverConfig.auth.password}`)}`;
+      }
+      const resp = await axios.post<{ name: string; description: string }>(
+        `${serverConfig.baseUrl}${serverConfig.apiPrefix}/templates/generate-meta`,
+        { formula_text: formulaText, formula_name: formulaName },
+        { headers }
+      );
+      if (resp.data.name || resp.data.description) {
+        onGenerated(resp.data.name || formulaName, resp.data.description || '');
+        message.success('Name & description generated');
+      }
+    } catch (err: any) {
+      message.error('Generate failed: ' + (err?.response?.data?.error || err.message));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Tooltip title="AI generates name & description from the formula">
+      <Button
+        size="middle"
+        loading={loading}
+        onClick={handleClick}
+        style={{ flexShrink: 0, fontSize: 12 }}
+      >
+        AI Generate
+      </Button>
+    </Tooltip>
   );
 }
 
@@ -1172,6 +1229,16 @@ RETURN l_result
                           serverConfig={current}
                           onSelect={(text) => {
                             setEditCode(text);
+                            setIsDirty(true);
+                          }}
+                        />
+                        <GenerateMetaButton
+                          formulaText={editCode}
+                          formulaName={editName}
+                          serverConfig={current}
+                          onGenerated={(name, desc) => {
+                            setEditName(name);
+                            setEditDesc(desc);
                             setIsDirty(true);
                           }}
                         />

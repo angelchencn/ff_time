@@ -1,0 +1,23 @@
+⏺ 本地仓库里没有这个文件（它在 ADE 那边）。这是 GSCC 的 Seed Data VO Usage                  审查规则，需要在 AM.xml 里对这个 VO usage 的两个属性做明确声明：
+                                                                                            修改方法：打开 FastFormulaServiceAM.xml，找到 FormulaTemplates 这个 viewUsage
+  节点，把属性补全：
+
+  <ViewUsage
+      Name="FormulaTemplates"
+                                                                                            ViewObjectName="oracle.apps.hcm.formulas.core.protectedModel.view.FormulaTemplatesVO"
+      customizable="YES"
+      recordIdentifiedBySurrogateAttr="TRUE"/>
+
+  两个属性怎么选：
+  1. customizable
+    - YES — 客户可以通过 FSM/Seed Data Framework 修改这行 seed
+  data（大多数业务数据模板属于这类）                                                          - NO — Oracle 内部 only，客户不能改（需要额外审批理由）
+    - 对 FormulaTemplates 这种客户可以扩展/自定义的模板表，应该是 YES
+  2. recordIdentifiedBySurrogateAttr
+    - TRUE — 主键是 surrogate key（如 TEMPLATE_ID，序列生成的数字 ID）
+    - FALSE — 主键是 natural key（如 TEMPLATE_NAME 业务语义键）
+    - FormulaTemplates 表如果 PK 是 TEMPLATE_ID（序列生成），填 TRUE；如果是用 name
+  作为唯一标识，填 FALSE
+
+  先确认一下：你的 FormulaTemplatesEO.xml 里 PK 属性是什么？是 TemplateId 还是
+  TemplateName？知道后就能确定 recordIdentifiedBySurrogateAttr 的值。

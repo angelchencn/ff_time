@@ -1,0 +1,36 @@
+
+Entry Point:
+    WFM
+    Agent formula UI
+
+
+Requirement:
+    formula type
+        basic formula type
+        dync formula type
+            element validation one
+            task repeat
+    chat experience
+        session_id
+        repeat conversation
+
+
+Storage/Source
+    Documentation not integrated
+    Sample formula - Vector search
+    Template - Seeddata template
+        - Sample Formula
+        - Additional Prompt Text
+
+Open Items:
+    Completion API/why hcm api not fit with our Requirement
+    Why Rest why not workflow
+    Storage location
+
+
+
+
+Pending tasks:
+    1. jazn change for jesery rest
+    2. we need to register a usercase in prompt lab (hcm.hrg.goal_creation/hcm.ff.formula_generate)
+    3. Seeddata for template

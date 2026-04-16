@@ -1,3 +1,37 @@
+SELECT fat.module_id,
+  fat.module_name,
+  fat.module_type
+FROM FND_APPL_TAXONOMY fat,
+  (SELECT source_module_id
+  FROM FND_APPL_TAXONOMY_HIERARCHY fath
+    CONNECT BY prior fath.target_module_id = fath.source_module_id
+    START WITH fath.source_module_id IN
+    (SELECT module_id
+    FROM FND_APPL_TAXONOMY
+    WHERE module_name like 'HcmPayCore'
+    )
+  ) module_id
+WHERE fat.module_id = module_id.source_module_id;
+
+--6345B48C2F5A8CB4E040449821C64847
+--6345B48C2F3C8CB4E040449821C64847
+--6345B48C2F3D8CB4E040449821C64847
+--61ECAF4AAB01E990E040449821C61C97
+SELECT fat.module_id,
+  fat.module_name,
+  fat.module_type
+FROM FND_APPL_TAXONOMY fat,
+  (SELECT source_module_id
+  FROM FND_APPL_TAXONOMY_HIERARCHY fath
+    CONNECT BY prior fath.target_module_id = fath.source_module_id
+    START WITH fath.source_module_id IN
+    (SELECT module_id
+    FROM FND_APPL_TAXONOMY
+    WHERE module_id = '6345B48C2E118CB4E040449821C64847'
+    )
+  ) module_id
+where fat.module_id = module_id.source_module_id;
+-----------------------------------------------------------------
 
 GRANT SELECT ON FF_FORMULA_TEMPLATES TO FUSION_RUNTIME;
 GRANT SELECT ON FF_FORMULA_TEMPLATES_TL TO FUSION_RUNTIME;
@@ -9,11 +43,23 @@ GRANT DELETE ON FF_FORMULA_TEMPLATES TO FUSION_RUNTIME;
 GRANT DELETE ON FF_FORMULA_TEMPLATES_TL TO FUSION_RUNTIME;
 GRANT SELECT ON FF_FORMULA_TEMPLATES_VL TO FUSION_RUNTIME;
 
-select * from FF_FORMULA_TEMPLATES_VL where name = 'Overtime Pay Calculation';
+
+select * from FF_FORMULA_TEMPLATES_VL where template_code = 'ORA_HCM_FF_SYSTEM_PROMPT';
+select * from "ff_formula_templates_tl" where template_id in (300100646124592, 100106861372618);
+select * from "ff_formula_templates" where template_id in (300100646124592, 100106861372618);
 
 
-delete from FF_FORMULA_TEMPLATES_VL where formula_type_id is not null;
+delete from "ff_formula_templates" where template_id in (300100646124592, 100106861372618);
 
+update ff_formula_templates_tl set description = 'Complete Oracle Fusion Cloud HCM Fast Formula language specification for LLM code generation. Covers data types, statement ordering, operators, control flow, built-in functions, formula type output contracts, naming conventions, and guardrails against hallucinated syntax.' where template_id = 300100646125593;
+
+update ff_formula_templates set module_id = '61ECAF4AABAFE911E040449821C61C97' where template_id = 300100646125592;
+update "ff_formula_templates_tl" set name = 'Fast Formula Language Reference', description = 'Complete Oracle Fusion Cloud HCM Fast Formula language specification for LLM code generation — covers data types, statement ordering, operators, control flow, built-in functions, formula type output contracts, naming conventions, and anti-hallucination rules.' where template_id = 100106861371859;
+
+select * from ff_formula_types;
+
+delete from ff_formula_templates_tl where template_id in (select template_id from FF_FORMULA_TEMPLATES_VL where formula_type_id is not null);
+delete from ff_formula_templates where formula_type_id is not null;
 
 
 ALTER TABLE "ff_formula_templates"

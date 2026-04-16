@@ -13,8 +13,8 @@ import oracle.adf.share.security.authorization.RestServicePermission;
 import org.apache.commons.lang3.StringUtils;
 
 public class FastFormulaResourceUtil {
-    public static final String FAST_FORMULA_RES_NAME = "fastFormula";
-    public static final String FASTFORMULA_ENTRIES = "/hcmRestApi/redwood/11.13.18.05/fastFormula";
+    public static final String FAST_FORMULA_RES_NAME = "fastFormulaAssistants";
+    public static final String FASTFORMULA_ENTRIES = "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants";
     
     public final static List<String> validResources = new ArrayList<String>();
     public static final List<String> VALID_RESOURCES;

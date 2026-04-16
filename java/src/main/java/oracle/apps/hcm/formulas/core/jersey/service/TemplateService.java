@@ -276,6 +276,9 @@ public class TemplateService {
         String formulaTypeName = str(req.get("formula_type"), null);
         int sortOrder = asInt(req.get("sort_order"), 0);
         String createdBy = str(req.get("user_id"), DEFAULT_USER);
+        String activeFlag = str(req.get("active_flag"), "Y");
+        String semanticFlag = str(req.get("semantic_flag"), "N");
+        String systempromptFlag = str(req.get("systemprompt_flag"), "N");
 
         try (Connection conn = DbConfig.getConnection()) {
             conn.setAutoCommit(false);
@@ -284,7 +287,7 @@ public class TemplateService {
                 Long formulaTypeId = resolveFormulaTypeId(conn, formulaTypeName);
 
                 insertBase(conn, templateId, formulaTypeId, templateCode, code, rule,
-                        sortOrder, createdBy);
+                        sortOrder, createdBy, activeFlag, semanticFlag, systempromptFlag);
                 insertTl(conn, templateId, name, description, createdBy);
 
                 conn.commit();
@@ -539,7 +542,8 @@ public class TemplateService {
 
     private void insertBase(Connection conn, long templateId, Long formulaTypeId,
                             String templateCode, String formulaText, String additionalPromptText,
-                            int sortOrder, String createdBy) throws SQLException {
+                            int sortOrder, String createdBy,
+                            String activeFlag, String semanticFlag, String systempromptFlag) throws SQLException {
         String sql =
             "INSERT INTO FF_FORMULA_TEMPLATES ( " +
             "  TEMPLATE_ID, FORMULA_TYPE_ID, TEMPLATE_CODE, FORMULA_TEXT, " +
@@ -548,7 +552,7 @@ public class TemplateService {
             "  CREATED_BY, CREATION_DATE, LAST_UPDATED_BY, LAST_UPDATE_DATE, " +
             "  ENTERPRISE_ID, SEED_DATA_SOURCE, MODULE_ID " +
             ") VALUES ( " +
-            "  ?, ?, ?, ?, ?, 'USER_CREATED', 'Y', 'Y', 'N', ?, 1, " +
+            "  ?, ?, ?, ?, ?, 'USER_CREATED', ?, ?, ?, ?, 1, " +
             "  ?, SYSTIMESTAMP, ?, SYSTIMESTAMP, " +
             "  nvl(SYS_CONTEXT('FND_VPD_CTX','FND_ENTERPRISE_ID'), 0), " +
             "  'USER_CREATED', 'HXT' " +
@@ -563,9 +567,12 @@ public class TemplateService {
             ps.setString(3, templateCode);
             setClob(ps, 4, formulaText);
             setClob(ps, 5, additionalPromptText);
-            ps.setInt(6, sortOrder);
-            ps.setString(7, createdBy);
-            ps.setString(8, createdBy);
+            ps.setString(6, activeFlag);
+            ps.setString(7, semanticFlag);
+            ps.setString(8, systempromptFlag);
+            ps.setInt(9, sortOrder);
+            ps.setString(10, createdBy);
+            ps.setString(11, createdBy);
             ps.executeUpdate();
         }
     }

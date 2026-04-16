@@ -136,7 +136,7 @@ export function EditorWithChat() {
     }
 
     abortRef.current = streamSSE(
-      `${current.baseUrl}${current.apiPrefix}/chat`,
+      `${current.baseUrl}${current.apiPrefix}/chat/sync`,
       body,
       (token) => appendToLast(token),
       () => {

@@ -106,14 +106,14 @@ public class AiService {
         } catch (Exception e) {
             if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
                 AppsLogger.write(this,
-                        "Cannot load system prompt from DB, using default: "
+                        "Cannot load system prompt from DB, returning empty: "
                                 + e.getMessage(),
                         AppsLogger.WARNING);
             }
         }
 
-        cachedSystemPrompt = DEFAULT_SYSTEM_PROMPT;
-        return DEFAULT_SYSTEM_PROMPT;
+        cachedSystemPrompt = "";
+        return "";
     }
 
     /**

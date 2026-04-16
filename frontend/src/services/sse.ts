@@ -47,16 +47,44 @@ export function streamSSE(
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let sawSseFrame = false;
+      let fullBody = '';
 
       while (true) {
         const { done, value } = await reader.read();
 
         if (done) {
+          if (!sawSseFrame) {
+            const raw = fullBody.trim();
+            if (raw) {
+              try {
+                const parsed = JSON.parse(raw) as {
+                  text?: string;
+                  content?: string;
+                  replace?: string;
+                  session_id?: string;
+                };
+                if (parsed.session_id && onSessionId) {
+                  onSessionId(parsed.session_id);
+                }
+                const text = parsed.text ?? parsed.content ?? '';
+                if (parsed.replace && onReplace) {
+                  onReplace(parsed.replace);
+                } else if (text) {
+                  onToken(text);
+                }
+              } catch {
+                onToken(raw);
+              }
+            }
+          }
           onDone();
           break;
         }
 
-        buffer += decoder.decode(value, { stream: true });
+        const chunk = decoder.decode(value, { stream: true });
+        fullBody += chunk;
+        buffer += chunk;
         const lines = buffer.split('\n');
         buffer = lines.pop() ?? '';
 
@@ -69,6 +97,7 @@ export function streamSSE(
           }
 
           if (trimmed.startsWith('data:')) {
+            sawSseFrame = true;
             const dataStr = trimmed.slice(5).trim();
             if (!dataStr || dataStr === '[DONE]') {
               continue;

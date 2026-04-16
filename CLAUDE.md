@@ -285,6 +285,7 @@ ai-common/llm/rest/v2/completion
 
 ade co -nc hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/util/FastFormulaResourceUtil.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/service/ValidatorService.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/service/SimulatorService.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/service/RagService.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/service/OpenAiProvider.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/service/LlmProvider.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/service/LlmDebugLog.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/service/FusionAiProvider.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/service/FormulaTypesService.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/service/FormulaService.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/service/DbiService.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/service/TemplateService.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/service/ChatSessionStore.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/service/AiService.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/parser/Tokenizer.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/parser/Interpreter.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/parser/FFParser.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/parser/AstNodes.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/model/Formula.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/config/JerseyConfig.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/config/DbConfig.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/config/CorsFilter.java hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/api/FastFormulaResource.java
 
+cp -r -f /scratch/xiaojuch/ff_time/java/src/main/java/oracle/apps/hcm/formulas/core/jersey/* ./hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey
 
 cp -r -f /scratch/xiaojuch/ff_time/java/src/main/java/oracle/apps/hcm/formulas/core/jersey/service/AiService.java ./hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/service
 cp -r -f /scratch/xiaojuch/ff_time/java/src/main/java/oracle/apps/hcm/formulas/core/jersey/config/DbConfig.java ./hcm/components/hcmPayroll/formulas/core/restModel/HcmFastFormulaRestModel/src/oracle/apps/hcm/formulas/core/jersey/config
@@ -316,3 +317,74 @@ https://docs.oracle.com/en/cloud/saas/human-resources/fapid/element-input-valida
   - AI Apps 的 quota / rate limiting 是按 usecase 隔离的
   - 日志和监控也按 usecase 分
   - 用别人的 usecase 会影响他们的用量统计
+
+
+
+AdfHcmFastFormulaRestModel.jar
+FUSIONAPPS_PT.V2MIBHCMBRONZE_LINUX.X64_260412.0754.S
+/net/phoenix647136.appsdev.fusionappsdphx1.oraclevcn.com/scratch/share/
+39168093
+
+
+
+setenv DB_CONN phxvm72.appsdev1.fusionappsdphx1.oraclevcn.com:1572/ems5150_FDB
+setenv DB_USER fusion
+setenv EXTRACT_ROOT /scratch/$USER/seed_data
+
+set DATA = $AVR/fusionapps/hcm/pay/db/data/HcmPayTop/HcmPayCore
+
+set cp = "$MW_HOME/atgpf/atgpf/lib/oracle.apps.fnd.applseed-rt.jar"
+set cp = "${cp}:$MW_HOME/oracle_common/modules/oracle.odl/ojdl.jar"
+set cp = "${cp}:$MW_HOME/oracle_common/modules/oracle.xdk/xmlparserv2.jar"
+set cp = "${cp}:$MW_HOME/oracle_common/modules/oracle.xdk/xml.jar"
+set cp = "${cp}:$AVR/fusionapps/jlib/hcmPillar/AdfHcmProcFlowCoreProtectedModel.jar"
+set cp = "${cp}:$AVR/fusionapps/jlib/AdfHcmCommonPayPublicModel.jar"
+set cp = "${cp}:$AVR/fusionapps/jlib/AdfHcmCommonCorePublicModel.jar"
+set cp = "${cp}:$AVR/fusionapps/jlib/hcmPillar/AdfHcmProcFlowCorePublicModel.jar"
+set cp = "${cp}:$AVR/fusionapps/jlib/AdfHcmSecurityCommonPublicModel.jar"
+set cp = "${cp}:$AVR/fusionapps/jlib/hcmPillar/AdfHcmFormulaCoreProtectedModel.jar"
+set cp = "${cp}:$AVR/fusionapps/jlib/AdfHcmCommonFfPublicModel.jar"
+set cp = "${cp}:$AVR/fusionapps/hcm/jlib/AdfHcmLegislativeDataGroupsPublicEntity.jar"
+set cp = "${cp}:$AVR/fusionapps/jlib/hcmPillar/AdfHcmPayBalSetupPublicEntity.jar"
+set cp = "${cp}:$AVR/fusionapps/jlib/hcmPillar/AdfHcmPayElementSetupPublicEntity.jar"
+set cp = "${cp}:$AVR/fusionapps/jlib/hcmPillar/AdfHcmFormulaCorePublicEntity.jar"
+set cp = "${cp}:$AVR/fusionapps/jlib/hcmPillar/AdfHcmPayBalSetupPublicView.jar"
+set cp = "${cp}:$AVR/fusionapps/jlib/hcmPillar/AdfHcmVolumeReportSetupPublicEntity.jar"
+
+
+setenv CP "$cp"
+
+setenv AGENT $MW_HOME/atgpf/plugins/jdeveloper/jdev/oaext/lib/oracle.apps.fnd.applseed-rt.jar
+setenv AM oracle.apps.hcm.formulas.core.fastFormulaService.applicationModule.FastFormulaServiceAM
+setenv DBURL jdbc:oracle:thin:fusion/fusion@$DB_CONN
+
+alias EXTRACT 'echo "fusion" | java -Xms1G -Xmx4G -javaagent:$AGENT -cp $CP oracle.apps.fnd.applseed.rt.extract.Extract -infraType FMW14C -am $AM -dburl $DBURL -dbuser $DB_USER -ExtractRootPath $EXTRACT_ROOT -PartitionKeyNames HcmPayCore -entid 0 -vo \!*'
+
+alias LOADER 'echo "fusion" | java -Xms1G -Xmx4G -javaagent:$AGENT -cp $CP oracle.apps.fnd.applseed.rt.loader.Loader -infraType FMW14C -am $AM -dburl $DBURL -dbuser $DB_USER -entid 0 -file \!*'
+
+
+java -cp $AVR/fusionapps/hcm/jlib/AdfHcmPayrollCoreRestModel.jar:$AVR/fusionapps/jlib/hcmPillar/AdfHcmProcFlowCoreProtectedModel.jar:$AVR/fusionapps/jlib/AdfHcmCommonPayPublicModel.jar:$AVR/fusionapps/jlib/AdfHcmCommonCorePublicModel.jar:$AVR/fusionapps/jlib/hcmPillar/AdfHcmProcFlowCorePublicModel.jar:$AVR/fusionapps/jlib/AdfHcmSecurityCommonPublicModel.jar:$CP oracle.apps.fnd.applseed.rt.loader.Loader -am oracle.apps.hcm.payrolls.core.restModel.applicationModule.PayrollGenericRestAM -file $AVR/fusionapps/hcm/pay/db/data/HcmPayTop/HcmPayCore/PayRestSD.xml -dburl jdbc:oracle:thin:@$DB_CONN -dbuser $DB_USER < $DB_PWD
+
+EXTRACT FormulaTemplates
+
+LOADER hcm/pay/db/data/HcmPayTop/HcmPayCore/FormulaTemplatesSD.xml
+LOADER hcm/pay/db/data/HcmPayTop/HcmPayCore/US/FormulaTemplatesSD.xlf
+
+
+
+ade co -nc hcm/components/hcmPayroll/formulas/core/protectedModel/src/oracle/apps/hcm/formulas/core/fastFormulaService/applicationModule/FastFormulaServiceAM.xml hcm/components/hcmPayroll/formulas/core/protectedModel/src/oracle/apps/hcm/formulas/core/fastFormulaService/applicationModule/FastFormulaServiceAMImpl.java hcm/components/hcmPayroll/formulas/core/protectedModel/src/oracle/apps/hcm/formulas/core/protectedModel/entity/FormulaTemplatesEO.xml hcm/components/hcmPayroll/formulas/core/protectedModel/src/oracle/apps/hcm/formulas/core/protectedModel/entity/FormulaTemplatesTranslationEO.xml hcm/components/hcmPayroll/formulas/core/protectedModel/src/oracle/apps/hcm/formulas/core/protectedModel/entity/association/FormulaTemplatesEOToTranslationEO.xml hcm/components/hcmPayroll/formulas/core/protectedModel/src/oracle/apps/hcm/formulas/core/protectedModel/view/FormulaTemplatesTranslationVO.xml hcm/components/hcmPayroll/formulas/core/protectedModel/src/oracle/apps/hcm/formulas/core/protectedModel/view/FormulaTemplatesVO.xml hcm/components/hcmPayroll/formulas/core/protectedModel/src/oracle/apps/hcm/formulas/core/protectedModel/view/link/FormulaTemplatesVOToTranslationVO.xml
+
+
+
+
+###PROXY
+#setenv HTTPS_PROXY http://www-proxy.us.oracle.com:80
+#setenv HTTP_PROXY http://www-proxy.us.oracle.com:80
+#setenv NOPROXY .us.oracle.com,localhost,.oraclecorp.com
+#setenv NO_PROXY .us.oracle.com,localhost,.oraclecorp.com
+#setenv https_proxy http://www-proxy.us.oracle.com:80
+#setenv http_proxy http://www-proxy.us.oracle.com:80
+#setenv no_proxy .us.oracle.com,localhost,.oraclecorp.com
+
+#setenv JAVA_HOME /usr/lib/jvm/java-21-openjdk
+#set path = ($JAVA_HOME/bin $path)

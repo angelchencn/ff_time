@@ -697,6 +697,62 @@ public class FastFormulaResource {
         }
     }
 
+    // ── Generate Name & Description ─────────────────────────────────────────
+
+    @POST
+    @Path("/templates/generate-meta")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response generateMeta(Map<String, Object> request) {
+        String formulaText = (String) request.getOrDefault("formula_text", "");
+        String formulaName = (String) request.getOrDefault("formula_name", "");
+        if (formulaText.isBlank() && formulaName.isBlank()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "formula_text or formula_name is required"))
+                    .build();
+        }
+
+        try {
+            String snippet = formulaText.length() > 3000
+                    ? formulaText.substring(0, 3000) : formulaText;
+            String userMsg =
+                    "Given the following Oracle Fast Formula, generate a concise template name and description.\n\n"
+                    + (formulaName.isBlank() ? "" : "Formula Name: " + formulaName + "\n\n")
+                    + (snippet.isBlank() ? "" : "Formula Text:\n" + snippet + "\n\n")
+                    + "Return ONLY a JSON object with two fields, no markdown fences:\n"
+                    + "{\"name\": \"<short template name, 5-10 words>\", "
+                    + "\"description\": \"<1-2 sentence description of what this formula does>\"}";
+
+            List<Map<String, String>> messages = List.of(
+                    Map.of("role", "system", "content",
+                            "You generate concise metadata for Oracle Fast Formula templates. "
+                            + "Return valid JSON only, no explanation."),
+                    Map.of("role", "user", "content", userMsg)
+            );
+
+            String raw = aiService.getProvider().complete(messages, 256);
+            String json = raw.replaceAll("(?s)^```[a-z]*\\n?", "")
+                             .replaceAll("(?s)\\n?```$", "").trim();
+
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, String> parsed = new com.fasterxml.jackson.databind.ObjectMapper()
+                        .readValue(json, Map.class);
+                return Response.ok(parsed).build();
+            } catch (Exception pe) {
+                return Response.ok(Map.of(
+                        "name", formulaName.isBlank() ? "New Template" : formulaName,
+                        "description", raw
+                )).build();
+            }
+        } catch (Exception e) {
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of("error", "Generate failed: " + e.getMessage()))
+                    .build();
+        }
+    }
+
     // ── Extract Prompt from URL ─────────────────────────────────────────────
 
     @POST

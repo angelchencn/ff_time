@@ -11,7 +11,7 @@ export function extractCodeBlocks(text: string): string[] {
     if (code) blocks.push(code);
   }
   if (blocks.length === 0) {
-    const ffKeywords = /\b(DEFAULT\s+FOR|INPUT\s+IS|OUTPUT\s+IS|RETURN)\b/i;
+    const ffKeywords = /\b(DEFAULT\s+FOR|INPUTS?\s+(IS|ARE)|OUTPUTS?\s+(IS|ARE)|RETURN|IF\s+.+\s+THEN|END\s+IF)\b/i;
     if (ffKeywords.test(text)) {
       blocks.push(text.trim());
     }

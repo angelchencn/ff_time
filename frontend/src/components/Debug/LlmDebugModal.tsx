@@ -136,11 +136,14 @@ export function LlmDebugModal({ open, onClose }: Props) {
               const ts = new Date(log.timestamp);
               const date = ts.toLocaleDateString('en-CA');
               const time = ts.toLocaleTimeString('en-GB');
-              // Show the actual user prompt text (truncated), not just "stream"
+              // Extract the user's actual request text, not the full formatted prompt
               const lastUser = [...log.messages].reverse().find((m) => m.role === 'user');
-              const preview = lastUser
-                ? lastUser.content.replace(/\s+/g, ' ').substring(0, 100)
-                : log.user_message || log.endpoint;
+              let preview = log.user_message || log.endpoint;
+              if (lastUser) {
+                const reqMatch = lastUser.content.match(/(?:Requirement|Request):\s*(.+)/);
+                preview = reqMatch ? reqMatch[1].trim() : lastUser.content.replace(/\s+/g, ' ');
+              }
+              preview = preview.substring(0, 100);
               return {
                 value: i,
                 label: `${date} ${time} — ${preview}${preview.length >= 100 ? '…' : ''}`,
