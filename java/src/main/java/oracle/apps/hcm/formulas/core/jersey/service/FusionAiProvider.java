@@ -44,6 +44,11 @@ public class FusionAiProvider implements LlmProvider {
     private static final String FAI_COMPLETIONS_CLIENT_CLASS =
             "oracle.apps.hcm.fai.genAiSdk.FAICompletionsClient";
 
+    // Cached reflection handles — resolved once on first use, reused on
+    // every subsequent call to avoid per-request Class.forName overhead.
+    private static volatile java.lang.reflect.Constructor<?> cachedClientConstructor;
+    private static volatile java.lang.reflect.Method cachedGetCompletions;
+
     @Override
     public boolean isAvailable() {
         return true;
@@ -75,20 +80,10 @@ public class FusionAiProvider implements LlmProvider {
 
     @Override
     public String completeWithContext(PromptContext context, int maxTokens) {
-        if (!isSpectraRoutingEnabled()) {
-            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-                AppsLogger.write(this,
-                        "[FusionAI] ORA_FAI_SDK_ENABLE_SPECTRA_ROUTE is not enabled",
-                        AppsLogger.WARNING);
-            }
-            return "Error: ORA_FAI_SDK_ENABLE_SPECTRA_ROUTE is not enabled. "
-                    + "Please contact your administrator to enable Spectra routing.";
-        }
-
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
             AppsLogger.write(this,
-                    "[FusionAI] completeWithContext → Spectra "
-                            + "promptCode=" + PROMPT_CODE
+                    "[FusionAI] completeWithContext"
+                            + " promptCode=" + PROMPT_CODE
                             + " sysLen=" + context.systemPromptOrEmpty().length()
                             + " userLen=" + context.userPromptOrEmpty().length()
                             + " formulaType=" + context.formulaTypeOrEmpty()
@@ -100,6 +95,16 @@ public class FusionAiProvider implements LlmProvider {
         }
         LlmDebugLog.getInstance().record(
                 "fusion-ai-apps", maxTokens, "fusion-spectra", context);
+
+        if (!isSpectraRoutingEnabled()) {
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "[FusionAI] ORA_FAI_SDK_ENABLE_SPECTRA_ROUTE is not enabled",
+                        AppsLogger.WARNING);
+            }
+            return "Error: ORA_FAI_SDK_ENABLE_SPECTRA_ROUTE is not enabled. "
+                    + "Please contact your administrator to enable Spectra routing.";
+        }
 
         String spectraText = callSpectraCompletions(
                 PROMPT_CODE,
@@ -164,19 +169,21 @@ public class FusionAiProvider implements LlmProvider {
                                           String additionalRules,
                                           String chatHistory) {
         try {
-            Class<?> clientClass = Class.forName(FAI_COMPLETIONS_CLIENT_CLASS);
-            Object client = clientClass.getDeclaredConstructor().newInstance();
-            java.lang.reflect.Method getCompletions =
-                    clientClass.getMethod("getCompletions", String.class, List.class);
+            if (cachedClientConstructor == null) {
+                Class<?> clientClass = Class.forName(FAI_COMPLETIONS_CLIENT_CLASS);
+                cachedClientConstructor = clientClass.getDeclaredConstructor();
+                cachedGetCompletions = clientClass.getMethod("getCompletions", String.class, List.class);
+            }
+            Object client = cachedClientConstructor.newInstance();
 
             List<Map<String, String>> properties = new ArrayList<>();
-            addProperty(properties, "systemPrompt",     systemPrompt);
-            addProperty(properties, "userPrompt",       userPrompt);
-            addProperty(properties, "formulaType",      formulaType);
-            addProperty(properties, "referenceFormula", referenceFormula);
-            addProperty(properties, "editorCode",       editorCode);
-            addProperty(properties, "additionalRules",  additionalRules);
-            addProperty(properties, "chatHistory",      chatHistory);
+            addProperty(properties, PromptContext.KEY_SYSTEM_PROMPT,     systemPrompt);
+            addProperty(properties, PromptContext.KEY_USER_PROMPT,       userPrompt);
+            addProperty(properties, PromptContext.KEY_FORMULA_TYPE,      formulaType);
+            addProperty(properties, PromptContext.KEY_REFERENCE_FORMULA, referenceFormula);
+            addProperty(properties, PromptContext.KEY_EDITOR_CODE,       editorCode);
+            addProperty(properties, PromptContext.KEY_ADDITIONAL_RULES,  additionalRules);
+            addProperty(properties, PromptContext.KEY_CHAT_HISTORY,      chatHistory);
 
             if (AppsLogger.isEnabled(AppsLogger.FINER)) {
                 AppsLogger.write(this,
@@ -187,7 +194,7 @@ public class FusionAiProvider implements LlmProvider {
                         AppsLogger.FINER);
             }
 
-            Object response = getCompletions.invoke(client, promptCode, properties);
+            Object response = cachedGetCompletions.invoke(client, promptCode, properties);
             if (response == null) {
                 if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
                     AppsLogger.write(this,

@@ -28,6 +28,16 @@ public record PromptContext(
         String additionalRules,
         String chatHistory
 ) {
+    // Property key names — must match {placeholder} names in the Spectra
+    // prompt template (hr_gen_ai_prompts_seed_b.prompt_tmpl).
+    public static final String KEY_SYSTEM_PROMPT     = "systemPrompt";
+    public static final String KEY_USER_PROMPT       = "userPrompt";
+    public static final String KEY_FORMULA_TYPE      = "formulaType";
+    public static final String KEY_REFERENCE_FORMULA = "referenceFormula";
+    public static final String KEY_EDITOR_CODE       = "editorCode";
+    public static final String KEY_ADDITIONAL_RULES  = "additionalRules";
+    public static final String KEY_CHAT_HISTORY      = "chatHistory";
+
     /**
      * Minimal constructor for the common case — just system + user prompt
      * with a formula type. Other fields default to empty.
