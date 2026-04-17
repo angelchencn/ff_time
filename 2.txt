@@ -42,10 +42,26 @@ import org.apache.commons.lang3.StringUtils;
 public class FusionAiProvider implements LlmProvider {
 
     private static final String COMPLETION_PATH = "ai-common/llm/rest/v2/completion";
-    private static final String USECASE = "hcm.hrg.goal_creation";
+    // promptCode registered in hr_gen_ai_prompts_seed_b. The template
+    // text (prompt_tmpl column) was updated to the HCM Fast Formula
+    // generator template with these placeholders:
+    //   {systemPrompt} {userPrompt} {formulaType}
+    //   {referenceFormula} {editorCode} {additionalRules} {chatHistory}
+    private static final String USECASE = "docio_generic_extract_payload";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public static final String AIMASTER_EXTERNAL_ENDPOINT_KEY = "ORA_AIAPP";
+
+    // FAI Spectra SDK class names ? loaded via reflection so this class
+    // compiles and runs even when the FAI SDK jar isn't on the classpath
+    // (e.g. local dev). When ORA_FAI_SDK_ENABLE_SPECTRA_ROUTE=Y and the
+    // SDK jar is present, complete() routes through Spectra's
+    // /orchestrator/llm/v1/internal-completions; otherwise it falls
+    // back to the existing ai-common hybrid path.
+    private static final String FAI_SDK_UTIL_CLASS =
+            "oracle.apps.hcm.fai.genAiSdk.util.FaiSdkUtil";
+    private static final String FAI_COMPLETIONS_CLIENT_CLASS =
+            "oracle.apps.hcm.fai.genAiSdk.FAICompletionsClient";
 
     @Override
     public boolean isAvailable() {
@@ -68,41 +84,96 @@ public class FusionAiProvider implements LlmProvider {
         }
     }
 
+    // ???????????????????????????????????????????????????????????????????????
+    // Structured prompt context path (Plan B) ? hands each PromptContext
+    // field to Spectra as its own named property so the server-side
+    // template can render them into dedicated XML tags (<system_instructions>,
+    // <formula_type>, <reference_formula>, <current_editor_code>,
+    // <additional_rules>, <chat_history>, <user_request>).
+    //
+    // Falls back to the flattening default (? complete/streamChat ? hybrid
+    // ai-common) when Spectra routing is disabled or returns null.
+    // ???????????????????????????????????????????????????????????????????????
+
+    @Override
+    public String completeWithContext(PromptContext context, int maxTokens) {
+        if (isSpectraRoutingEnabled()) {
+            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                AppsLogger.write(this,
+                        "[FusionAI] completeWithContext ? Spectra "
+                                + "promptCode=" + USECASE
+                                + " sysLen=" + context.systemPromptOrEmpty().length()
+                                + " userLen=" + context.userPromptOrEmpty().length()
+                                + " formulaType=" + context.formulaTypeOrEmpty()
+                                + " refLen=" + context.referenceFormulaOrEmpty().length()
+                                + " editorLen=" + context.editorCodeOrEmpty().length()
+                                + " rulesLen=" + context.additionalRulesOrEmpty().length()
+                                + " historyLen=" + context.chatHistoryOrEmpty().length(),
+                        AppsLogger.INFO);
+            }
+            // Structured-mode debug log ? captures each PromptContext field
+            // independently so the debug UI can show per-field sizes and
+            // per-field token estimates. This replaces the older flat record
+            // which just stored system + user messages.
+            LlmDebugLog.getInstance().record(
+                    "fusion-ai-apps", maxTokens, "fusion-spectra", context);
+
+            String spectraText = callSpectraCompletions(
+                    USECASE,
+                    context.systemPromptOrEmpty(),
+                    context.userPromptOrEmpty(),
+                    context.formulaTypeOrEmpty(),
+                    context.referenceFormulaOrEmpty(),
+                    context.editorCodeOrEmpty(),
+                    context.additionalRulesOrEmpty(),
+                    context.chatHistoryOrEmpty()
+            );
+            if (spectraText != null && !spectraText.isEmpty()) {
+                return spectraText;
+            }
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "[FusionAI] Spectra structured call returned null/empty; falling back to hybrid",
+                        AppsLogger.WARNING);
+            }
+        }
+        // Fallback: default impl flattens to messages and routes through
+        // complete() ? hybrid ai-common path.
+        return LlmProvider.super.completeWithContext(context, maxTokens);
+    }
+
+    @Override
+    public void streamChatWithContext(PromptContext context, int maxTokens,
+                                      Consumer<String> tokenCallback) {
+        String response = completeWithContext(context, maxTokens);
+        if (response != null && !response.isEmpty()) {
+            tokenCallback.accept(response);
+        } else {
+            tokenCallback.accept("Error: Fusion AI returned empty response.");
+        }
+    }
+
     @Override
     public String complete(List<Map<String, String>> messages, int maxTokens) {
         try {
+            // ?? Build unified prompt string from messages ????????????????????
+            // Both Spectra and Hybrid paths consume a single "prompt" string,
+            // so we flatten system/user/assistant messages the same way for
+            // both. The promptCode template on the server side is expected
+            // to contain a {{prompt}} placeholder that this value binds to.
             StringBuilder prompt = new StringBuilder();
             for (Map<String, String> msg : messages) {
                 String role = msg.get("role");
                 String content = msg.get("content");
-                if ("system".equals(role)) {
-                    prompt.append(content).append("\n\n");
-                } else if ("user".equals(role)) {
+                if ("system".equals(role) || "user".equals(role)) {
                     prompt.append(content).append("\n\n");
                 } else if ("assistant".equals(role)) {
                     prompt.append("Assistant: ").append(content).append("\n\n");
                 }
             }
+            String promptText = prompt.toString().trim();
 
-            // Fusion AI expects: { "prompt": "...", "usecase": "...", "properties": [...] }
-            Map<String, Object> requestBody = new LinkedHashMap<>();
-            requestBody.put("prompt", prompt.toString().trim());
-            requestBody.put("usecase", USECASE);
-            requestBody.put("properties", new ArrayList<>());
-
-            String jsonPayload = MAPPER.writeValueAsString(requestBody);
-
-            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
-                AppsLogger.write(this,
-                        "[FusionAI] Calling " + COMPLETION_PATH
-                                + " messages=" + messages.size()
-                                + " maxTokens=" + maxTokens,
-                        AppsLogger.INFO);
-            }
-            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                AppsLogger.write(this,
-                        "[FusionAI] payload=" + jsonPayload, AppsLogger.FINER);
-            }
+            // Debug log capture (unchanged)
             String sysPrompt = "";
             String userPrompt = "";
             for (Map<String, String> msg : messages) {
@@ -115,24 +186,252 @@ public class FusionAiProvider implements LlmProvider {
             LlmDebugLog.getInstance().record("fusion-ai-apps", maxTokens,
                     sysPrompt, messages, "fusion", userPrompt);
 
-            // ?? Fusion environment: uncomment this block, comment out callDebugEndpoint ??
-             Object result = invokeGenerativeAiRestService(jsonPayload);
-             if (result == null) {
-                 if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-                     AppsLogger.write(this,
-                             "[FusionAI] invokeGenerativeAiRestService returned null",
-                             AppsLogger.WARNING);
-                 }
-                 return null;
-             }
-             return extractResponse(result.toString());
+            // ?? Route 1: Spectra via FAI Orchestrator SDK ????????????????????
+            // Active only when ORA_FAI_SDK_ENABLE_SPECTRA_ROUTE=Y and the
+            // HcmFaiGenAiSdk jar is on the classpath. The SDK's parent
+            // FAIOrchestratorClient handles OAuth, host resolution, and
+            // bearer-token injection, so we just hand it the promptCode
+            // and properties list.
+            if (isSpectraRoutingEnabled()) {
+                if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                    AppsLogger.write(this,
+                            "[FusionAI] Spectra routing enabled ? calling "
+                                    + "/orchestrator/llm/v1/internal-completions "
+                                    + "promptCode=" + USECASE
+                                    + " maxTokens=" + maxTokens
+                                    + " messages=" + messages.size(),
+                            AppsLogger.INFO);
+                }
+                // The template has separate {systemPrompt} and {userPrompt}
+                // placeholders, so pass them distinctly. Other placeholders
+                // ({formulaType}, {referenceFormula}, {editorCode},
+                // {additionalRules}, {chatHistory}) aren't exposed by the
+                // current LlmProvider interface yet ? pass "" so the
+                // template skips those XML tags (template is designed to
+                // ignore empty-tag blocks).
+                String spectraText = callSpectraCompletions(
+                        USECASE,
+                        sysPrompt,   // {systemPrompt}
+                        userPrompt,  // {userPrompt}
+                        "",          // {formulaType}      ? TODO: wire from AiService
+                        "",          // {referenceFormula} ? TODO: wire from AiService
+                        "",          // {editorCode}       ? TODO: wire from AiService
+                        "",          // {additionalRules}  ? TODO: wire from AiService
+                        ""           // {chatHistory}      ? TODO: wire from AiService
+                );
+                if (spectraText != null && !spectraText.isEmpty()) {
+                    return spectraText;
+                }
+                // Spectra returned null/empty ? log and fall through to hybrid
+                // so the user still gets a response. If the SDK is genuinely
+                // broken, the hybrid path will return its own error message.
+                if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                    AppsLogger.write(this,
+                            "[FusionAI] Spectra returned null/empty; falling back to hybrid path",
+                            AppsLogger.WARNING);
+                }
+            }
+
+            // ?? Route 2: Hybrid (ai-common/llm/rest/v2/completion) ???????????
+            // Existing path. Kept as fallback for environments where Spectra
+            // routing isn't enabled or the SDK isn't deployed yet.
+            Map<String, Object> requestBody = new LinkedHashMap<>();
+            requestBody.put("prompt", promptText);
+            requestBody.put("usecase", USECASE);
+            requestBody.put("properties", new ArrayList<>());
+
+            String jsonPayload = MAPPER.writeValueAsString(requestBody);
+
+            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                AppsLogger.write(this,
+                        "[FusionAI] Hybrid path: " + COMPLETION_PATH
+                                + " messages=" + messages.size()
+                                + " maxTokens=" + maxTokens,
+                        AppsLogger.INFO);
+            }
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(this,
+                        "[FusionAI] hybrid payload=" + jsonPayload, AppsLogger.FINER);
+            }
+
+            Object result = invokeGenerativeAiRestService(jsonPayload);
+            if (result == null) {
+                if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                    AppsLogger.write(this,
+                            "[FusionAI] invokeGenerativeAiRestService returned null",
+                            AppsLogger.WARNING);
+                }
+                return "Error: Fusion AI returned empty response (null).";
+            }
+            return extractResponse(result.toString());
 
         } catch (Exception e) {
-            // SEVERE inside catch ? Fusion AI call failure means the user
-            // gets nothing, ops needs the stack trace.
             AppsLogger.write(this, e, AppsLogger.SEVERE);
+            return "Error: Fusion AI call failed ? " + e.getMessage();
+        }
+    }
+
+    // ???????????????????????????????????????????????????????????????????????
+    // Spectra (FAI Orchestrator) helpers ? reflection-based
+    //
+    // Both methods use reflection so this class has no compile-time
+    // dependency on the HcmFaiGenAiSdk jar. If the jar is missing, or
+    // the ORA_FAI_SDK_ENABLE_SPECTRA_ROUTE profile option is not 'Y',
+    // these methods return false/null and complete() falls back to the
+    // existing ai-common hybrid path.
+    // ???????????????????????????????????????????????????????????????????????
+
+    /**
+     * Probes FaiSdkUtil.isSpectraRoutingEnabled() via reflection.
+     * Returns false if the SDK class is not on the classpath or the
+     * profile option check fails for any reason. Never throws.
+     */
+    private static boolean isSpectraRoutingEnabled() {
+        try {
+            Class<?> clazz = Class.forName(FAI_SDK_UTIL_CLASS);
+            java.lang.reflect.Method method = clazz.getMethod("isSpectraRoutingEnabled");
+            Object result = method.invoke(null);
+            return Boolean.TRUE.equals(result);
+        } catch (Throwable t) {
+            // SDK not available or profile check failed ? treat as disabled.
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(FusionAiProvider.class,
+                        "[FusionAI] Spectra routing probe failed: " + t.getMessage(),
+                        AppsLogger.FINER);
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Calls FAICompletionsClient.getCompletions(promptCode, properties)
+     * via reflection, serializes the returned FAICompletionsResponse to
+     * JSON, and extracts the first choice's text.
+     *
+     * The properties list has one entry per placeholder in the
+     * promptCode template text (hr_gen_ai_prompts_seed_b.prompt_tmpl).
+     * The HCM Fast Formula template declares these placeholders:
+     *   {systemPrompt}      ? system instructions (14 CRITICAL REQUIREMENTS)
+     *   {userPrompt}        ? user's natural-language requirement
+     *   {formulaType}       ? selected formula type name
+     *   {referenceFormula}  ? RAG-retrieved reference formula (optional)
+     *   {editorCode}        ? current editor content (optional, follow-up turns)
+     *   {additionalRules}   ? per-type extra rules (optional)
+     *   {chatHistory}       ? formatted chat history (optional)
+     *
+     * Optional placeholders accept "" ? the template is designed to
+     * ignore XML tags whose body is empty/whitespace.
+     *
+     * Response shape (per fai-orchestrator LLMCompletionResponse):
+     *   {"id": "...", "choices": [{"index": 0, "text": "..."}]}
+     *
+     * Returns null on any failure; caller falls back to the hybrid path.
+     */
+    private String callSpectraCompletions(String promptCode,
+                                          String systemPrompt,
+                                          String userPrompt,
+                                          String formulaType,
+                                          String referenceFormula,
+                                          String editorCode,
+                                          String additionalRules,
+                                          String chatHistory) {
+        try {
+            Class<?> clientClass = Class.forName(FAI_COMPLETIONS_CLIENT_CLASS);
+            Object client = clientClass.getDeclaredConstructor().newInstance();
+            java.lang.reflect.Method getCompletions =
+                    clientClass.getMethod("getCompletions", String.class, List.class);
+
+            List<Map<String, String>> properties = new ArrayList<>();
+            addProperty(properties, "systemPrompt",     systemPrompt);
+            addProperty(properties, "userPrompt",       userPrompt);
+            addProperty(properties, "formulaType",      formulaType);
+            addProperty(properties, "referenceFormula", referenceFormula);
+            addProperty(properties, "editorCode",       editorCode);
+            addProperty(properties, "additionalRules",  additionalRules);
+            addProperty(properties, "chatHistory",      chatHistory);
+
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(this,
+                        "[FusionAI] Spectra call: promptCode=" + promptCode
+                                + " propertyKeys=" + properties.size()
+                                + " systemPromptLen=" + (systemPrompt == null ? 0 : systemPrompt.length())
+                                + " userPromptLen=" + (userPrompt == null ? 0 : userPrompt.length()),
+                        AppsLogger.FINER);
+            }
+
+            Object response = getCompletions.invoke(client, promptCode, properties);
+            if (response == null) {
+                if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                    AppsLogger.write(this,
+                            "[FusionAI] FAICompletionsClient.getCompletions returned null "
+                                    + "(check ORA_FAI_SDK_ENABLE_SPECTRA_ROUTE profile "
+                                    + "and promptCode registration for " + promptCode + ")",
+                            AppsLogger.WARNING);
+                }
+                return null;
+            }
+
+            // Serialize via Jackson so we don't need to know the exact
+            // FAICompletionsResponse class structure. Works with both
+            // POJO-style and record-style response objects.
+            String json = MAPPER.writeValueAsString(response);
+            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                AppsLogger.write(this,
+                        "[FusionAI] Spectra raw response: " + json, AppsLogger.FINER);
+            }
+
+            JsonNode root = MAPPER.readTree(json);
+            JsonNode choices = root.path("choices");
+            if (!choices.isArray() || choices.size() == 0) {
+                if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                    AppsLogger.write(this,
+                            "[FusionAI] Spectra response has no choices: " + json,
+                            AppsLogger.WARNING);
+                }
+                return null;
+            }
+
+            JsonNode first = choices.get(0);
+            // Preferred: completion-style "text" field.
+            JsonNode textNode = first.path("text");
+            if (!textNode.isMissingNode() && !textNode.isNull()) {
+                String text = textNode.asText();
+                if (!text.isEmpty()) {
+                    return text;
+                }
+            }
+            // Fallback: OpenAI chat-style "message.content".
+            JsonNode contentNode = first.path("message").path("content");
+            if (!contentNode.isMissingNode() && !contentNode.isNull()) {
+                String text = contentNode.asText();
+                if (!text.isEmpty()) {
+                    return text;
+                }
+            }
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "[FusionAI] Spectra choices[0] had no extractable text: " + first,
+                        AppsLogger.WARNING);
+            }
+            return null;
+
+        } catch (Throwable t) {
+            AppsLogger.write(this, t, AppsLogger.SEVERE);
             return null;
         }
+    }
+
+    /**
+     * Appends a {key, value} entry to the Spectra properties list.
+     * Null values become "" so the template placeholder renders empty
+     * (the template ignores XML tags with whitespace-only bodies).
+     */
+    private static void addProperty(List<Map<String, String>> properties,
+                                    String key, String value) {
+        Map<String, String> p = new LinkedHashMap<>();
+        p.put("key", key);
+        p.put("value", value == null ? "" : value);
+        properties.add(p);
     }
 
     // ???????????????????????????????????????????????????????????????????????

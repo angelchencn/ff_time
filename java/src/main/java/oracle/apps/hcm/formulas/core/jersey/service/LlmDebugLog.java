@@ -27,6 +27,7 @@ public class LlmDebugLog {
         entry.put("endpoint", endpoint);
         entry.put("model", model);
         entry.put("max_completion_tokens", maxTokens);
+        entry.put("mode", "flat");
         entry.put("system_prompt", systemPrompt);
         entry.put("system_prompt_length", systemPrompt.length());
         entry.put("messages", messages);
@@ -52,6 +53,79 @@ public class LlmDebugLog {
         entry.put("total_chars", totalChars);
         entry.put("estimated_input_tokens", totalChars / 4);
 
+        addEntry(entry);
+    }
+
+    /**
+     * Structured-context overload (Plan B). Captures each {@link PromptContext}
+     * field independently so the debug UI can show per-field size and content.
+     * Use this from providers that hand a {@code PromptContext} to a
+     * named-property template (e.g. FusionAiProvider → Spectra).
+     *
+     * <p>The legacy 6-arg {@link #record} overload still works and is used
+     * by OpenAI / hybrid paths that only have a flattened messages array.
+     */
+    public synchronized void record(String model, int maxTokens, String endpoint,
+                                     PromptContext context) {
+        var entry = new LinkedHashMap<String, Object>();
+        entry.put("timestamp", Instant.now().toString());
+        entry.put("endpoint", endpoint);
+        entry.put("model", model);
+        entry.put("max_completion_tokens", maxTokens);
+        entry.put("mode", "structured");
+
+        // Keep top-level legacy keys populated for UIs that still read them.
+        String systemPrompt = context.systemPromptOrEmpty();
+        String userPrompt = context.userPromptOrEmpty();
+        entry.put("system_prompt", systemPrompt);
+        entry.put("system_prompt_length", systemPrompt.length());
+        entry.put("user_message", userPrompt);
+        entry.put("messages", List.of(
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", userPrompt)
+        ));
+
+        // Structured fields — one entry per PromptContext placeholder.
+        var pc = new LinkedHashMap<String, Object>();
+        putFieldWithLength(pc, "system_prompt",     context.systemPromptOrEmpty());
+        putFieldWithLength(pc, "user_prompt",       context.userPromptOrEmpty());
+        putFieldWithLength(pc, "formula_type",      context.formulaTypeOrEmpty());
+        putFieldWithLength(pc, "reference_formula", context.referenceFormulaOrEmpty());
+        putFieldWithLength(pc, "editor_code",       context.editorCodeOrEmpty());
+        putFieldWithLength(pc, "additional_rules",  context.additionalRulesOrEmpty());
+        putFieldWithLength(pc, "chat_history",      context.chatHistoryOrEmpty());
+        entry.put("prompt_context", pc);
+
+        // Token breakdown per field so the UI can show which section is
+        // eating the budget — critical when investigating 4081-style caps.
+        var tokenBreakdown = new ArrayList<Map<String, Object>>();
+        int totalChars = 0;
+        totalChars += addBreakdown(tokenBreakdown, "system_prompt",     context.systemPromptOrEmpty());
+        totalChars += addBreakdown(tokenBreakdown, "user_prompt",       context.userPromptOrEmpty());
+        totalChars += addBreakdown(tokenBreakdown, "formula_type",      context.formulaTypeOrEmpty());
+        totalChars += addBreakdown(tokenBreakdown, "reference_formula", context.referenceFormulaOrEmpty());
+        totalChars += addBreakdown(tokenBreakdown, "editor_code",       context.editorCodeOrEmpty());
+        totalChars += addBreakdown(tokenBreakdown, "additional_rules",  context.additionalRulesOrEmpty());
+        totalChars += addBreakdown(tokenBreakdown, "chat_history",      context.chatHistoryOrEmpty());
+        entry.put("token_breakdown", tokenBreakdown);
+        entry.put("total_chars", totalChars);
+        entry.put("estimated_input_tokens", totalChars / 4);
+
+        addEntry(entry);
+    }
+
+    private static void putFieldWithLength(Map<String, Object> target, String key, String value) {
+        target.put(key, value);
+        target.put(key + "_length", value.length());
+    }
+
+    private static int addBreakdown(List<Map<String, Object>> breakdown, String part, String value) {
+        int chars = value.length();
+        breakdown.add(Map.of("part", part, "chars", chars, "est_tokens", chars / 4));
+        return chars;
+    }
+
+    private void addEntry(Map<String, Object> entry) {
         entries.add(0, entry);
         if (entries.size() > MAX_ENTRIES) {
             entries.remove(entries.size() - 1);

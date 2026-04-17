@@ -10,11 +10,29 @@ interface TokenPart {
   est_tokens: number;
 }
 
+interface PromptContextFields {
+  system_prompt: string;
+  system_prompt_length: number;
+  user_prompt: string;
+  user_prompt_length: number;
+  formula_type: string;
+  formula_type_length: number;
+  reference_formula: string;
+  reference_formula_length: number;
+  editor_code: string;
+  editor_code_length: number;
+  additional_rules: string;
+  additional_rules_length: number;
+  chat_history: string;
+  chat_history_length: number;
+}
+
 interface LlmLogEntry {
   timestamp: string;
   endpoint: string;
   model: string;
   max_completion_tokens: number;
+  mode?: 'flat' | 'structured';
   system_prompt: string;
   system_prompt_length: number;
   messages: Array<{ role: string; content: string }>;
@@ -22,7 +40,26 @@ interface LlmLogEntry {
   total_chars: number;
   token_breakdown: TokenPart[];
   user_message: string;
+  // Structured mode only (FusionAiProvider → Spectra path). Each field maps
+  // to one {placeholder} in the server-side prompt template.
+  prompt_context?: PromptContextFields;
 }
+
+// Order matches the Spectra template's XML tag order so the UI walks the
+// reader top-to-bottom through the actual prompt structure.
+const STRUCTURED_FIELDS: Array<{
+  key: keyof PromptContextFields;
+  lengthKey: keyof PromptContextFields;
+  label: string;
+}> = [
+  { key: 'system_prompt',     lengthKey: 'system_prompt_length',     label: 'System Prompt' },
+  { key: 'user_prompt',       lengthKey: 'user_prompt_length',       label: 'User Prompt' },
+  { key: 'formula_type',      lengthKey: 'formula_type_length',      label: 'Formula Type' },
+  { key: 'reference_formula', lengthKey: 'reference_formula_length', label: 'Reference Formula' },
+  { key: 'editor_code',       lengthKey: 'editor_code_length',       label: 'Editor Code' },
+  { key: 'additional_rules',  lengthKey: 'additional_rules_length',  label: 'Additional Rules' },
+  { key: 'chat_history',      lengthKey: 'chat_history_length',      label: 'Chat History' },
+];
 
 interface Props {
   open: boolean;
@@ -107,14 +144,15 @@ export function LlmDebugModal({ open, onClose }: Props) {
       open={open}
       onCancel={onClose}
       footer={null}
-      width={900}
+      width="90vw"
+      style={{ top: 20 }}
       maskClosable={false}
       modalRender={(modal) => (
         <div style={{ transform: `translate(${position.x}px, ${position.y}px)` }}>
           {modal}
         </div>
       )}
-      styles={{ body: { height: 600, overflow: 'auto', padding: 0 } }}
+      styles={{ body: { height: '75vh', overflow: 'auto', padding: 0 } }}
     >
       <div style={{ padding: '8px 16px', borderBottom: '1px solid #d6cdc2', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Space>
@@ -156,11 +194,12 @@ export function LlmDebugModal({ open, onClose }: Props) {
       {entry ? (
         <div style={{ padding: 16 }}>
           {/* Summary */}
-          <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             <InfoTag label="Time" value={new Date(entry.timestamp).toLocaleTimeString()} />
             <InfoTag label="Model" value={entry.model} />
             <InfoTag label="Endpoint" value={entry.endpoint} />
             <InfoTag label="Max Output Tokens" value={String(entry.max_completion_tokens)} />
+            <ModeBadge mode={entry.mode} />
           </div>
 
           {/* Token Breakdown */}
@@ -184,31 +223,7 @@ export function LlmDebugModal({ open, onClose }: Props) {
 
           <Tabs
             size="small"
-            items={[
-              {
-                key: 'system',
-                label: `System Prompt (${entry.system_prompt_length} chars)`,
-                children: (
-                  <CodeBlock content={entry.system_prompt} />
-                ),
-              },
-              ...entry.messages
-                .filter(m => m.role !== 'system')
-                .map((msg, i) => ({
-                  key: `msg-${i}`,
-                  label: `${msg.role === 'user' ? 'User Prompt' : 'Assistant'} (${msg.content.length} chars)`,
-                  children: (
-                    <CodeBlock content={msg.content} />
-                  ),
-                })),
-              {
-                key: 'full',
-                label: 'Full Request JSON',
-                children: (
-                  <CodeBlock content={JSON.stringify(entry, null, 2)} />
-                ),
-              },
-            ]}
+            items={buildTabs(entry)}
           />
         </div>
       ) : (
@@ -227,6 +242,100 @@ function InfoTag({ label, value }: { label: string; value: string }) {
       <span style={{ fontWeight: 600, color: '#2c1810' }}>{value}</span>
     </div>
   );
+}
+
+function ModeBadge({ mode }: { mode?: 'flat' | 'structured' }) {
+  if (!mode) return null;
+  const isStructured = mode === 'structured';
+  return (
+    <span
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        padding: '2px 8px',
+        borderRadius: 10,
+        backgroundColor: isStructured ? '#e8f3e4' : '#f3ece4',
+        color: isStructured ? '#2e5e23' : '#6b4a2e',
+        border: `1px solid ${isStructured ? '#8cb87b' : '#c9a87e'}`,
+      }}
+      title={
+        isStructured
+          ? 'Structured mode: each PromptContext field sent as its own Spectra property'
+          : 'Flat mode: system + user messages flattened for OpenAI / hybrid path'
+      }
+    >
+      {isStructured ? 'STRUCTURED' : 'FLAT'}
+    </span>
+  );
+}
+
+/**
+ * Build the Tabs items for a log entry. In structured mode (FusionAiProvider
+ * → Spectra), we emit one tab per non-empty PromptContext field so the user
+ * can inspect exactly what went into each XML placeholder in the template.
+ * In flat mode (OpenAI / hybrid), we fall back to the original
+ * system-prompt + user-messages tabs.
+ */
+function buildTabs(entry: LlmLogEntry) {
+  const isStructured = entry.mode === 'structured' && entry.prompt_context;
+
+  if (isStructured && entry.prompt_context) {
+    const pc = entry.prompt_context;
+    const fieldTabs = STRUCTURED_FIELDS
+      .filter((f) => (pc[f.lengthKey] as number) > 0)
+      .map((f) => ({
+        key: `pc-${f.key}`,
+        label: `${f.label} (${(pc[f.lengthKey] as number).toLocaleString()} chars)`,
+        children: <CodeBlock content={pc[f.key] as string} />,
+      }));
+
+    // If literally every field is empty (pathological case), still give
+    // the user something rather than a bare Tabs with only "Full JSON".
+    const hasAny = fieldTabs.length > 0;
+
+    return [
+      ...(hasAny
+        ? fieldTabs
+        : [
+            {
+              key: 'pc-empty',
+              label: 'Prompt Context (all empty)',
+              children: (
+                <div style={{ padding: 16, color: '#5c4a3e', fontSize: 12 }}>
+                  All PromptContext fields were empty or whitespace. Check the
+                  AiService.buildPromptContext implementation.
+                </div>
+              ),
+            },
+          ]),
+      {
+        key: 'full',
+        label: 'Full Request JSON',
+        children: <CodeBlock content={JSON.stringify(entry, null, 2)} />,
+      },
+    ];
+  }
+
+  // Flat mode — legacy rendering preserved.
+  return [
+    {
+      key: 'system',
+      label: `System Prompt (${entry.system_prompt_length} chars)`,
+      children: <CodeBlock content={entry.system_prompt} />,
+    },
+    ...entry.messages
+      .filter((m) => m.role !== 'system')
+      .map((msg, i) => ({
+        key: `msg-${i}`,
+        label: `${msg.role === 'user' ? 'User Prompt' : 'Assistant'} (${msg.content.length} chars)`,
+        children: <CodeBlock content={msg.content} />,
+      })),
+    {
+      key: 'full',
+      label: 'Full Request JSON',
+      children: <CodeBlock content={JSON.stringify(entry, null, 2)} />,
+    },
+  ];
 }
 
 function CodeBlock({ content }: { content: string }) {

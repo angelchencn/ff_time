@@ -1,5 +1,7 @@
 package oracle.apps.hcm.formulas.core.jersey.service;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -55,4 +57,80 @@ public interface LlmProvider {
      * Provider name for logging.
      */
     String name();
+
+    // ───────────────────────────────────────────────────────────────────────
+    // Structured prompt context (Plan B) — lets providers with named-property
+    // templates (FusionAiProvider → Spectra) receive each prompt section as
+    // its own property instead of a flattened blob. Providers that don't
+    // support structured input (OpenAiProvider) inherit the default impls
+    // which flatten the context back into a system + user message pair.
+    // ───────────────────────────────────────────────────────────────────────
+
+    /**
+     * Non-streaming completion with structured prompt context. Default impl
+     * flattens the context to a 2-message array (system + user) and delegates
+     * to {@link #complete}; providers that can consume structured named
+     * properties (e.g. FusionAiProvider sending to a Spectra promptCode
+     * template) should override and use the fields directly.
+     */
+    default String completeWithContext(PromptContext context, int maxTokens) {
+        return complete(flattenContextToMessages(context), maxTokens);
+    }
+
+    /**
+     * Streaming counterpart of {@link #completeWithContext}. Default impl
+     * flattens and delegates to {@link #streamChat}.
+     */
+    default void streamChatWithContext(PromptContext context, int maxTokens,
+                                       Consumer<String> tokenCallback) {
+        streamChat(flattenContextToMessages(context), maxTokens, tokenCallback);
+    }
+
+    /**
+     * Flattens a {@link PromptContext} into a 2-entry messages list suitable
+     * for OpenAI-style chat providers. Everything except {@code userPrompt}
+     * is folded into the system message so the LLM gets the same content it
+     * would have received under the old single-blob prompt construction.
+     *
+     * <p>Order inside the system message:
+     * <ol>
+     *   <li>systemPrompt (the core instructions)</li>
+     *   <li>formulaType one-liner (if present)</li>
+     *   <li>referenceFormula section (if present)</li>
+     *   <li>editorCode section (if present)</li>
+     *   <li>additionalRules section (if present)</li>
+     *   <li>chatHistory section (if present)</li>
+     * </ol>
+     * Empty / null fields are skipped entirely — no empty section headers.
+     */
+    static List<Map<String, String>> flattenContextToMessages(PromptContext ctx) {
+        StringBuilder sys = new StringBuilder();
+
+        appendIfPresent(sys, null, ctx.systemPrompt());
+        appendIfPresent(sys, "Formula type: ", ctx.formulaType());
+        appendIfPresent(sys, "## Reference Formula\n\n", ctx.referenceFormula());
+        appendIfPresent(sys, "## Current Editor Code\n\n", ctx.editorCode());
+        appendIfPresent(sys, "## Additional Rules\n\n", ctx.additionalRules());
+        appendIfPresent(sys, "## Chat History\n\n", ctx.chatHistory());
+
+        List<Map<String, String>> messages = new ArrayList<>();
+        Map<String, String> systemMsg = new LinkedHashMap<>();
+        systemMsg.put("role", "system");
+        systemMsg.put("content", sys.toString().trim());
+        messages.add(systemMsg);
+
+        Map<String, String> userMsg = new LinkedHashMap<>();
+        userMsg.put("role", "user");
+        userMsg.put("content", ctx.userPromptOrEmpty());
+        messages.add(userMsg);
+
+        return messages;
+    }
+
+    private static void appendIfPresent(StringBuilder sb, String header, String value) {
+        if (value == null || value.isBlank()) return;
+        if (sb.length() > 0) sb.append("\n\n");
+        if (header != null) sb.append(header);
+        sb.append(value);
+    }
 }

@@ -330,6 +330,29 @@ function SectionLabel({ children, hint }: { children: React.ReactNode; hint?: st
   );
 }
 
+function TokenBadge({ text }: { text: string }) {
+  if (!text) return null;
+  const chars = text.length;
+  const tokens = Math.ceil(chars / 4);
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        fontFamily: 'var(--font-mono)',
+        color: tokens > 3000 ? '#a0522d' : 'var(--text-tertiary)',
+        backgroundColor: tokens > 3000 ? 'var(--accent-amber-dim)' : 'var(--bg-inset)',
+        border: `1px solid ${tokens > 3000 ? 'var(--accent-amber)' : 'var(--border-muted)'}`,
+        borderRadius: 3,
+        padding: '2px 6px',
+        whiteSpace: 'nowrap',
+      }}
+      title={`${chars.toLocaleString()} characters, estimated ${tokens.toLocaleString()} tokens (chars / 4)`}
+    >
+      {chars.toLocaleString()} chars / ~{tokens.toLocaleString()} tokens
+    </span>
+  );
+}
+
 function StatusDot({ color, title }: { color: string; title: string }) {
   return (
     <span
@@ -1419,16 +1442,21 @@ RETURN l_result
                   {/* Additional Prompt Text */}
                   <section>
                     <SectionLabel hint="ADDITIONAL_PROMPT_TEXT">Additional Prompt Text</SectionLabel>
-                    {!fieldsLocked && (
-                      <ExtractPromptBar
-                        formulaType={selected?.formula_type_name || null}
-                        serverConfig={current}
-                        onExtracted={(text) => {
-                          setEditRule(text);
-                          setIsDirty(true);
-                        }}
-                      />
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      {!fieldsLocked && (
+                        <div style={{ flex: 1 }}>
+                          <ExtractPromptBar
+                            formulaType={selected?.formula_type_name || null}
+                            serverConfig={current}
+                            onExtracted={(text) => {
+                              setEditRule(text);
+                              setIsDirty(true);
+                            }}
+                          />
+                        </div>
+                      )}
+                      <TokenBadge text={editRule} />
+                    </div>
                     <Input.TextArea
                       value={editRule}
                       rows={5}
@@ -1475,8 +1503,9 @@ RETURN l_result
                       gap: 12,
                     }}
                   >
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <SectionLabel hint="FORMULA_TEXT · CLOB">Reference Formula</SectionLabel>
+                      <TokenBadge text={editCode} />
                     </div>
                     {fieldsLocked && (
                       <div

@@ -184,8 +184,10 @@ public class AiService {
     //   streamChat(...)  — server-sent events, tokens pushed via a callback
     //   chatOnce(...)    — blocking, returns the full text at once
     //
-    // Both delegate to buildChatMessages() so the system prompt, history,
-    // reference formula, and custom rule are assembled identically.
+    // Both delegate to buildPromptContext() which splits the prompt into 7
+    // named fields (systemPrompt, userPrompt, formulaType, referenceFormula,
+    // editorCode, additionalRules, chatHistory) and hands them to the
+    // provider via completeWithContext / streamChatWithContext.
 
     public void streamChat(String message, String editorCode, String formulaType,
                            List<Map<String, String>> history,
@@ -210,9 +212,9 @@ public class AiService {
             tokenCallback.accept("Error: " + provider.name() + " is not available.");
             return;
         }
-        List<Map<String, String>> messages = buildChatMessages(
+        PromptContext context = buildPromptContext(
                 message, editorCode, formulaType, history, customSampleCode, customRule);
-        provider.streamChat(messages, MAX_TOKENS_CHAT, tokenCallback);
+        provider.streamChatWithContext(context, MAX_TOKENS_CHAT, tokenCallback);
     }
 
     /** Convenience overload without history/custom sample/rule */
@@ -248,9 +250,9 @@ public class AiService {
             }
             return "Error: " + provider.name() + " is not available.";
         }
-        List<Map<String, String>> messages = buildChatMessages(
+        PromptContext context = buildPromptContext(
                 message, editorCode, formulaType, history, customSampleCode, customRule);
-        String response = provider.complete(messages, MAX_TOKENS_CHAT);
+        String response = provider.completeWithContext(context, MAX_TOKENS_CHAT);
         if (AppsLogger.isEnabled(AppsLogger.FINER)) {
             AppsLogger.write(this,
                     "chatOnce returned " + (response == null ? 0 : response.length()) + " chars",
@@ -259,83 +261,119 @@ public class AiService {
         return response == null ? "" : response;
     }
 
+    // ── Structured prompt context ───────────────────────────────────────────
+    //
+    // buildPromptContext assembles a PromptContext with one field per
+    // Spectra template placeholder ({systemPrompt}, {userPrompt},
+    // {formulaType}, {referenceFormula}, {editorCode}, {additionalRules},
+    // {chatHistory}). FusionAiProvider sends each field as a named
+    // property to the Spectra template; OpenAiProvider's default impl
+    // flattens them into a system + user message pair.
+    //
+    // Meta-instructions (output format, CRITICAL requirements, "Don't ask
+    // for formula type") live in the Spectra template
+    // (hr_gen_ai_prompts_seed_b.prompt_tmpl), NOT here — this code
+    // assembles data only.
+
     /**
-     * Assemble the message array passed to the LLM for a chat/generation
-     * request. Shared between streaming and non-streaming variants so both
-     * produce identical prompts for the same inputs.
-     *
-     * <h3>First-turn vs follow-up prompt</h3>
-     *
-     * <p>The first turn in a session pays the full prompt-construction cost:
-     * reference formula, RAG examples, formula-type contract, generation
-     * instructions. The LLM uses all of that to produce its initial answer.
-     * That answer is what populates the Monaco editor on the frontend.</p>
-     *
-     * <p>On a follow-up turn the LLM only needs three things:</p>
-     * <ul>
-     *   <li>the {@code system} prompt + {@code customRule} — re-sent every
-     *       call (LLM API is stateless), this is the persona/rules</li>
-     *   <li>the <em>current</em> shape of the formula — which the user
-     *       always has in front of them in Monaco, shipped to us as
-     *       {@code editorCode}</li>
-     *   <li>the new request the user typed — {@code message}</li>
-     * </ul>
-     *
-     * <p><b>We deliberately do <em>not</em> replay {@code history} to the
-     * LLM on follow-up turns.</b> The previous user/assistant exchange is
-     * not needed: {@code editorCode} is the source of truth for the
-     * formula state (it's either what the assistant just generated, or
-     * the user's hand-edited version of it). Skipping history makes each
-     * follow-up call O(1) in token cost instead of O(N turns), and
-     * eliminates a class of bugs where the LLM saw an old version of the
-     * formula in history alongside the current version in the new user
-     * message and got confused about which one to modify.</p>
-     *
-     * <p>{@code history} is still maintained server-side by
-     * {@code ChatSessionStore} — we just don't ship it to the model. We
-     * use {@code history.isEmpty()} as the "is this the first turn"
-     * signal, nothing more.</p>
+     * Assemble a structured {@link PromptContext} for the chat endpoints.
+     * Each field maps to one placeholder in the Spectra promptCode template.
      */
-    private List<Map<String, String>> buildChatMessages(
+    PromptContext buildPromptContext(
             String message, String editorCode, String formulaType,
             List<Map<String, String>> history,
             String customSampleCode, String customRule) {
 
-        boolean isFirstTurn = history.isEmpty();
+        String systemPrompt = getSystemPrompt();
+        String userPrompt = extractUserRequestText(message, formulaType);
+        String referenceFormula = extractReferenceFormula(message, customSampleCode);
+        String normalizedEditor = (editorCode == null || editorCode.isBlank()) ? "" : editorCode;
+        String additionalRules = (customRule == null || customRule.isBlank()) ? "" : customRule;
+        String chatHistoryText = formatChatHistory(history);
 
-        String userPrompt = isFirstTurn
-                ? buildGenerationPrompt(message, formulaType, editorCode, customSampleCode)
-                : buildFollowUpPrompt(message, editorCode, formulaType);
-
-        String sysPrompt = getSystemPrompt();
-        if (customRule != null && !customRule.isBlank()) {
-            sysPrompt = sysPrompt + "\n\n## 19. Custom Rule\n\n" + customRule;
-        }
-
-        List<Map<String, String>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", sysPrompt));
-        messages.add(Map.of("role", "user", "content", userPrompt));
-        return messages;
+        return new PromptContext(
+                systemPrompt,
+                userPrompt,
+                formulaType == null ? "" : formulaType,
+                referenceFormula,
+                normalizedEditor,
+                additionalRules,
+                chatHistoryText
+        );
     }
 
     /**
-     * Build the user message for a follow-up turn. Just the current
-     * editor state plus the new request — no reference formula, no RAG,
-     * no generation instructions. The LLM already knows it's a Fast
-     * Formula generator (system prompt) and now sees the formula it's
-     * supposed to modify (editorCode) plus what to do with it (message).
+     * Resolve the reference formula for the {@code {referenceFormula}}
+     * placeholder. Returns:
+     * <ul>
+     *   <li>the {@code customSampleCode} verbatim when supplied (template
+     *       path — user chose a specific starter)</li>
+     *   <li>a concatenation of up to 3 RAG-retrieved examples when
+     *       {@code customSampleCode} is {@code null} (RAG path)</li>
+     *   <li>empty string when {@code customSampleCode} is "" (explicit
+     *       suppress — e.g. Custom formula type with no reference)</li>
+     * </ul>
      */
-    private String buildFollowUpPrompt(String message, String editorCode, String formulaType) {
-        boolean hasEditorCode = editorCode != null && !editorCode.isBlank();
-        if (!hasEditorCode) {
-            return "Formula type: " + formulaType + "\n\n" + message;
+    @SuppressWarnings("unchecked")
+    String extractReferenceFormula(String message, String customSampleCode) {
+        if (customSampleCode != null && !customSampleCode.isBlank()) {
+            return customSampleCode;
         }
-        return "Formula type: " + formulaType + "\n\n"
-                + "## Current Formula\n\n```\n" + editorCode + "\n```\n\n"
-                + "Modify the formula above according to the request below. "
-                + "Return ONLY the complete updated formula — no markdown fences, "
-                + "no explanation.\n\n"
-                + "Request: " + message;
+        if (customSampleCode != null) {
+            // "" sentinel — caller explicitly suppressed RAG (e.g. Custom type)
+            return "";
+        }
+        try {
+            List<Map<String, Object>> ragResults = ragService.query(message, 3);
+            if (ragResults == null || ragResults.isEmpty()) return "";
+            StringBuilder examples = new StringBuilder();
+            for (Map<String, Object> r : ragResults) {
+                String useCase = "";
+                Map<String, Object> meta = (Map<String, Object>) r.get("metadata");
+                if (meta != null) useCase = String.valueOf(meta.getOrDefault("use_case", ""));
+                examples.append("/* use_case: ").append(useCase).append(" */\n");
+                Object code = r.get("code");
+                if (code != null) examples.append(code).append("\n\n");
+            }
+            return examples.toString().trim();
+        } catch (Exception e) {
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "extractReferenceFormula: RAG query failed: " + e.getMessage(),
+                        AppsLogger.WARNING);
+            }
+            return "";
+        }
+    }
+
+    /**
+     * Produce the user-request text for the {@code {userPrompt}} placeholder.
+     * Returns only the user's actual message — formula type, reference
+     * formula, editor code, and meta-instructions are carried in their own
+     * PromptContext fields and rendered by the Spectra template.
+     */
+    String extractUserRequestText(String message, String formulaType) {
+        return message == null ? "" : message;
+    }
+
+    /**
+     * Render a history list of {@code [{role, content}, ...]} as plain text
+     * suitable for the {@code {chatHistory}} placeholder. Returns empty
+     * string when history is empty or null so the template skips the
+     * {@code <chat_history>} XML tag.
+     */
+    String formatChatHistory(List<Map<String, String>> history) {
+        if (history == null || history.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (Map<String, String> turn : history) {
+            String role = turn.get("role");
+            String content = turn.get("content");
+            if (content == null || content.isBlank()) continue;
+            String label = "assistant".equalsIgnoreCase(role) ? "Assistant" : "User";
+            if (sb.length() > 0) sb.append("\n\n");
+            sb.append(label).append(": ").append(content);
+        }
+        return sb.toString();
     }
 
     // ── Complete ────────────────────────────────────────────────────────────
@@ -395,77 +433,13 @@ public class AiService {
         provider.streamChat(messages, MAX_TOKENS_CHAT, tokenCallback);
     }
 
-    // ── Prompt Builders ─────────────────────────────────────────────────────
-
-    private String buildGenerationPrompt(String message, String formulaType, String editorCode) {
-        return buildGenerationPrompt(message, formulaType, editorCode, null);
-    }
-
-    @SuppressWarnings("unchecked")
-    private String buildGenerationPrompt(String message, String formulaType,
-                                          String editorCode, String customSampleCode) {
-        List<String> sections = new ArrayList<>();
-
-        if (customSampleCode != null && !customSampleCode.isBlank()) {
-            sections.add("## Reference Formula\n\nUse the following formula as the base template. "
-                    + "Modify it according to the user's request.\n\n```\n"
-                    + customSampleCode + "\n```");
-        } else if (customSampleCode == null) {
-            List<Map<String, Object>> ragResults = ragService.query(message, 3);
-            if (!ragResults.isEmpty()) {
-                StringBuilder examples = new StringBuilder();
-                for (Map<String, Object> r : ragResults) {
-                    String useCase = "";
-                    Map<String, Object> meta = (Map<String, Object>) r.get("metadata");
-                    if (meta != null) useCase = String.valueOf(meta.getOrDefault("use_case", ""));
-                    examples.append("/* use_case: ").append(useCase).append(" */\n");
-                    examples.append(r.get("code")).append("\n\n");
-                }
-                sections.add("## Relevant Example Formulas\n\n" + examples);
-            }
-        }
-
-        boolean hasEditorCode = editorCode != null && !editorCode.isBlank();
-        if (hasEditorCode) {
-            sections.add("## Current Formula in Editor\n\n```\n" + editorCode + "\n```\n\n"
-                    + "The user wants to modify this existing formula. "
-                    + "Output the complete updated formula incorporating the requested change.");
-        }
-
-        boolean hasReferenceFormula = customSampleCode != null && !customSampleCode.isBlank();
-        boolean isCustomType = "Custom".equalsIgnoreCase(formulaType);
-
-        StringBuilder request = new StringBuilder("## Request\n\nFormula type: " + formulaType + "\n\n");
-        if (hasReferenceFormula) {
-            request.append("Use the Reference Formula above as the structural template. ");
-            if (isCustomType) {
-                request.append("This is a general-purpose formula, not bound to a specific Fusion formula type contract. ");
-            }
-            request.append("RETURN variables should match the reference formula pattern or the user's requirement.\n\n");
-        }
-        request.append("Do NOT ask the user to confirm the formula type.\n\n");
-        request.append("Requirement: ").append(message);
-        sections.add(request.toString());
-
-        if (hasEditorCode) {
-            sections.add("Return the complete modified formula. Do not explain the changes unless asked. "
-                    + "Preserve the header comment block if one exists, updating the Change History.");
-        } else {
-            sections.add("Generate a complete Fast Formula that satisfies the requirement. "
-                    + "Derive a proper formula name following Oracle Fast Formula naming conventions "
-                    + "for the given formula type.\n\n"
-                    + "CRITICAL REQUIREMENTS:\n"
-                    + "1. MUST include a professional header comment block\n"
-                    + "2. Include DEFAULT FOR statements for input variables that need fallback values\n"
-                    + "3. Include INPUTS ARE if the formula type requires input variables\n"
-                    + "4. MUST include PAY_INTERNAL_LOG_WRITE at entry and exit\n"
-                    + "5. MUST end with RETURN — variables must match the formula type's output contract\n"
-                    + "6. Return ONLY the formula code, no markdown fences, no explanation\n"
-                    + "7. Do NOT invent DBI names, context names, or return variable names — use placeholders if unsure");
-        }
-
-        return String.join("\n\n", sections);
-    }
+    // buildGenerationPrompt / buildFollowUpPrompt / buildChatMessages removed
+    // — these were the legacy flat-prompt builders that baked reference
+    // formula, editor code, CRITICAL REQUIREMENTS, and meta-instructions
+    // into a single merged user message. Replaced by buildPromptContext()
+    // which passes each piece as an independent PromptContext field,
+    // and the template on the Spectra side (prompt_tmpl) handles all
+    // output-format / meta-instruction rules.
 
     // ── fix_default_types post-processor ────────────────────────────────────
 

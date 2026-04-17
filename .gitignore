@@ -38,3 +38,5 @@ java/target/
 *.bak
 *.tmp
 *.log
+
+fai-orchestrator-main/
