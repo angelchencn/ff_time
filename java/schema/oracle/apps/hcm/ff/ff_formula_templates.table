@@ -1,5 +1,5 @@
 <?xml version = '1.0' encoding = 'UTF-8'?>
-<!--$Header: fusionapps/hcm/components/hcmPayroll/formulas/core/dbSchema/database/fusionDB/FUSION/ff_formula_templates.table ff_time/1 2026/04/08 00:00:00 alex Exp $-->
+<!--$Header: fusionapps/hcm/components/hcmPayroll/formulas/core/dbSchema/database/fusionDB/FUSION/ff_formula_templates.table xiaojuch_bug-39168092/5 2026/04/13 00:34:20 xiaojuch Exp $-->
 <!-- adxml:    <src_file bootstrap="~BOOTSTRAP" version="~VERSION" -->
 <!-- adxml:       translation_level="~TRANS_LEVEL" techstack_level="~TXK_LEVEL" -->
 <!-- adxml:       verticalisation_level="~VERT_LEVEL" custom_level="~CUST_LEVEL" -->
@@ -32,8 +32,9 @@
 Primary Object's Schema : FUSION
 Primary Object Name    : "ff_formula_templates"
 Primary Object Type    : TABLE
-Dependent Objects' Information :
-  Index(es) on "ff_formula_templates" : FF_FORMULA_TEMPLATES_N1, FF_FORMULA_TEMPLATES_U1, FF_FORMULA_TEMPLATES_U2, FF_FORMULA_TEMPLATES_U3
+Dependent Objects' Information : 
+  Index(es) on "ff_formula_templates" : FF_FORMULA_TEMPLATES_U1, FF_FORMULA_TEMPLATES_U2, FF_FORMULA_TEMPLATES_U3, 
+		FF_FORMULA_TEMPLATES_U4
   Constraint(s) on "ff_formula_templates" : FF_FORMULA_TEMPLATES_PK
 -->
 <COMPOSITE version="1.0" xmlns="http://xmlns.oracle.com/ku">
@@ -191,6 +192,24 @@ Dependent Objects' Information :
                   </CUSTOMER_AREA>
                </COL_LIST_ITEM>
                <COL_LIST_ITEM>
+                  <NAME>SYSTEMPROMPT_FLAG</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>1</LENGTH>
+                  <DEFAULT>'N'</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Prompt Flag. Y indicates this row holds the AI system prompt text in FORMULA_TEXT. At most one row should have this flag set to Y. When Y and ACTIVE_FLAG is also Y, AiService loads the FORMULA_TEXT as the LLM system prompt instead of the hardcoded default. FORMULA_TYPE_ID should be NULL for system prompt rows.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>COLUMN1</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
                   <NAME>ACTIVE_FLAG</NAME>
                   <DATATYPE>VARCHAR2</DATATYPE>
                   <LENGTH>1</LENGTH>
@@ -243,32 +262,6 @@ Dependent Objects' Information :
                   </CUSTOMER_AREA>
                </COL_LIST_ITEM>
                <COL_LIST_ITEM>
-                  <NAME>SYSTEMPROMPT_FLAG</NAME>
-                  <DATATYPE>VARCHAR2</DATATYPE>
-                  <LENGTH>1</LENGTH>
-                  <DEFAULT>'N'</DEFAULT>
-                  <NOT_NULL/>
-                  <CUSTOMER_AREA>
-                     <ODB_PROPERTY_LIST>
-                        <COMMENT>System Prompt Flag. Y indicates this row holds the AI system prompt text in FORMULA_TEXT. At most one row should have this flag set to Y. When Y and ACTIVE_FLAG is also Y, AiService loads the FORMULA_TEXT as the LLM system prompt instead of the hardcoded default. FORMULA_TYPE_ID should be NULL for system prompt rows.</COMMENT>
-                     </ODB_PROPERTY_LIST>
-                     <UDP_LIST>
-                        <UDP_LIST_ITEM>
-                           <NAME>defaultOnNull</NAME>
-                           <VALUE>Y</VALUE>
-                        </UDP_LIST_ITEM>
-                        <UDP_LIST_ITEM>
-                           <NAME>securityClassification</NAME>
-                           <VALUE>Internal</VALUE>
-                        </UDP_LIST_ITEM>
-                        <UDP_LIST_ITEM>
-                           <NAME>shortName</NAME>
-                           <VALUE>SYSTEMPROMPT_FLAG</VALUE>
-                        </UDP_LIST_ITEM>
-                     </UDP_LIST>
-                  </CUSTOMER_AREA>
-               </COL_LIST_ITEM>
-               <COL_LIST_ITEM>
                   <NAME>SORT_ORDER</NAME>
                   <DATATYPE>NUMBER</DATATYPE>
                   <PRECISION>9</PRECISION>
@@ -308,6 +301,10 @@ Dependent Objects' Information :
                         <UDP_LIST_ITEM>
                            <NAME>defaultOnNull</NAME>
                            <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
                         </UDP_LIST_ITEM>
                         <UDP_LIST_ITEM>
                            <NAME>shortName</NAME>
@@ -607,32 +604,32 @@ Dependent Objects' Information :
             <UDP_LIST>
                <UDP_LIST_ITEM>
                   <NAME>adxml</NAME>
-                  <VALUE> adxml:    &lt;src_file bootstrap="~BOOTSTRAP" version="~VERSION"
- adxml:       translation_level="~TRANS_LEVEL" techstack_level="~TXK_LEVEL"
- adxml:       verticalisation_level="~VERT_LEVEL" custom_level="~CUST_LEVEL"
- adxml:       language="~LANG" needs_translation="~TRANSLATION" ship="~SHIP"
- adxml:       localization="~LOCALIZATION" object_type="~OBJECT_TYPE">
- adxml:     &lt;abstract_file te="~PROD" subdir="~PATH" file_basename="~BASENAME" file_type="~FILE_TYPE"/>
- adxml:     &lt;metadata>
- adxml:       &lt;action identifier="TABLE" category="DD_TABLES" portion="D" online_category="N">
- adxml:         &lt;apply_action>
- adxml:           &lt;action_details name="java">
- adxml:             &lt;invoking_exec>
- adxml:               &lt;executable file_basename="oracle.apps.fnd.applxdf.comp.XdfSchemaDeploy" file_type="class"/>
- adxml:             &lt;/invoking_exec>
- adxml:             &lt;args>owner_un=#un:fusion# apps_un=#un:fusion#
- adxml:                      jdbc_protocol=#jdbc_protocol# jdbc_db_addr=#jdbc_db_addr# xdf_mode=table
- adxml:                      xdf_file_name=#fullpath:~PROD:~PATH:~FILE#
- adxml:             &lt;/args>
- adxml:           &lt;/action_details>
- adxml:         &lt;/apply_action>
- adxml:         &lt;analysis_action>
- adxml:           &lt;default_action/>
- adxml:         &lt;/analysis_action>
- adxml:         &lt;ahead_of_time_run_conditions>
- adxml:           &lt;check_file check="Y"/>
- adxml:         &lt;/ahead_of_time_run_conditions>
- adxml:       &lt;/action>
+                  <VALUE> adxml:    &lt;src_file bootstrap="~BOOTSTRAP" version="~VERSION" 
+ adxml:       translation_level="~TRANS_LEVEL" techstack_level="~TXK_LEVEL" 
+ adxml:       verticalisation_level="~VERT_LEVEL" custom_level="~CUST_LEVEL" 
+ adxml:       language="~LANG" needs_translation="~TRANSLATION" ship="~SHIP" 
+ adxml:       localization="~LOCALIZATION" object_type="~OBJECT_TYPE"> 
+ adxml:     &lt;abstract_file te="~PROD" subdir="~PATH" file_basename="~BASENAME" file_type="~FILE_TYPE"/> 
+ adxml:     &lt;metadata> 
+ adxml:       &lt;action identifier="TABLE" category="DD_TABLES" portion="D" online_category="N"> 
+ adxml:         &lt;apply_action> 
+ adxml:           &lt;action_details name="java"> 
+ adxml:             &lt;invoking_exec> 
+ adxml:               &lt;executable file_basename="oracle.apps.fnd.applxdf.comp.XdfSchemaDeploy" file_type="class"/> 
+ adxml:             &lt;/invoking_exec> 
+ adxml:             &lt;args>owner_un=#un:fusion# apps_un=#un:fusion# 
+ adxml:                      jdbc_protocol=#jdbc_protocol# jdbc_db_addr=#jdbc_db_addr# xdf_mode=table 
+ adxml:                      xdf_file_name=#fullpath:~PROD:~PATH:~FILE#  
+ adxml:             &lt;/args> 
+ adxml:           &lt;/action_details> 
+ adxml:         &lt;/apply_action> 
+ adxml:         &lt;analysis_action> 
+ adxml:           &lt;default_action/> 
+ adxml:         &lt;/analysis_action> 
+ adxml:         &lt;ahead_of_time_run_conditions> 
+ adxml:           &lt;check_file check="Y"/> 
+ adxml:         &lt;/ahead_of_time_run_conditions> 
+ adxml:       &lt;/action> 
 </VALUE>
                </UDP_LIST_ITEM>
                <UDP_LIST_ITEM>
@@ -668,35 +665,6 @@ Dependent Objects' Information :
       </TABLE>
    </BASE_OBJECT>
    <INDEX_LIST>
-      <INDEX version="1.0">
-         <SCHEMA>FUSION</SCHEMA>
-         <NAME>FF_FORMULA_TEMPLATES_N1</NAME>
-         <TABLE_INDEX>
-            <ON_TABLE>
-               <SCHEMA>FUSION</SCHEMA>
-               <NAME>ff_formula_templates</NAME>
-            </ON_TABLE>
-            <COL_LIST>
-               <COL_LIST_ITEM>
-                  <NAME>FORMULA_TYPE_ID</NAME>
-               </COL_LIST_ITEM>
-            </COL_LIST>
-            <INDEX_ATTRIBUTES>
-               <TABLESPACE>Default</TABLESPACE>
-            </INDEX_ATTRIBUTES>
-         </TABLE_INDEX>
-         <CUSTOMER_AREA>
-            <ODB_PROPERTY_LIST>
-               <SYSTEM_GENERATED>N</SYSTEM_GENERATED>
-            </ODB_PROPERTY_LIST>
-            <UDP_LIST>
-               <UDP_LIST_ITEM>
-                  <NAME>shortName</NAME>
-                  <VALUE>FF_FORMULA_TEMPLATES_N1</VALUE>
-               </UDP_LIST_ITEM>
-            </UDP_LIST>
-         </CUSTOMER_AREA>
-      </INDEX>
       <INDEX version="1.0">
          <UNIQUE/>
          <SCHEMA>FUSION</SCHEMA>
@@ -776,6 +744,9 @@ Dependent Objects' Information :
                <COL_LIST_ITEM>
                   <NAME>TEMPLATE_CODE</NAME>
                </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>ORA_SEED_SET1</NAME>
+               </COL_LIST_ITEM>
             </COL_LIST>
             <INDEX_ATTRIBUTES>
                <TABLESPACE>Default</TABLESPACE>
@@ -789,6 +760,39 @@ Dependent Objects' Information :
                <UDP_LIST_ITEM>
                   <NAME>shortName</NAME>
                   <VALUE>FF_FORMULA_TEMPLATES_U3</VALUE>
+               </UDP_LIST_ITEM>
+            </UDP_LIST>
+         </CUSTOMER_AREA>
+      </INDEX>
+      <INDEX version="1.0">
+         <UNIQUE/>
+         <SCHEMA>FUSION</SCHEMA>
+         <NAME>FF_FORMULA_TEMPLATES_U4</NAME>
+         <TABLE_INDEX>
+            <ON_TABLE>
+               <SCHEMA>FUSION</SCHEMA>
+               <NAME>ff_formula_templates</NAME>
+            </ON_TABLE>
+            <COL_LIST>
+               <COL_LIST_ITEM>
+                  <NAME>TEMPLATE_CODE</NAME>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>ORA_SEED_SET2</NAME>
+               </COL_LIST_ITEM>
+            </COL_LIST>
+            <INDEX_ATTRIBUTES>
+               <TABLESPACE>Default</TABLESPACE>
+            </INDEX_ATTRIBUTES>
+         </TABLE_INDEX>
+         <CUSTOMER_AREA>
+            <ODB_PROPERTY_LIST>
+               <SYSTEM_GENERATED>N</SYSTEM_GENERATED>
+            </ODB_PROPERTY_LIST>
+            <UDP_LIST>
+               <UDP_LIST_ITEM>
+                  <NAME>shortName</NAME>
+                  <VALUE>FF_FORMULA_TEMPLATES_U4</VALUE>
                </UDP_LIST_ITEM>
             </UDP_LIST>
          </CUSTOMER_AREA>

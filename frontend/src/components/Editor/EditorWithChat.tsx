@@ -41,6 +41,7 @@ export function EditorWithChat() {
   const { formulaTypes } = useFormulaTypes();
   const { templates: dbTemplates, loading: templatesLoading } =
     useTemplatesByFormulaType(formulaType);
+  const [selectedPromptCode, setSelectedPromptCode] = useState<string>('HCM_FF_GENERATION_LLM405B');
   const [chatOpen, setChatOpen] = useState(false);
   const [chatHeight, setChatHeight] = useState(DEFAULT_CHAT_HEIGHT);
   const listEndRef = useRef<HTMLDivElement>(null);
@@ -122,6 +123,11 @@ export function EditorWithChat() {
       message: text,
       formula_type: formulaType,
     };
+    // Only send prompt_code for Fusion environments (has auth).
+    // Local dev uses OpenAI GPT 5.4 — prompt_code is ignored server-side.
+    if (current.auth) {
+      body.prompt_code = selectedPromptCode;
+    }
     if (shouldShipEditorCode) {
       body.editor_code = code;
     }
@@ -438,6 +444,40 @@ export function EditorWithChat() {
             }
             options={sampleOptions}
           />
+        </div>
+
+        <div style={{ width: 1, height: 18, backgroundColor: 'var(--border-muted)' }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 600,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: 'var(--text-tertiary)',
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            Model
+          </span>
+          {current.auth ? (
+            <Select
+              value={selectedPromptCode}
+              onChange={setSelectedPromptCode}
+              size="small"
+              variant="borderless"
+              style={{ width: 160 }}
+              options={[
+                { value: 'HCM_FF_GENERATION_LLM405B', label: 'Llama 405B' },
+                { value: 'HCM_FF_GENERATION_GPT5MINI', label: 'GPT-5 Mini' },
+              ]}
+            />
+          ) : (
+            <Text style={{ fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}>
+              GPT 5.4
+            </Text>
+          )}
         </div>
       </div>
 

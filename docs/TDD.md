@@ -2,13 +2,21 @@
 
 ## 1. Overview
 
-**Product Name:** FF Time — AI-Based Fast Formula Generator for Time & Labor
+**Product Name:** FF Time — AI-Based Fast Formula Generator for HCM
 
-**Purpose:** A web application that enables Oracle HCM consultants to generate, validate, simulate, and manage Fast Formula code using AI (Claude API) with a built-in compiler, interpreter, and knowledge base.
+**Purpose:** A web application that enables Oracle HCM consultants to generate, validate, simulate, and manage Fast Formula code using AI with a built-in hand-written parser, interpreter, and RAG knowledge base.
 
 **Target Users:**
 - HR/Payroll Business Consultants — generate formulas via natural language
 - Oracle HCM Technical Consultants — write/edit code with AI-assisted completion and validation
+- AI Agent Studio consumers — programmatic formula generation via REST API
+
+**Two Backend Implementations:**
+
+| Backend | Stack | LLM | Status |
+|---------|-------|-----|--------|
+| Java/Jersey (`java/`) | Grizzly HTTP, hand-written parser, JDBC | Fusion AI Spectra (Llama 405B / GPT-5 Mini) or OpenAI GPT-5.4 | **Primary** |
+| Python/FastAPI (`backend/`) | Lark parser, SQLAlchemy, ChromaDB | Claude API | Legacy |
 
 ---
 
@@ -17,269 +25,299 @@
 ### 2.1 High-Level Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│               React Frontend                     │
-│   Monaco Editor + Chat + Simulation Panel        │
-│   (TypeScript, Vite, Ant Design, Zustand)        │
-└──────────────────┬──────────────────────────────┘
-                   │ REST / SSE
-                   ▼
-┌─────────────────────────────────────────────────┐
-│             FastAPI Backend (Python)              │
-│  ┌───────────┬───────────┬───────────┬────────┐  │
-│  │ Validator  │ Simulator │ AI Service│  RAG   │  │
-│  │ (3-layer)  │ (AST      │ (Claude   │Engine  │  │
-│  │            │ Interp.)  │  API)     │(Chroma)│  │
-│  └─────┬─────┴─────┬─────┴─────┬─────┴───┬────┘  │
-│        │           │           │         │        │
-│  ┌─────┴───────────┴───┐  ┌───┴───┐  ┌──┴─────┐  │
-│  │   Lark Parser       │  │Claude │  │ChromaDB│  │
-│  │   (grammar.lark)    │  │  API  │  │Vector  │  │
-│  │   → AST → Interp.   │  │       │  │Store   │  │
-│  └─────────────────────┘  └───────┘  └────────┘  │
-│                                                   │
-│  ┌─────────────────────────────────────────────┐  │
-│  │  SQLite + SQLAlchemy + Alembic              │  │
-│  │  (Formula, ChatSession, SimulationRun, DBI) │  │
-│  └─────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                   React Frontend                          │
+│   Monaco Editor + Chat + Simulation + Templates Panel     │
+│   (TypeScript, Vite, Ant Design, Zustand)                 │
+│   Model Selector: Llama 405B / GPT-5 Mini (Fusion)        │
+│                   GPT 5.4 (Local Dev)                     │
+└────────────────────────┬─────────────────────────────────┘
+                         │ REST / SSE
+                         ▼
+┌──────────────────────────────────────────────────────────┐
+│              Java/Jersey Backend (Grizzly)                 │
+│  ┌────────────┬────────────┬────────────┬──────────────┐  │
+│  │ Validator   │ Simulator  │ AI Service │ Template     │  │
+│  │ (3-layer)   │ (AST       │ (Spectra / │ Service      │  │
+│  │             │  Interp.)  │  OpenAI)   │ (DB CRUD)    │  │
+│  └──────┬──────┴──────┬─────┴──────┬─────┴──────┬───────┘  │
+│         │             │            │            │           │
+│  ┌──────┴─────────────┴──┐  ┌─────┴──────┐  ┌──┴────────┐  │
+│  │  Hand-written Parser   │  │ LlmProvider│  │ RAG       │  │
+│  │  Tokenizer → FFParser  │  │ (interface)│  │ Service   │  │
+│  │  → AST → Interpreter   │  │            │  │ (JDBC)    │  │
+│  └────────────────────────┘  └─────┬──────┘  └───────────┘  │
+│                                    │                         │
+│                         ┌──────────┴──────────┐              │
+│                         │                     │              │
+│                  ┌──────┴───────┐  ┌──────────┴─────────┐   │
+│                  │FusionAiProv. │  │ OpenAiProvider     │   │
+│                  │(Spectra SDK) │  │ (GPT-5.4 API)      │   │
+│                  └──────────────┘  └────────────────────┘   │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  Oracle DB (JDBC / ADF BC)                            │   │
+│  │  FF_FORMULA_TEMPLATES, FF_FORMULA_TEMPLATES_TL,       │   │
+│  │  FF_FORMULA_TYPES, FF_FORMULAS_VL                     │   │
+│  └──────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 Component Interaction Flow
+### 2.2 Provider Selection
 
 ```
-User types in Chat Input
-  → POST /api/chat (SSE streaming)
-    → AI Service builds prompt:
-        1. Load chat history from DB (ChatSession)
-        2. Include current editor code as context
-        3. RAG retrieval from ChromaDB (similar formulas)
-        4. Assemble system prompt + examples + user request
-    → Claude API streams response
-    → Frontend extracts code blocks → fills Monaco Editor
-    → Validator auto-triggered (300ms debounce)
-        → Parser (Lark grammar → AST)
-        → Semantic check (undeclared vars, output assignment)
-        → Rule check (missing RETURN, business rules)
-    → Diagnostics displayed as Monaco markers + Validate tab
+Environment variable: LLM_PROVIDER
+
+  LLM_PROVIDER=openai  →  OpenAiProvider (GPT-5.4)
+                           + JDBC via DriverManager (FF_DB_URL)
+
+  LLM_PROVIDER unset   →  FusionAiProvider (Spectra SDK)
+  (default)                + JDBC via ADF BC ApplicationModule
+```
+
+### 2.3 Request Flow — Formula Generation
+
+```
+User: "Write overtime formula for Time Calculation Rules"
+  │
+  ▼
+Frontend: POST /chat/sync {message, formula_type, prompt_code?, template_code?}
+  │
+  ▼
+FastFormulaResource: extract request fields
+  ├── Resolve template_code → TemplateService.findByTemplateCode() → DB
+  ├── ChatSessionStore.getOrCreateSession() → in-memory history
+  │
+  ▼
+AiService.chatOnce()
+  ├── getSystemPrompt() → FF_FORMULA_TEMPLATES (SYSTEMPROMPT_FLAG=Y, ACTIVE_FLAG=Y)
+  ├── extractReferenceFormula() → template body OR RagService (top-3 vector search)
+  ├── buildPromptContext() → PromptContext (8 fields)
+  │
+  ▼
+LlmProvider.completeWithContext(context, maxTokens)
+  │
+  ├── FusionAiProvider path:
+  │     resolve promptCode from context (default: HCM_FF_GENERATION_LLM405B)
+  │     FAICompletionsClient.getCompletions(promptCode, properties) via reflection
+  │     Spectra Orchestrator → LLM (Llama 405B or GPT-5 Mini)
+  │
+  └── OpenAiProvider path:
+        flatten PromptContext → system + user messages
+        OpenAI Chat Completions API → GPT-5.4
+  │
+  ▼
+AiService.fixDefaultTypes() → post-process DEFAULT value types
+  │
+  ▼
+Response: {"text": "<formula code>", "session_id": "<uuid>"}
 ```
 
 ---
 
-## 3. Backend Design
+## 3. Backend Design (Java)
 
 ### 3.1 Technology Stack
 
-| Component | Technology | Version | Purpose |
-|-----------|-----------|---------|---------|
-| Framework | FastAPI | 0.115.6 | Async REST API |
-| Language | Python | 3.13 | Backend runtime |
-| ORM | SQLAlchemy | 2.0.36 | Database access |
-| Migrations | Alembic | 1.14.1 | Schema versioning |
-| Parser | Lark | 1.2.2 | Fast Formula grammar → AST |
-| AI | Anthropic SDK | 0.43.0+ | Claude API integration |
-| Vector DB | ChromaDB | 0.6.3 | RAG knowledge base |
-| Embeddings | sentence-transformers | 3.3.1 | all-MiniLM-L6-v2 model |
-| Streaming | sse-starlette | 2.2.1 | Server-Sent Events |
-| Rate Limit | slowapi | 0.1.9 | API rate limiting |
-| Config | pydantic-settings | 2.7.1 | Environment config |
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| HTTP Server | Grizzly + Jersey | REST API |
+| Language | Java 17+ | Backend runtime |
+| Parser | Hand-written (Tokenizer → FFParser) | Fast Formula → AST |
+| Interpreter | Tree-walking | Simulation |
+| LLM (Fusion) | FAI Spectra SDK (reflection) | Llama 405B / GPT-5 Mini |
+| LLM (Local) | OpenAI API (okhttp3) | GPT-5.4 |
+| Database | Oracle DB (JDBC) | Templates, formula types, formulas |
+| Session | In-memory ConcurrentHashMap | Chat history |
 
 ### 3.2 Module Design
 
-#### 3.2.1 Parser Module (`app/parser/`)
-
-**Purpose:** Parse Oracle Fast Formula source code into an Abstract Syntax Tree (AST).
-
-**Components:**
+#### 3.2.1 Parser Module (`jersey/parser/`)
 
 | File | Responsibility |
 |------|---------------|
-| `grammar.lark` | Lark EBNF grammar definition for Fast Formula |
-| `ast_nodes.py` | Immutable frozen dataclass AST node types |
-| `ff_parser.py` | Lark Transformer: parse tree → AST |
-| `interpreter.py` | Tree-walking AST interpreter for simulation |
+| `Tokenizer.java` | Lexer: source code → token stream |
+| `FFParser.java` | Recursive descent parser: tokens → AST |
+| `AstNodes.java` | Immutable AST node types (sealed interfaces / records) |
+| `Interpreter.java` | Tree-walking interpreter for simulation |
 
 **Grammar Coverage:**
 
-| Construct | Syntax | Status |
-|-----------|--------|--------|
-| Default declaration | `DEFAULT FOR name IS value` | Supported |
-| Single input | `INPUT IS name` | Supported |
-| Multiple inputs | `INPUTS ARE name1 (TYPE), name2` | Supported |
-| Output | `OUTPUT IS name` | Supported |
-| Local variable | `LOCAL name` | Supported |
-| Alias | `ALIAS long_name AS short_name` | Supported |
-| If/Elsif/Else | `IF...THEN...ELSIF...ELSE...END IF` | Supported |
-| While loop | `WHILE...LOOP...END LOOP` | Supported |
-| Return (multi) | `RETURN var1, var2` | Supported |
-| Was Defaulted | `IF var WAS DEFAULTED` | Supported |
-| Like | `name LIKE 'pattern%'` | Supported |
-| Block comments | `/* comment */` | Supported |
-| Cursor/Fetch | `CURSOR...FETCH` | Not supported |
-| Change Contexts | `CHANGE_CONTEXTS(...)` | Not supported |
-| Array processing | `A.FIRST`, `A.NEXT` | Not supported |
+| Construct | Status |
+|-----------|--------|
+| DEFAULT / DEFAULT_DATA_VALUE | Supported |
+| INPUTS ARE / INPUT IS | Supported |
+| OUTPUTS ARE / OUTPUT IS | Supported |
+| LOCAL declarations | Supported |
+| ALIAS | Supported |
+| IF / ELSIF / ELSE / END IF | Supported |
+| WHILE / LOOP / END LOOP / EXIT | Supported |
+| RETURN (multi-value, empty) | Supported |
+| WAS DEFAULTED / WAS NOT DEFAULTED | Supported |
+| LIKE / NOT LIKE | Supported |
+| String concat `\|\|` | Supported |
+| Typed strings `'01-JAN-2024'(DATE)` | Supported |
+| Quoted identifiers `"AREA1"` | Supported |
+| Array access `name[index]`, `.FIRST`, `.NEXT` | Supported |
+| CALL_FORMULA | Supported |
+| CHANGE_CONTEXTS | Supported |
+| EXECUTE / SET_INPUT / GET_OUTPUT | Supported |
+| Block comments `/* */` | Supported |
+| Bare function calls | Supported |
 
-**AST Node Types:**
+#### 3.2.2 LLM Provider Interface (`jersey/service/`)
 
-```
-Program(statements)
-├── VariableDecl(kind, var_name, data_type, default_value)
-├── Assignment(var_name, value)
-├── IfStatement(condition, then_body, else_body)
-├── WhileLoop(condition, body)
-├── ReturnStatement(value)
-└── Expression nodes:
-    ├── BinaryOp(op, left, right)
-    ├── UnaryOp(op, operand)
-    ├── FunctionCall(name, args)
-    ├── NumberLiteral(value)
-    ├── StringLiteral(value)
-    └── VariableRef(name)
-```
-
-**Key Design Decisions:**
-- All AST nodes are frozen dataclasses (immutable)
-- Keywords are case-insensitive via regex terminals with priority `.2`
-- `END IF` and `END LOOP` support optional space via `\s*` in regex
-- `INPUTS ARE` multi-line support: grammar uses `name_list` rule
-- ELSIF chains are converted to nested IfStatement nodes in else_body
-- Comments are ignored at grammar level (`%ignore BLOCK_COMMENT`)
-
-#### 3.2.2 Validator Service (`app/services/validator.py`)
-
-**Purpose:** Three-layer validation of Fast Formula code.
-
-| Layer | Check | Severity | Example |
-|-------|-------|----------|---------|
-| 1. Syntax | Lark parser errors | error | `IF hours > THEN` → missing expression |
-| 2. Semantic | Undeclared variable references | error | Using `unknown_var` without DEFAULT/INPUT |
-| 2. Semantic | OUTPUT variable never assigned | warning | `OUTPUT IS result` but no `result = ...` |
-| 3. Rules | Missing RETURN statement | warning | Formula without RETURN |
-| 3. Rules | OT formula missing HOURS_WORKED | warning | Overtime output without DBI reference |
-
-**Output:** `ValidationResult(valid: bool, diagnostics: list[Diagnostic])`
-
-Each `Diagnostic` contains: `line`, `col`, `end_col`, `severity`, `message`, `layer`
-
-#### 3.2.3 Simulator Service (`app/services/simulator.py`)
-
-**Purpose:** Execute Fast Formula code with user-provided test data.
-
-**Interpreter Design:**
-- Tree-walking interpreter based on AST from parser
-- Variable environment: dict mapping names → values
-- `ReturnSignal` exception for RETURN control flow
-- `SimulationError` for runtime errors (division by zero, etc.)
-- Infinite loop protection: max 10,000 iterations
-- Execution trace: records each statement's execution with line, statement, result
-- Output filtering: excludes input/declared variables, returns only computed values
-
-**Built-in Functions Supported:**
-
-| Category | Functions |
-|----------|----------|
-| Numeric | `ABS`, `ROUND`, `GREATEST`, `LEAST`, `TO_NUMBER` |
-| String | `TO_CHAR`, `UPPER`, `LOWER`, `LENGTH`, `SUBSTR` |
-| Conversion | `TO_NUMBER`, `TO_CHAR` |
-
-**Output:** `SimulationResult(status, output_data, execution_trace, error)`
-
-#### 3.2.4 AI Service (`app/services/ai_service.py`)
-
-**Purpose:** AI-powered formula generation, completion, and explanation via Claude API.
-
-**Model Selection:**
-
-| Use Case | Model | Max Tokens | Latency |
-|----------|-------|-----------|---------|
-| Chat / Generation | claude-sonnet-4 | 4096 | 2-10s |
-| Code Completion | claude-haiku-4.5 | 512 | <1s |
-| Explain | claude-sonnet-4 | 4096 | 2-10s |
-
-**Prompt Assembly Flow:**
-
-```
-System Prompt (FF syntax rules, keywords, functions)
-  + RAG Context (similar formulas from ChromaDB, top-k=3)
-  + Current Editor Code (if modifying existing formula)
-  + Chat History (from DB, last 10 messages)
-  + User Message
+```java
+public interface LlmProvider {
+    void streamChat(messages, maxTokens, tokenCallback);
+    String complete(messages, maxTokens);
+    String autocomplete(messages, maxTokens);  // editor inline-completion
+    String completeWithContext(PromptContext, maxTokens);
+    void streamChatWithContext(PromptContext, maxTokens, tokenCallback);
+    boolean isAvailable();
+    String name();
+}
 ```
 
-**Key Design:** When `current_code` is provided, the prompt instructs Claude to modify the existing formula rather than generate from scratch. This enables iterative refinement.
+**Implementations:**
 
-#### 3.2.5 RAG Engine (`app/services/rag_engine.py`)
+| Provider | Class | Model | Selection |
+|----------|-------|-------|-----------|
+| Fusion AI Spectra | `FusionAiProvider` | Llama 405B or GPT-5 Mini | Default (no LLM_PROVIDER env) |
+| OpenAI | `OpenAiProvider` | GPT-5.4 (chat) / GPT-5.4-mini (autocomplete) | `LLM_PROVIDER=openai` |
 
-**Purpose:** Retrieval-Augmented Generation for formula examples.
+#### 3.2.3 PromptContext (Structured Prompt)
 
-| Config | Value |
-|--------|-------|
-| Vector DB | ChromaDB (PersistentClient) |
-| Embedding Model | all-MiniLM-L6-v2 (384-dim) |
-| Distance Metric | Cosine |
-| Collection | `fast_formulas` |
-| Retrieval | Top-k=3, min similarity=0.6 |
-
-**Knowledge Base:** 5 sample formulas in `data/samples/`:
-- `overtime_pay.ff` — standard overtime
-- `shift_differential.ff` — night/evening premiums
-- `holiday_pay.ff` — holiday multiplier
-- `weekly_hours_cap.ff` — hours cap with warning
-- `double_time_overtime.ff` — California-style tiered OT
-
-### 3.3 Database Design
-
-**Engine:** SQLite (MVP) → PostgreSQL (production)
-
-**ORM:** SQLAlchemy 2.0 with Mapped types
-
+```java
+public record PromptContext(
+    String systemPrompt,       // FF language reference (~730 lines, from DB)
+    String userPrompt,         // user's natural language request
+    String formulaType,        // e.g. "WFM Time Calculation Rules"
+    String referenceFormula,   // template body or RAG results
+    String editorCode,         // current Monaco editor content
+    String additionalRules,    // per-template prompt overlay
+    String chatHistory,        // prior conversation turns
+    String promptCode          // Spectra prompt code override (nullable)
+)
 ```
-┌──────────────┐     ┌──────────────────┐
-│   Formula     │◄────│  SimulationRun   │
-├──────────────┤     ├──────────────────┤
-│ id (PK)      │     │ id (PK)          │
-│ name         │     │ formula_id (FK)  │
-│ description  │     │ input_data (JSON)│
-│ formula_type │     │ output_data(JSON)│
-│ use_case     │     │ exec_trace(JSON) │
-│ code (TEXT)  │     │ status           │
-│ version      │     │ created_at       │
-│ status       │     └──────────────────┘
-│ user_id      │
-│ created_at   │     ┌──────────────────┐
-│ updated_at   │◄────│  ChatSession     │
-└──────────────┘     ├──────────────────┤
-                     │ id (PK)          │
-┌──────────────┐     │ formula_id (FK)  │
-│ DBIRegistry  │     │ messages (JSON)  │
-├──────────────┤     │ created_at       │
-│ id (PK)      │     └──────────────────┘
-│ name (UNIQUE)│
-│ data_type    │
-│ module       │
-│ description  │
-│ is_active    │
-└──────────────┘
-```
+
+FusionAiProvider sends each field as a named property to the Spectra template.
+OpenAiProvider flattens them into a system + user message pair.
+
+#### 3.2.4 Spectra Prompt Configuration
+
+Two prompt codes in `hr_gen_ai_prompts_seed_b`:
+
+| prompt_code | Model | Provider | UI Label |
+|---|---|---|---|
+| `HCM_FF_GENERATION_LLM405B` | meta.llama-3.1-405b-instruct | OCI_META | Llama 405B (default) |
+| `HCM_FF_GENERATION_GPT5MINI` | openai.gpt-5-mini | OCI_ON_DEMAND | GPT-5 Mini |
+
+**Model Parameters** (shared):
+
+| Parameter | Value | Rationale |
+|---|---|---|
+| temperature | 0.1 | Code generation needs determinism |
+| maxTokens | 10240 | Formulas can be long |
+| topP | 0.9 | Slightly narrowed sampling |
+| topK | 0 | Disabled — topP alone controls |
+| frequencyPenalty | 0 | Repeated keywords are normal in formulas |
+| presencePenalty | 0 | Formula structure naturally repeats tokens |
+
+#### 3.2.5 Template Service (`jersey/service/TemplateService.java`)
+
+CRUD operations on `FF_FORMULA_TEMPLATES` + `FF_FORMULA_TEMPLATES_TL` (Oracle DB).
+
+| Method | Purpose |
+|--------|---------|
+| `listByFormulaType()` | Templates for a formula type (active only by default) |
+| `listDistinctFormulaTypes()` | Distinct formula types that have templates |
+| `findByTemplateCode()` | Lookup by TEMPLATE_CODE business key |
+| `findSystemPrompts()` | Active rows with SYSTEMPROMPT_FLAG=Y, ordered by SORT_ORDER |
+| `create() / update() / delete()` | CRUD for Manage Templates UI |
+| `searchFormulas()` | Search FF_FORMULAS_VL for formula lookup |
+
+#### 3.2.6 Validator Service
+
+Three-layer validation (same as Python version):
+
+| Layer | Check | Severity |
+|-------|-------|----------|
+| Syntax | Parser errors | error |
+| Semantic | Undeclared variables, unassigned outputs | error/warning |
+| Rules | Missing RETURN, business logic | warning |
+
+#### 3.2.7 Simulator Service
+
+AST interpreter with:
+- Variable environment (dict)
+- ReturnSignal exception for control flow
+- Infinite loop protection (max iterations)
+- Execution trace recording
+- Built-in function support (numeric, string, date, conversion)
+
+### 3.3 Database Schema
+
+#### FF_FORMULA_TEMPLATES (Base — 20 columns)
+
+| Column | Type | Key | Description |
+|--------|------|-----|-------------|
+| TEMPLATE_ID | NUMBER(18) | PK | Surrogate key |
+| FORMULA_TYPE_ID | NUMBER(18) | FK | FK to FF_FORMULA_TYPES (NULL = Custom) |
+| TEMPLATE_CODE | VARCHAR2(150) | UK | Business key |
+| FORMULA_TEXT | CLOB | | Fast Formula source code |
+| ADDITIONAL_PROMPT_TEXT | CLOB | | Per-template AI prompt overlay |
+| SOURCE_TYPE | VARCHAR2(30) | | SEEDED or USER_CREATED |
+| SYSTEMPROMPT_FLAG | VARCHAR2(1) | | Y = this row is the AI system prompt |
+| ACTIVE_FLAG | VARCHAR2(1) | | Y = visible in UI |
+| SEMANTIC_FLAG | VARCHAR2(1) | | Y = participates in RAG search |
+| SORT_ORDER | NUMBER(9) | | Display order within formula type |
+| + WHO columns, ENTERPRISE_ID, SEED_DATA_SOURCE, MODULE_ID, ORA_SEED_SET1/2 |
+
+#### FF_FORMULA_TEMPLATES_TL (Translation — 15 columns)
+
+| Column | Type | Description |
+|--------|------|-------------|
+| TEMPLATE_ID | NUMBER(18) | FK to base table |
+| LANGUAGE | VARCHAR2(4) | Language code |
+| NAME | VARCHAR2(240) | Translated display name (translateFlag=Y) |
+| DESCRIPTION | VARCHAR2(4000) | Translated description (translateFlag=Y) |
+| SOURCE_LANG | VARCHAR2(4) | Original language |
+| + WHO columns, ENTERPRISE_ID, SEED_DATA_SOURCE, ORA_SEED_SET1/2 |
 
 ### 3.4 API Design
 
 | Method | Endpoint | Request | Response | Transport |
 |--------|----------|---------|----------|-----------|
-| POST | `/api/validate` | `{code}` | `{valid, diagnostics[]}` | JSON |
-| POST | `/api/simulate` | `{code, input_data}` | `{status, output_data, execution_trace, error}` | JSON |
-| POST | `/api/chat` | `{session_id?, message, code}` | `{text}` chunks | SSE |
-| POST | `/api/complete` | `{code, cursor_line, cursor_col}` | `{suggestions[]}` | JSON |
-| POST | `/api/explain` | `{code, selected_range?, action}` | `{text}` chunks | SSE |
-| GET | `/api/formulas` | — | `[{id, name, ...}]` | JSON |
-| POST | `/api/formulas` | `{name, code, ...}` | `{id, name}` | JSON |
-| GET | `/api/formulas/:id` | — | `{id, name, code, ...}` | JSON |
-| PUT | `/api/formulas/:id` | `{name?, code?, status?}` | `{id, status}` | JSON |
-| POST | `/api/formulas/:id/export` | — | `{filename, content}` | JSON |
-| GET | `/api/dbi` | `?module=&search=` | `[{name, data_type, module, description}]` | JSON |
-| GET | `/api/health` | — | `{status: "ok"}` | JSON |
+| POST | `/chat` | `{message, formula_type, editor_code, session_id, template_code, prompt_code}` | SSE stream | text/event-stream |
+| POST | `/chat/sync` | same as /chat | `{text, session_id}` | JSON |
+| POST | `/complete` | `{code, cursor_line}` | `{suggestions[]}` | JSON |
+| POST | `/explain` | `{code}` | SSE stream | text/event-stream |
+| POST | `/validate` | `{code}` | `{valid, diagnostics[]}` | JSON |
+| POST | `/simulate` | `{code, input_data}` | `{status, output_data, trace, error}` | JSON |
+| GET | `/formulas` | — | `[{id, name, ...}]` | JSON |
+| POST | `/formulas` | `{name, code, ...}` | `{id, name}` | JSON |
+| GET | `/formulas/{id}` | — | `{id, name, code, ...}` | JSON |
+| PUT | `/formulas/{id}` | `{name?, code?}` | `{id, ...}` | JSON |
+| GET | `/formulas/{id}/export` | — | `{id, name, code, content}` | JSON |
+| GET | `/formulas/lookup` | `?formula_type=&search=&limit=&offset=` | `[{formula_id, formula_name, ...}]` | JSON |
+| GET | `/formulas/lookup/{id}/text` | — | `{formula_id, formula_text}` | JSON |
+| GET | `/formula-types` | `?all=true` | `[{type_name, display_name}]` | JSON |
+| GET | `/templates` | `?formula_type=&include_inactive=` | `[{template_id, name, ...}]` | JSON |
+| GET | `/templates/{id}` | — | `{template_id, name, code, rule, ...}` | JSON |
+| POST | `/templates` | `{name, template_code, ...}` | `{template_id, ...}` | JSON |
+| PUT | `/templates/{id}` | `{name?, code?, ...}` | `{template_id, ...}` | JSON |
+| DELETE | `/templates/{id}` | — | `{status, template_id}` | JSON |
+| POST | `/templates/generate-meta` | `{formula_text, formula_name}` | `{name, description}` | JSON |
+| POST | `/templates/extract-prompt` | `{url, formula_type}` | `{prompt}` | JSON |
+| GET | `/dbi` | `?module=&search=&data_type=&limit=&offset=` | `{items[], total}` | JSON |
+| GET | `/dbi/modules` | — | `[module_names]` | JSON |
+| GET | `/debug/llm-logs` | — | `[{timestamp, provider, ...}]` | JSON |
+| GET | `/debug/llm-logs/latest` | — | `{...}` | JSON |
+| DELETE | `/debug/llm-logs` | — | `{status}` | JSON |
+| GET | `/health` | — | `{status}` | JSON |
 
-**SSE Protocol:** Backend sends `data: {"text": "..."}` (JSON encoded to preserve newlines). Frontend parses JSON and extracts `text` field.
+**Base Path:** `/11.13.18.05/calculationEntries`
 
 ---
 
@@ -287,237 +325,193 @@ System Prompt (FF syntax rules, keywords, functions)
 
 ### 4.1 Technology Stack
 
-| Component | Technology | Version |
-|-----------|-----------|---------|
-| Framework | React | 19.x |
-| Language | TypeScript | 5.9 |
-| Build Tool | Vite | 5.x |
-| UI Library | Ant Design | 6.x |
-| State Management | Zustand | 5.x |
-| Code Editor | Monaco Editor | 4.x |
-| HTTP Client | Axios | 1.x |
+| Component | Technology |
+|-----------|-----------|
+| Framework | React 19 |
+| Language | TypeScript 5.9 |
+| Build Tool | Vite 5 |
+| UI Library | Ant Design 6 |
+| State Management | Zustand 5 |
+| Code Editor | Monaco Editor 4 |
 
 ### 4.2 Layout
 
 ```
-┌──────────────────────────────────────────────────┐
-│  [New] [Save] [Export]                            │  ← Toolbar
-├──────────────────────────────┬───────────────────┤
-│                              │  Validate         │
-│  Monaco Editor               │  Simulate         │
-│  (Fast Formula code)         │  DBIs             │
-│                              │  Explain          │
-├──────────────────────────────┤                   │
-│  💬 Chat History (collapse)  │                   │
-├──────────────────────────────┤                   │
-│  [Chat input] [Send]         │                   │
-├──────────────────────────────┴───────────────────┤
-│  ✓ Syntax OK                         32 lines    │  ← StatusBar
-└──────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  Fast Formula                          [New] [Export] [Templates] │
+├──────────────────────────────────┬──────────────────────────┤
+│                                  │  Validate | Explain       │
+│  Monaco Editor                   │                          │
+│  (fast-formula language)         │  VALID  No issues found. │
+│                                  │                          │
+├──────────────────────────────────┤                          │
+│  ▼ CONVERSATION  2 messages      │                          │
+│  [drag to resize]                │                          │
+│  Chat history (collapsible)      │                          │
+├──────────────────────────────────┤                          │
+│  TYPE [Custom Formula ▼]         │                          │
+│  START WITH [template... ▼]      │                          │
+│  MODEL [Llama 405B ▼]           │                          │
+├──────────────────────────────────┤                          │
+│  [Describe what you need...]  [>]│                    [ENV ▼]│
+└──────────────────────────────────┴──────────────────────────┘
 ```
-
-- Two-column layout with draggable divider
-- Left: Monaco Editor + collapsible chat history + chat input
-- Right: Tabbed panel (Validate / Simulate / DBIs / Explain)
 
 ### 4.3 State Management (Zustand)
 
 | Store | State | Purpose |
 |-------|-------|---------|
-| `editorStore` | code, diagnostics, isValid, isDirty, currentFormulaId | Editor state + validation results |
-| `chatStore` | sessionId, messages[], isStreaming | Chat conversation state |
-| `simulationStore` | inputData, outputData, trace, status, error | Simulation inputs/outputs |
+| `editorStore` | code, diagnostics, isValid, isDirty, formulaType | Editor state + validation |
+| `chatStore` | sessionId, messages[], isStreaming | Chat conversation |
+| `simulationStore` | inputData, outputData, trace, status | Simulation I/O |
+| `serverStore` | servers[], selectedIndex, current | Multi-server switching (Fusion / Local) |
 
-### 4.4 Monaco Editor Integration
+### 4.4 Context Selectors
 
-**Custom Language:** `fast-formula`
+| Selector | Source | Behavior |
+|----------|--------|----------|
+| **Type** | `GET /formula-types` | 123 formula types, searchable, A-Z sorted |
+| **Start with** | `GET /templates?formula_type=X` | DB-backed templates per formula type |
+| **Model** | Static options | Fusion: dropdown (Llama 405B / GPT-5 Mini). Local: static "GPT 5.4" |
 
-| Feature | Implementation |
-|---------|---------------|
-| Syntax Highlighting | Monarch tokenizer (28 keywords, 3 types, 60+ functions) |
-| Auto-completion | CompletionItemProvider (keywords, functions, DBI names) |
-| Error Markers | Diagnostics from `/api/validate` → Monaco `setModelMarkers` |
-| Code Folding | Regex markers for IF/END IF, WHILE/END LOOP |
-| Theme | Light theme |
+Model selector only sends `prompt_code` in the request body for Fusion environments (detected by `current.auth` presence).
 
-### 4.5 Chat Integration
+### 4.5 Server Switching
 
-- Chat input at bottom of editor panel
-- Chat history collapsible between editor and input
-- SSE streaming: tokens arrive in real-time
-- Code extraction: regex matches ` ```...``` ` blocks in AI response → fills editor
-- Fallback: if no fenced blocks, detect FF keywords in response
-- Context: current editor code sent with each chat request for iterative modification
+| Server | baseUrl | Auth | LLM |
+|--------|---------|------|-----|
+| Payroll VP DEV | `/fusion-proxy` | Basic auth | Fusion AI Spectra |
+| Local Dev (Grizzly) | `http://<ip>:8000` | None | OpenAI GPT-5.4 |
 
 ---
 
-## 5. Data Flow Diagrams
+## 5. Seed Data
 
-### 5.1 Formula Generation Flow
+### 5.1 FF_FORMULA_TEMPLATES Seed
 
-```
-User: "Write overtime formula"
-  │
-  ▼
-Frontend: POST /api/chat {message, code, session_id}
-  │
-  ▼
-Backend: Load ChatSession history from SQLite
-  │
-  ▼
-AI Service: RAG query ChromaDB → top 3 similar formulas
-  │
-  ▼
-AI Service: Assemble prompt (system + RAG + code context + history + message)
-  │
-  ▼
-Claude API: Stream response tokens
-  │
-  ▼
-Backend: yield SSE events {data: {"text": "..."}}
-  │
-  ▼
-Frontend: Append tokens to chat message
-  │
-  ▼
-Frontend: On stream done → extract code blocks → set editor code
-  │
-  ▼
-Frontend: useValidation hook triggers (300ms debounce)
-  │
-  ▼
-Backend: POST /api/validate → Parser → Semantic → Rules
-  │
-  ▼
-Frontend: Update Monaco markers + Validate tab
-```
+**Bulk SQL:** `FastFormulaServiceAM_FormulaTemplatesSeed.sql`
 
-### 5.2 Simulation Flow
+- AM: `FastFormulaServiceAM`
+- Tables: `FF_FORMULA_TEMPLATES` + `FF_FORMULA_TEMPLATES_TL`
+- Business key: `TEMPLATE_CODE` (MERGE ON condition)
+- TL join: `TEMPLATE_CODE` + `ENTERPRISE_ID` to resolve TEMPLATE_ID across schemas
+- Protection: `WHERE last_updated_by IN ('SEED_DATA_FROM_APPLICATION', '0')` — does not overwrite user-modified rows
+- ID generation: `S_ROW_ID_SEQ.NEXTVAL` on INSERT
 
-```
-User: Fills input form → clicks "Run Simulation"
-  │
-  ▼
-Frontend: POST /api/simulate {code, input_data}
-  │
-  ▼
-Backend: parse_formula(code) → AST
-  │
-  ▼
-Backend: Interpreter(input_data).run(AST)
-  │
-  ▼
-Backend: Execute statements, build trace, catch errors
-  │
-  ▼
-Frontend: Display output_data + execution_trace
+### 5.2 Spectra Prompt Seed
+
+Prompt codes in `hr_gen_ai_prompts_seed_b`:
+
+| prompt_code | model_name | model_provider | label |
+|---|---|---|---|
+| HCM_FF_GENERATION_LLM405B | meta.llama-3.1-405b-instruct | OCI_META | HCM Fast Formula AI Generator (Llama 405B) |
+| HCM_FF_GENERATION_GPT5MINI | openai.gpt-5-mini | OCI_ON_DEMAND | HCM Fast Formula AI Generator (GPT-5 Mini) |
+
+Both share the same `prompt_tmpl` with 7 placeholders: `{systemPrompt}`, `{userPrompt}`, `{formulaType}`, `{referenceFormula}`, `{editorCode}`, `{additionalRules}`, `{chatHistory}`.
+
+---
+
+## 6. Testing
+
+### 6.1 Java Test Suite (113 tests)
+
+| Module | Tests | Covers |
+|--------|-------|--------|
+| `FFParserTest` | 3 | Basic parsing |
+| `FFParserExtendedTest` | 20 | Full grammar coverage |
+| `ValidatorTest` | 19 | 3-layer validation |
+| `SimulatorTest` | 10 | Arithmetic, branching, trace |
+| `InterpreterTest` | 5 | AST interpretation |
+| `AiServiceTest` | 18 | Prompt building, provider selection |
+| `ApiTest` | 13 | REST endpoints |
+| `SessionFixesTest` | 16 | Multi-turn session management |
+| `AstNodesTest` | 3 | AST node construction |
+| `FormulaServiceTest` | 3 | Formula CRUD |
+| `FormulaTypesServiceTest` | 2 | Formula type listing |
+| `HealthResourceTest` | 1 | Health endpoint |
+
+```bash
+cd java && mvn test        # all 113 tests
+mvn test -Dtest=ValidatorTest  # single class
 ```
 
 ---
 
-## 6. Security Design
+## 7. Deployment
+
+### 7.1 Fusion Environment
+
+Deployed as part of the HCM Payroll REST service on WebLogic. No separate deployment — the Jersey resource is registered via `JerseyConfig` in the existing `HcmFastFormulaRestModel` application module.
+
+**Prerequisites:**
+- `ORA_FAI_SDK_ENABLE_SPECTRA_ROUTE = Y` (profile option)
+- `AdfHcmFaiGenAiSdk.jar` on classpath
+- Prompt codes registered in `hr_gen_ai_prompts_seed_b`
+- System prompt rows in `FF_FORMULA_TEMPLATES`
+
+### 7.2 Local Development
+
+```bash
+export LLM_PROVIDER=openai
+export OPENAI_API_KEY=sk-...
+export FF_DB_URL='jdbc:oracle:thin:@//host:port/service'
+export FF_DB_USER='fusion'
+export FF_DB_PASSWORD='fusion'
+
+cd java && mvn compile exec:java    # Backend at port 8000
+cd frontend && npm run dev -- --host 0.0.0.0  # Frontend at port 5173
+```
+
+### 7.3 Linux Server (Oracle Linux / csh)
+
+```bash
+rsync -avh --progress --exclude 'target/' \
+    java/ user@host:/scratch/user/ff_time/java/
+
+rsync -avh --progress --exclude '.git/' --exclude 'node_modules/' \
+    frontend/ user@host:/scratch/user/ff_time/frontend/
+```
+
+---
+
+## 8. Security
 
 | Concern | Measure |
 |---------|---------|
-| API Key | Stored in backend `.env`, never exposed to frontend |
-| Input Validation | All API inputs validated with Pydantic schemas |
-| Code Injection | Simulator uses AST interpretation, never `eval()` |
-| Rate Limiting | slowapi middleware on AI endpoints (10/min) |
-| CORS | Configured for frontend origin only |
-| Data Isolation | MVP is single-user; auth deferred to post-MVP |
+| API Keys | Environment variables, never in source |
+| Code Injection | AST interpretation, never `eval()` |
+| SQL Injection | Parameterized queries via PreparedStatement |
+| Prompt Injection | `<user_request>` tag with DATA ONLY declaration |
+| CORS | CorsFilter configured for frontend origin |
+| Seed Data Protection | MERGE only overwrites `SEED_DATA_FROM_APPLICATION` rows |
 
 ---
 
-## 7. DBI Registry
+## 9. External Integration
 
-65 database items across 3 modules, stored in `data/dbi_registry/time_labor_dbis.json`:
+### 9.1 AI Agent Studio
 
-| Module | Prefix | Count | Examples |
-|--------|--------|-------|----------|
-| TIME_LABOR | `HWM_PPM_TM_` | 7 | `HWM_PPM_TM_MEASURE`, `HWM_PPM_TM_START_TIME` |
-| TIME_LABOR | `HWM_EMP_SCHD_` | 5 | `HWM_EMP_SCHD_SHIFT_NAME`, `HWM_EMP_SCHD_MEASURE` |
-| TIME_LABOR | `HWM_CTX_` | 4 | `HWM_CTX_PERIOD_START_DATE`, `HWM_CTX_PERIOD_END_DATE` |
-| TIME_LABOR | (core) | 23 | `HOURS_WORKED`, `OVERTIME_RATE`, `SHIFT_TYPE`, `HOLIDAY_FLAG` |
-| PERSON | `PER_ASG_` | 13 | `PER_ASG_NORMAL_HOURS`, `PER_ASG_STATUS`, `PER_ASG_GRADE_ID` |
-| PERSON | `PER_EMP_` | 8 | `PER_EMP_HIRE_DATE`, `PER_EMP_FULL_NAME` |
-| PAYROLL | `PAY_` | 5 | `PAY_EARN_PERIOD_START`, `PAY_PERIODS_PER_YEAR` |
+Time & Labor team uptakes via AI Agent Studio, calling `/chat/sync` as a tool.
 
-Source: Oracle FastFormula User Guide + MOS Doc ID 1990057.1
+See: [ff-ai-generator-uptake.md](ff-ai-generator-uptake.md)
 
----
+### 9.2 Supported Formula Types (T&L)
 
-## 8. Testing Strategy
-
-### 8.1 Backend Tests
-
-| Test File | Coverage |
-|-----------|----------|
-| `test_health.py` | Health endpoint |
-| `test_models.py` | All 4 SQLAlchemy models (CRUD, relationships) |
-| `test_parser.py` | Simple formula, IF/ELSE, syntax errors |
-| `test_validator.py` | Valid formula, undeclared vars, syntax errors, output warnings |
-| `test_simulator.py` | Arithmetic, IF branching, execution trace, division by zero |
-| `test_ai_service.py` | Prompt building (system, generation with RAG, completion) |
-| `test_api.py` | Validate, simulate, DBI endpoints |
-| `test_rag_engine.py` | Add/query formulas, empty collection |
-
-**Total:** 27 tests, all passing
-
-### 8.2 Test Commands
-
-```bash
-# All tests
-python -m pytest tests/ -v
-
-# Single file
-python -m pytest tests/test_parser.py -v
-
-# Single test
-python -m pytest tests/test_parser.py::test_parse_if_else -v
-
-# Skip slow RAG tests
-python -m pytest tests/ --ignore=tests/test_rag_engine.py -v
-```
-
----
-
-## 9. Deployment
-
-### 9.1 Development Setup
-
-```bash
-# Backend
-cd backend
-cp .env.example .env          # Add ANTHROPIC_API_KEY
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-alembic upgrade head
-python -m app.scripts.seed_knowledge_base
-uvicorn app.main:app --reload --port 8000
-
-# Frontend
-cd frontend
-npm install
-npm run dev                    # http://localhost:5173
-```
-
-### 9.2 Environment Variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | Yes | — | Claude API key |
-| `DATABASE_URL` | No | `sqlite:///./ff_time.db` | Database connection |
-| `CHROMA_PERSIST_DIR` | No | `./chroma_data` | ChromaDB storage path |
-| `CORS_ORIGINS` | No | `http://localhost:5173` | Allowed CORS origins |
+| Type | Prefix |
+|------|--------|
+| WFM Time Calculation Rules | `ORA_WFM_TCR_*_AP` |
+| WFM Time Entry Rules | `ORA_WFM_TER_*_AP` |
+| WFM Time Submission Rules | `ORA_WFM_TSR_*_AP` |
+| WFM Time Compliance Rules | `ORA_WFM_WCR_*_AP` |
+| WFM Time Device Rules | `ORA_WFM_TDR_*` |
 
 ---
 
 ## 10. Known Limitations
 
-1. **Single-user only** — No authentication/authorization in MVP
-2. **Grammar coverage** — CURSOR/FETCH, CHANGE_CONTEXTS, array processing not supported
-3. **Simulator fidelity** — Cannot 100% reproduce Oracle runtime behavior (edge cases in built-in functions, database interactions)
-4. **No type inference** — Validator does not track variable types through expressions
-5. **DBI registry is static** — Not connected to live Oracle instance; manually maintained JSON file
-6. **posthog version pinned** — ChromaDB requires `posthog<4` due to API incompatibility
+1. **Chat session is in-memory** — server restart loses conversation history
+2. **No authentication** — relies on Fusion REST infrastructure for auth
+3. **RAG is DB-query based** — no vector embeddings in the Java backend (uses SQL LIKE search on FF_FORMULAS_VL)
+4. **Spectra SDK loaded via reflection** — FusionAiProvider compiles without the SDK jar; ClassNotFoundException at runtime means the jar is missing
+5. **System prompt from DB** — if no active SYSTEMPROMPT_FLAG=Y row exists, the LLM gets no domain knowledge and returns generic responses
+6. **CLOB handling** — FORMULA_TEXT and ADDITIONAL_PROMPT_TEXT are CLOBs; bulk seed SQL handles them but large templates may hit Oracle MERGE limitations

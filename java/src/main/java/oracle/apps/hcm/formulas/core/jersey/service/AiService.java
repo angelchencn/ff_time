@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
 public class AiService {
 
     private static final int MAX_TOKENS_CHAT = 10240;
-    private static final int MAX_TOKENS_COMPLETION = 512;
+    private static final int MAX_TOKENS_COMPLETION = 10240;
 
     /**
      * Fully-qualified name of {@code FusionAiProvider}, loaded via
@@ -193,6 +193,7 @@ public class AiService {
                            List<Map<String, String>> history,
                            String customSampleCode,
                            String customRule,
+                           String promptCode,
                            Consumer<String> tokenCallback) {
         if (AppsLogger.isEnabled(AppsLogger.FINER)) {
             AppsLogger.write(this,
@@ -200,7 +201,8 @@ public class AiService {
                             + " formulaType=" + formulaType
                             + " historyTurns=" + history.size()
                             + " hasSample=" + (customSampleCode != null)
-                            + " hasRule=" + (customRule != null && !customRule.isBlank()),
+                            + " hasRule=" + (customRule != null && !customRule.isBlank())
+                            + " promptCode=" + promptCode,
                     AppsLogger.FINER);
         }
         if (!provider.isAvailable()) {
@@ -213,14 +215,14 @@ public class AiService {
             return;
         }
         PromptContext context = buildPromptContext(
-                message, editorCode, formulaType, history, customSampleCode, customRule);
+                message, editorCode, formulaType, history, customSampleCode, customRule, promptCode);
         provider.streamChatWithContext(context, MAX_TOKENS_CHAT, tokenCallback);
     }
 
-    /** Convenience overload without history/custom sample/rule */
+    /** Convenience overload without history/custom sample/rule/promptCode */
     public void streamChat(String message, String editorCode, String formulaType,
                            Consumer<String> tokenCallback) {
-        streamChat(message, editorCode, formulaType, List.of(), null, null, tokenCallback);
+        streamChat(message, editorCode, formulaType, List.of(), null, null, null, tokenCallback);
     }
 
     /**
@@ -234,12 +236,14 @@ public class AiService {
     public String chatOnce(String message, String editorCode, String formulaType,
                            List<Map<String, String>> history,
                            String customSampleCode,
-                           String customRule) {
+                           String customRule,
+                           String promptCode) {
         if (AppsLogger.isEnabled(AppsLogger.FINER)) {
             AppsLogger.write(this,
                     "chatOnce: provider=" + provider.name()
                             + " formulaType=" + formulaType
-                            + " historyTurns=" + history.size(),
+                            + " historyTurns=" + history.size()
+                            + " promptCode=" + promptCode,
                     AppsLogger.FINER);
         }
         if (!provider.isAvailable()) {
@@ -251,7 +255,7 @@ public class AiService {
             return "Error: " + provider.name() + " is not available.";
         }
         PromptContext context = buildPromptContext(
-                message, editorCode, formulaType, history, customSampleCode, customRule);
+                message, editorCode, formulaType, history, customSampleCode, customRule, promptCode);
         String response = provider.completeWithContext(context, MAX_TOKENS_CHAT);
         if (AppsLogger.isEnabled(AppsLogger.FINER)) {
             AppsLogger.write(this,
@@ -282,7 +286,7 @@ public class AiService {
     PromptContext buildPromptContext(
             String message, String editorCode, String formulaType,
             List<Map<String, String>> history,
-            String customSampleCode, String customRule) {
+            String customSampleCode, String customRule, String promptCode) {
 
         String systemPrompt = getSystemPrompt();
         String userPrompt = extractUserRequestText(message, formulaType);
@@ -298,7 +302,8 @@ public class AiService {
                 referenceFormula,
                 normalizedEditor,
                 additionalRules,
-                chatHistoryText
+                chatHistoryText,
+                promptCode
         );
     }
 

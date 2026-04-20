@@ -1,5 +1,5 @@
 <?xml version = '1.0' encoding = 'UTF-8'?>
-<!--$Header: fusionapps/hcm/components/hcmPayroll/formulas/core/dbSchema/database/fusionDB/FUSION/FF_FORMULA_TEMPLATES_VL.view ff_time/1 2026/04/08 00:00:00 alex Exp $-->
+<!--$Header: fusionapps/hcm/components/hcmPayroll/formulas/core/dbSchema/database/fusionDB/FUSION/FF_FORMULA_TEMPLATES_VL.view xiaojuch_bug-39168092/2 2026/04/13 00:34:20 xiaojuch Exp $-->
 <!-- adxml:    <src_file bootstrap="~BOOTSTRAP" version="~VERSION" -->
 <!-- adxml:       translation_level="~TRANS_LEVEL" techstack_level="~TXK_LEVEL" -->
 <!-- adxml:       verticalisation_level="~VERT_LEVEL" custom_level="~CUST_LEVEL" -->
@@ -105,6 +105,9 @@ Dependent Objects' Information : None
          </CUSTOMER_AREA>
       </COL_LIST_ITEM>
       <COL_LIST_ITEM>
+         <NAME>SYSTEMPROMPT_FLAG</NAME>
+      </COL_LIST_ITEM>
+      <COL_LIST_ITEM>
          <NAME>ACTIVE_FLAG</NAME>
          <CUSTOMER_AREA>
             <UDP_LIST>
@@ -122,17 +125,6 @@ Dependent Objects' Information : None
                <UDP_LIST_ITEM>
                   <NAME>shortName</NAME>
                   <VALUE>SEMANTIC_FLAG</VALUE>
-               </UDP_LIST_ITEM>
-            </UDP_LIST>
-         </CUSTOMER_AREA>
-      </COL_LIST_ITEM>
-      <COL_LIST_ITEM>
-         <NAME>SYSTEMPROMPT_FLAG</NAME>
-         <CUSTOMER_AREA>
-            <UDP_LIST>
-               <UDP_LIST_ITEM>
-                  <NAME>shortName</NAME>
-                  <VALUE>SYSTEMPROMPT_FLAG</VALUE>
                </UDP_LIST_ITEM>
             </UDP_LIST>
          </CUSTOMER_AREA>
@@ -277,9 +269,9 @@ Dependent Objects' Information : None
     fft.FORMULA_TEXT FORMULA_TEXT,
     fft.ADDITIONAL_PROMPT_TEXT ADDITIONAL_PROMPT_TEXT,
     fft.SOURCE_TYPE SOURCE_TYPE,
+    fft.SYSTEMPROMPT_FLAG SYSTEMPROMPT_FLAG,
     fft.ACTIVE_FLAG ACTIVE_FLAG,
     fft.SEMANTIC_FLAG SEMANTIC_FLAG,
-    fft.SYSTEMPROMPT_FLAG SYSTEMPROMPT_FLAG,
     fft.SORT_ORDER SORT_ORDER,
     fft.SEED_DATA_SOURCE SEED_DATA_SOURCE,
     fft.CREATED_BY CREATED_BY,
@@ -293,40 +285,40 @@ Dependent Objects' Information : None
     ffttl.NAME NAME,
     ffttl.DESCRIPTION DESCRIPTION
 FROM
-    "ff_formula_templates" fft,
-    "ff_formula_templates_tl" ffttl
+    FF_FORMULA_TEMPLATES fft,
+    FF_FORMULA_TEMPLATES_TL ffttl
 WHERE
     fft.TEMPLATE_ID = ffttl.TEMPLATE_ID AND ffttl.LANGUAGE = USERENV('LANG')</SUBQUERY>
    <CUSTOMER_AREA>
       <UDP_LIST>
          <UDP_LIST_ITEM>
             <NAME>adxml</NAME>
-            <VALUE> adxml:    &lt;src_file bootstrap="~BOOTSTRAP" version="~VERSION"
- adxml:       translation_level="~TRANS_LEVEL" techstack_level="~TXK_LEVEL"
- adxml:       verticalisation_level="~VERT_LEVEL" custom_level="~CUST_LEVEL"
- adxml:       language="~LANG" needs_translation="~TRANSLATION" ship="~SHIP"
- adxml:       localization="~LOCALIZATION" object_type="~OBJECT_TYPE">
- adxml:     &lt;abstract_file te="~PROD" subdir="~PATH" file_basename="~BASENAME" file_type="~FILE_TYPE"/>
- adxml:     &lt;metadata>
- adxml:       &lt;action identifier="VIEW" category="DD_NORMAL_VIEWS" portion="D" online_category="N">
- adxml:         &lt;apply_action>
- adxml:           &lt;action_details name="java">
- adxml:             &lt;invoking_exec>
- adxml:               &lt;executable file_basename="oracle.apps.fnd.applxdf.comp.XdfSchemaDeploy" file_type="class"/>
- adxml:             &lt;/invoking_exec>
- adxml:             &lt;args>owner_un=#un:fusion# apps_un=#un:fusion#
- adxml:                      jdbc_protocol=#jdbc_protocol# jdbc_db_addr=#jdbc_db_addr# xdf_mode=view
- adxml:                      xdf_file_name=#fullpath:~PROD:~PATH:~FILE#
- adxml:             &lt;/args>
- adxml:           &lt;/action_details>
- adxml:         &lt;/apply_action>
- adxml:         &lt;analysis_action>
- adxml:           &lt;default_action/>
- adxml:         &lt;/analysis_action>
- adxml:         &lt;ahead_of_time_run_conditions>
- adxml:           &lt;check_file check="Y"/>
- adxml:         &lt;/ahead_of_time_run_conditions>
- adxml:       &lt;/action>
+            <VALUE> adxml:    &lt;src_file bootstrap="~BOOTSTRAP" version="~VERSION" 
+ adxml:       translation_level="~TRANS_LEVEL" techstack_level="~TXK_LEVEL" 
+ adxml:       verticalisation_level="~VERT_LEVEL" custom_level="~CUST_LEVEL" 
+ adxml:       language="~LANG" needs_translation="~TRANSLATION" ship="~SHIP" 
+ adxml:       localization="~LOCALIZATION" object_type="~OBJECT_TYPE"> 
+ adxml:     &lt;abstract_file te="~PROD" subdir="~PATH" file_basename="~BASENAME" file_type="~FILE_TYPE"/> 
+ adxml:     &lt;metadata> 
+ adxml:       &lt;action identifier="VIEW" category="DD_NORMAL_VIEWS" portion="D" online_category="N"> 
+ adxml:         &lt;apply_action> 
+ adxml:           &lt;action_details name="java"> 
+ adxml:             &lt;invoking_exec> 
+ adxml:               &lt;executable file_basename="oracle.apps.fnd.applxdf.comp.XdfSchemaDeploy" file_type="class"/> 
+ adxml:             &lt;/invoking_exec> 
+ adxml:             &lt;args>owner_un=#un:fusion# apps_un=#un:fusion# 
+ adxml:                      jdbc_protocol=#jdbc_protocol# jdbc_db_addr=#jdbc_db_addr# xdf_mode=view 
+ adxml:                      xdf_file_name=#fullpath:~PROD:~PATH:~FILE#  
+ adxml:             &lt;/args> 
+ adxml:           &lt;/action_details> 
+ adxml:         &lt;/apply_action> 
+ adxml:         &lt;analysis_action> 
+ adxml:           &lt;default_action/> 
+ adxml:         &lt;/analysis_action> 
+ adxml:         &lt;ahead_of_time_run_conditions> 
+ adxml:           &lt;check_file check="Y"/> 
+ adxml:         &lt;/ahead_of_time_run_conditions> 
+ adxml:       &lt;/action> 
 </VALUE>
          </UDP_LIST_ITEM>
          <UDP_LIST_ITEM>

@@ -1,734 +1,797 @@
-package oracle.apps.hcm.formulas.core.jersey.service;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import java.net.MalformedURLException;
-import java.net.URL;
-
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Consumer;
-
-import oracle.apps.fnd.applcore.log.AppsLogger;
-import oracle.apps.hcm.formulas.core.jersey.util.ConnectionHelper;
-import oracle.apps.topologyManager.exception.TMException;
-
-import oracle.topologyManager.client.deployedInfo.EndPointProvider;
-
-import oracle.wsm.metadata.feature.PolicyReferenceFeature;
-import oracle.wsm.metadata.feature.PolicySetFeature;
-import oracle.wsm.metadata.feature.PropertyFeature;
-import oracle.wsm.security.oauth2.OAuth2ClientTokenManager;
-import oracle.wsm.security.oauth2.OAuth2TokenContext;
-import oracle.wsm.security.oauth2.OAuth2TokenResponse;
-import oracle.wsm.security.util.SecurityConstants;
-
-import org.apache.commons.lang3.StringUtils;
-
-
-/**
- * Oracle Fusion AI Apps Completions provider.
- * Uses ai-common/llm/rest/v2/completion endpoint.
- *
- * Host: EndPointProvider.getExternalEndpointWithProtocolByAppShortName("ORA_AIAPP")
- * Auth: OAuth2 via PolicySetFeature + OAuth2ClientTokenManager
- *
- * In standalone/debug mode (FUSION_AI_DEBUG_URL env var set): uses java.net.http with Basic auth.
- * Inside Fusion: uses TopologyManager + OAuth2 (uncomment the Fusion blocks).
- */
-public class FusionAiProvider implements LlmProvider {
-
-    private static final String COMPLETION_PATH = "ai-common/llm/rest/v2/completion";
-    // promptCode registered in hr_gen_ai_prompts_seed_b. The template
-    // text (prompt_tmpl column) was updated to the HCM Fast Formula
-    // generator template with these placeholders:
-    //   {systemPrompt} {userPrompt} {formulaType}
-    //   {referenceFormula} {editorCode} {additionalRules} {chatHistory}
-    private static final String USECASE = "docio_generic_extract_payload";
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
-    public static final String AIMASTER_EXTERNAL_ENDPOINT_KEY = "ORA_AIAPP";
-
-    // FAI Spectra SDK class names — loaded via reflection so this class
-    // compiles and runs even when the FAI SDK jar isn't on the classpath
-    // (e.g. local dev). When ORA_FAI_SDK_ENABLE_SPECTRA_ROUTE=Y and the
-    // SDK jar is present, complete() routes through Spectra's
-    // /orchestrator/llm/v1/internal-completions; otherwise it falls
-    // back to the existing ai-common hybrid path.
-    private static final String FAI_SDK_UTIL_CLASS =
-            "oracle.apps.hcm.fai.genAiSdk.util.FaiSdkUtil";
-    private static final String FAI_COMPLETIONS_CLIENT_CLASS =
-            "oracle.apps.hcm.fai.genAiSdk.FAICompletionsClient";
-
-    @Override
-    public boolean isAvailable() {
-        return true;
-    }
-
-    @Override
-    public String name() {
-        return "Fusion AI Apps (ai-common/llm/rest/v2/completion)";
-    }
-
-    @Override
-    public void streamChat(List<Map<String, String>> messages, int maxTokens,
-                           Consumer<String> tokenCallback) {
-        String response = complete(messages, maxTokens);
-        if (response != null && !response.isEmpty()) {
-            tokenCallback.accept(response);
-        } else {
-            tokenCallback.accept("Error: Fusion AI returned empty response.");
-        }
-    }
-
-    // ───────────────────────────────────────────────────────────────────────
-    // Structured prompt context path (Plan B) — hands each PromptContext
-    // field to Spectra as its own named property so the server-side
-    // template can render them into dedicated XML tags (<system_instructions>,
-    // <formula_type>, <reference_formula>, <current_editor_code>,
-    // <additional_rules>, <chat_history>, <user_request>).
-    //
-    // Falls back to the flattening default (→ complete/streamChat → hybrid
-    // ai-common) when Spectra routing is disabled or returns null.
-    // ───────────────────────────────────────────────────────────────────────
-
-    @Override
-    public String completeWithContext(PromptContext context, int maxTokens) {
-        if (isSpectraRoutingEnabled()) {
-            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
-                AppsLogger.write(this,
-                        "[FusionAI] completeWithContext → Spectra "
-                                + "promptCode=" + USECASE
-                                + " sysLen=" + context.systemPromptOrEmpty().length()
-                                + " userLen=" + context.userPromptOrEmpty().length()
-                                + " formulaType=" + context.formulaTypeOrEmpty()
-                                + " refLen=" + context.referenceFormulaOrEmpty().length()
-                                + " editorLen=" + context.editorCodeOrEmpty().length()
-                                + " rulesLen=" + context.additionalRulesOrEmpty().length()
-                                + " historyLen=" + context.chatHistoryOrEmpty().length(),
-                        AppsLogger.INFO);
-            }
-            // Structured-mode debug log — captures each PromptContext field
-            // independently so the debug UI can show per-field sizes and
-            // per-field token estimates. This replaces the older flat record
-            // which just stored system + user messages.
-            LlmDebugLog.getInstance().record(
-                    "fusion-ai-apps", maxTokens, "fusion-spectra", context);
-
-            String spectraText = callSpectraCompletions(
-                    USECASE,
-                    context.systemPromptOrEmpty(),
-                    context.userPromptOrEmpty(),
-                    context.formulaTypeOrEmpty(),
-                    context.referenceFormulaOrEmpty(),
-                    context.editorCodeOrEmpty(),
-                    context.additionalRulesOrEmpty(),
-                    context.chatHistoryOrEmpty()
-            );
-            if (spectraText != null && !spectraText.isEmpty()) {
-                return spectraText;
-            }
-            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-                AppsLogger.write(this,
-                        "[FusionAI] Spectra structured call returned null/empty; falling back to hybrid",
-                        AppsLogger.WARNING);
-            }
-        }
-        // Fallback: default impl flattens to messages and routes through
-        // complete() → hybrid ai-common path.
-        return LlmProvider.super.completeWithContext(context, maxTokens);
-    }
-
-    @Override
-    public void streamChatWithContext(PromptContext context, int maxTokens,
-                                      Consumer<String> tokenCallback) {
-        String response = completeWithContext(context, maxTokens);
-        if (response != null && !response.isEmpty()) {
-            tokenCallback.accept(response);
-        } else {
-            tokenCallback.accept("Error: Fusion AI returned empty response.");
-        }
-    }
-
-    @Override
-    public String complete(List<Map<String, String>> messages, int maxTokens) {
-        try {
-            // ── Build unified prompt string from messages ────────────────────
-            // Both Spectra and Hybrid paths consume a single "prompt" string,
-            // so we flatten system/user/assistant messages the same way for
-            // both. The promptCode template on the server side is expected
-            // to contain a {{prompt}} placeholder that this value binds to.
-            StringBuilder prompt = new StringBuilder();
-            for (Map<String, String> msg : messages) {
-                String role = msg.get("role");
-                String content = msg.get("content");
-                if ("system".equals(role) || "user".equals(role)) {
-                    prompt.append(content).append("\n\n");
-                } else if ("assistant".equals(role)) {
-                    prompt.append("Assistant: ").append(content).append("\n\n");
-                }
-            }
-            String promptText = prompt.toString().trim();
-
-            // Debug log capture (unchanged)
-            String sysPrompt = "";
-            String userPrompt = "";
-            for (Map<String, String> msg : messages) {
-                if ("system".equals(msg.get("role"))) {
-                    sysPrompt = msg.get("content");
-                } else if ("user".equals(msg.get("role"))) {
-                    userPrompt = msg.get("content");
-                }
-            }
-            LlmDebugLog.getInstance().record("fusion-ai-apps", maxTokens,
-                    sysPrompt, messages, "fusion-hybrid", userPrompt);
-
-            // ── Hybrid only (ai-common/llm/rest/v2/completion) ───────────────
-            // This method is the fallback path reached when
-            // completeWithContext's Spectra call fails or when Spectra
-            // routing is disabled. Do NOT call Spectra again here — that
-            // would be a redundant second attempt with worse data
-            // (flattened, no structured fields). Spectra routing happens
-            // exclusively in completeWithContext().
-            Map<String, Object> requestBody = new LinkedHashMap<>();
-            requestBody.put("prompt", promptText);
-            requestBody.put("usecase", USECASE);
-            requestBody.put("properties", new ArrayList<>());
-
-            String jsonPayload = MAPPER.writeValueAsString(requestBody);
-
-            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
-                AppsLogger.write(this,
-                        "[FusionAI] Hybrid path: " + COMPLETION_PATH
-                                + " messages=" + messages.size()
-                                + " maxTokens=" + maxTokens,
-                        AppsLogger.INFO);
-            }
-            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                AppsLogger.write(this,
-                        "[FusionAI] hybrid payload=" + jsonPayload, AppsLogger.FINER);
-            }
-
-            Object result = invokeGenerativeAiRestService(jsonPayload);
-            if (result == null) {
-                if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-                    AppsLogger.write(this,
-                            "[FusionAI] invokeGenerativeAiRestService returned null",
-                            AppsLogger.WARNING);
-                }
-                return "Error: Fusion AI returned empty response (null).";
-            }
-            return extractResponse(result.toString());
-
-        } catch (Exception e) {
-            AppsLogger.write(this, e, AppsLogger.SEVERE);
-            return "Error: Fusion AI call failed — " + e.getMessage();
-        }
-    }
-
-    // ───────────────────────────────────────────────────────────────────────
-    // Spectra (FAI Orchestrator) helpers — reflection-based
-    //
-    // Both methods use reflection so this class has no compile-time
-    // dependency on the HcmFaiGenAiSdk jar. If the jar is missing, or
-    // the ORA_FAI_SDK_ENABLE_SPECTRA_ROUTE profile option is not 'Y',
-    // these methods return false/null and complete() falls back to the
-    // existing ai-common hybrid path.
-    // ───────────────────────────────────────────────────────────────────────
-
-    /**
-     * Probes FaiSdkUtil.isSpectraRoutingEnabled() via reflection.
-     * Returns false if the SDK class is not on the classpath or the
-     * profile option check fails for any reason. Never throws.
-     */
-    private static boolean isSpectraRoutingEnabled() {
-        try {
-            Class<?> clazz = Class.forName(FAI_SDK_UTIL_CLASS);
-            java.lang.reflect.Method method = clazz.getMethod("isSpectraRoutingEnabled");
-            Object result = method.invoke(null);
-            return Boolean.TRUE.equals(result);
-        } catch (Throwable t) {
-            // SDK not available or profile check failed — treat as disabled.
-            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                AppsLogger.write(FusionAiProvider.class,
-                        "[FusionAI] Spectra routing probe failed: " + t.getMessage(),
-                        AppsLogger.FINER);
-            }
-            return false;
-        }
-    }
-
-    /**
-     * Calls FAICompletionsClient.getCompletions(promptCode, properties)
-     * via reflection, serializes the returned FAICompletionsResponse to
-     * JSON, and extracts the first choice's text.
-     *
-     * The properties list has one entry per placeholder in the
-     * promptCode template text (hr_gen_ai_prompts_seed_b.prompt_tmpl).
-     * The HCM Fast Formula template declares these placeholders:
-     *   {systemPrompt}      — system instructions (14 CRITICAL REQUIREMENTS)
-     *   {userPrompt}        — user's natural-language requirement
-     *   {formulaType}       — selected formula type name
-     *   {referenceFormula}  — RAG-retrieved reference formula (optional)
-     *   {editorCode}        — current editor content (optional, follow-up turns)
-     *   {additionalRules}   — per-type extra rules (optional)
-     *   {chatHistory}       — formatted chat history (optional)
-     *
-     * Optional placeholders accept "" — the template is designed to
-     * ignore XML tags whose body is empty/whitespace.
-     *
-     * Response shape (per fai-orchestrator LLMCompletionResponse):
-     *   {"id": "...", "choices": [{"index": 0, "text": "..."}]}
-     *
-     * Returns null on any failure; caller falls back to the hybrid path.
-     */
-    private String callSpectraCompletions(String promptCode,
-                                          String systemPrompt,
-                                          String userPrompt,
-                                          String formulaType,
-                                          String referenceFormula,
-                                          String editorCode,
-                                          String additionalRules,
-                                          String chatHistory) {
-        try {
-            Class<?> clientClass = Class.forName(FAI_COMPLETIONS_CLIENT_CLASS);
-            Object client = clientClass.getDeclaredConstructor().newInstance();
-            java.lang.reflect.Method getCompletions =
-                    clientClass.getMethod("getCompletions", String.class, List.class);
-
-            List<Map<String, String>> properties = new ArrayList<>();
-            addProperty(properties, "systemPrompt",     systemPrompt);
-            addProperty(properties, "userPrompt",       userPrompt);
-            addProperty(properties, "formulaType",      formulaType);
-            addProperty(properties, "referenceFormula", referenceFormula);
-            addProperty(properties, "editorCode",       editorCode);
-            addProperty(properties, "additionalRules",  additionalRules);
-            addProperty(properties, "chatHistory",      chatHistory);
-
-            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                AppsLogger.write(this,
-                        "[FusionAI] Spectra call: promptCode=" + promptCode
-                                + " propertyKeys=" + properties.size()
-                                + " systemPromptLen=" + (systemPrompt == null ? 0 : systemPrompt.length())
-                                + " userPromptLen=" + (userPrompt == null ? 0 : userPrompt.length()),
-                        AppsLogger.FINER);
-            }
-
-            Object response = getCompletions.invoke(client, promptCode, properties);
-            if (response == null) {
-                if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-                    AppsLogger.write(this,
-                            "[FusionAI] FAICompletionsClient.getCompletions returned null "
-                                    + "(check ORA_FAI_SDK_ENABLE_SPECTRA_ROUTE profile "
-                                    + "and promptCode registration for " + promptCode + ")",
-                            AppsLogger.WARNING);
-                }
-                return null;
-            }
-
-            // Serialize via Jackson so we don't need to know the exact
-            // FAICompletionsResponse class structure. Works with both
-            // POJO-style and record-style response objects.
-            String json = MAPPER.writeValueAsString(response);
-            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                AppsLogger.write(this,
-                        "[FusionAI] Spectra raw response: " + json, AppsLogger.FINER);
-            }
-
-            JsonNode root = MAPPER.readTree(json);
-            JsonNode choices = root.path("choices");
-            if (!choices.isArray() || choices.size() == 0) {
-                if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-                    AppsLogger.write(this,
-                            "[FusionAI] Spectra response has no choices: " + json,
-                            AppsLogger.WARNING);
-                }
-                return null;
-            }
-
-            JsonNode first = choices.get(0);
-            // Preferred: completion-style "text" field.
-            JsonNode textNode = first.path("text");
-            if (!textNode.isMissingNode() && !textNode.isNull()) {
-                String text = textNode.asText();
-                if (!text.isEmpty()) {
-                    return text;
-                }
-            }
-            // Fallback: OpenAI chat-style "message.content".
-            JsonNode contentNode = first.path("message").path("content");
-            if (!contentNode.isMissingNode() && !contentNode.isNull()) {
-                String text = contentNode.asText();
-                if (!text.isEmpty()) {
-                    return text;
-                }
-            }
-            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-                AppsLogger.write(this,
-                        "[FusionAI] Spectra choices[0] had no extractable text: " + first,
-                        AppsLogger.WARNING);
-            }
-            return null;
-
-        } catch (Throwable t) {
-            AppsLogger.write(this, t, AppsLogger.SEVERE);
-            return null;
-        }
-    }
-
-    /**
-     * Appends a {key, value} entry to the Spectra properties list.
-     * Null values become "" so the template placeholder renders empty
-     * (the template ignores XML tags with whitespace-only bodies).
-     */
-    private static void addProperty(List<Map<String, String>> properties,
-                                    String key, String value) {
-        Map<String, String> p = new LinkedHashMap<>();
-        p.put("key", key);
-        p.put("value", value == null ? "" : value);
-        properties.add(p);
-    }
-
-    // ???????????????????????????????????????????????????????????????????????
-    // Fusion AI Apps methods (from AIAppsConnector)
-    // TODO: uncomment in Fusion environment
-    // ???????????????????????????????????????????????????????????????????????
-
-    /**
-     * Invoke AI rest service from TopologyManager.
-     * Flow: get host ? get OAuth token ? POST to ai-common/llm/rest/v2/completion
-     */
-     public static Object invokeGenerativeAiRestService(String pJsonPayload) throws Exception {
-         logFusion("Method Start: invokeGenerativeAiRestService");
-         logFusion("Request payload:\n" + pJsonPayload);
-    
-         Object restResult = null;
-         String hostTMRaw = null;
-         String hostTM = null;
-         String restURL = null;
-         String authenticationToken = null;
-         ConnectionHelper connectionFactory = new ConnectionHelper();
-    
-         URL hostURL = getHostFromTopologyManager(AIMASTER_EXTERNAL_ENDPOINT_KEY);
-         if (hostURL == null) {
-             logFusion("No host from Topology Manager found for key: " + AIMASTER_EXTERNAL_ENDPOINT_KEY);
-             return null;
-         } else {
-             try {
-                 hostTMRaw = hostURL.toString();
-    
-                 if (authenticationToken == null || authenticationToken.length() <= 0) {
-                     authenticationToken = getAuthToken(hostTMRaw);
-                     logFusion("New authentication token obtained");
-                 }
-    
-                 if (!hostTMRaw.endsWith("/")) {
-                     hostTM = hostTMRaw + "/";
-                 }
-    
-                 restURL = hostTM + "ai-common/llm/rest/v2/completion";
-                 logFusion("Final REST URL: " + restURL);
-    
-                 restResult = connectionFactory.doPost(restURL, pJsonPayload, authenticationToken);
-    
-             } catch (Exception e) {
-                 // SEVERE inside catch — inline (not via logFusionError
-                 // helper) so PSR sees the catch frame and accepts the
-                 // SEVERE level. The helper itself is WARNING because it
-                 // is also called from non-catch contexts.
-                 AppsLogger.write(FusionAiProvider.class, e, AppsLogger.SEVERE);
-                 throw e;
-             }
-         }
-    
-         logFusion("Rest response: " + (restResult != null ? restResult.toString() : "null"));
-         logFusion("Method End: invokeGenerativeAiRestService");
-         return restResult;
-     }
-
-    /**
-     * Returns AIApps HOST URL from the Topology Manager.
-     */
-     public static URL getHostFromTopologyManager(String key) {
-         logFusion("Method Start: getHostFromTopologyManager, Key: " + key);
-
-         URL aiCloudHostURL = null;
-         try {
-             String cloudHost = EndPointProvider.getExternalEndpointWithProtocolByAppShortName(key);
-             aiCloudHostURL = (cloudHost != null && !"".equals(cloudHost.trim())) ? new URL(cloudHost.trim()) : null;
-
-             // INFO not SEVERE — this is the success path. PSR
-             // (oracle.apps.ps java-appslogger-severe-level) rejects
-             // AppsLogger.SEVERE outside catch blocks.
-             if (AppsLogger.isEnabled(AppsLogger.INFO)) {
-                 AppsLogger.write(FusionAiProvider.class,
-                         "Host from Topology Manager: " + aiCloudHostURL,
-                         AppsLogger.INFO);
-             }
-         } catch (TMException tme) {
-             // SEVERE inside catch — TM is a hard infra dep, this is a
-             // legitimate platform failure.
-             AppsLogger.write(FusionAiProvider.class, tme, AppsLogger.SEVERE);
-         } catch (MalformedURLException mue) {
-             AppsLogger.write(FusionAiProvider.class, mue, AppsLogger.SEVERE);
-         } catch (Exception e) {
-             AppsLogger.write(FusionAiProvider.class, e, AppsLogger.SEVERE);
-         } finally {
-             // WARNING not SEVERE — finally block is not a catch context;
-             // PSR rejects SEVERE here. Caller (invokeGenerativeAiRestService)
-             // already handles a null return without throwing, so WARNING
-             // is the right severity for "we couldn't resolve a host".
-             if (aiCloudHostURL == null && AppsLogger.isEnabled(AppsLogger.WARNING)) {
-                 AppsLogger.write(FusionAiProvider.class,
-                         "AI Apps Host not found in TopologyManager for key: " + key,
-                         AppsLogger.WARNING);
-             }
-         }
-
-         logFusion("Method End: getHostFromTopologyManager");
-         return aiCloudHostURL;
-     }
-
-    /**
-     * Get OAuth2 auth token from TopologyManager host.
-     */
-     private static String getAuthToken(String hostTM) throws Exception {
-         logFusion("Method Start: getAuthToken");
-    
-         String authenticationTokenInfo = null;
-         if (StringUtils.isNotBlank(hostTM)) {
-             authenticationTokenInfo = getAccessTokenFromTopologyManager(hostTM);
-             logFusion("Authentication token retrieved from Topology Manager");
-             if (authenticationTokenInfo == null) {
-                 logFusionError("Could not obtain authentication token for host: " + hostTM);
-                 throw new RuntimeException("getAuthToken || Error getting authentication token");
-             }
-         } else {
-             logFusion("hostTM string is empty");
-             throw new RuntimeException("getAuthToken || hostTM string is empty");
-         }
-    
-         logFusion("Method End: getAuthToken");
-         return authenticationTokenInfo;
-     }
-
-    /**
-     * Create PolicySetFeature for OAuth2 token request.
-     */
-     private static PolicySetFeature createPolicySetFeature(String host) throws Exception {
-         logFusion("Method Start: createPolicySetFeature, host: " + host);
-    
-         if (host == null) {
-             throw new Exception("Endpoint URL is null");
-         }
-    
-         String scopeUri = host + "urn:opc:resource:consumer::all";
-         PropertyFeature scope = new PropertyFeature(SecurityConstants.ConfigOverride.CO_SCOPE, scopeUri);
-         PropertyFeature subjectPrecedence =
-             new PropertyFeature(SecurityConstants.ConfigOverride.CO_SUBJECT_PRECEDENCE, "false");
-    
-         PolicyReferenceFeature[] clientPRF = new PolicyReferenceFeature[] {
-             new PolicyReferenceFeature("oracle/http_oauth2_token_over_ssl_idcs_client_policy",
-                                        new PropertyFeature[] { scope, subjectPrecedence })
-         };
-    
-         PolicySetFeature policySetFeature = new PolicySetFeature(clientPRF);
-
-         // INFO not SEVERE — success path. PSR rejects SEVERE here.
-         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
-             AppsLogger.write(FusionAiProvider.class,
-                     "PolicySetFeature created: scope=" + scopeUri, AppsLogger.INFO);
-         }
-
-         logFusion("Method End: createPolicySetFeature");
-         return policySetFeature;
-     }
-
-    /**
-     * Get OAuth2TokenResponse for the given host.
-     */
-     public static OAuth2TokenResponse getOAuthAccessToken(String host) throws Exception {
-         logFusion("Method Start: getOAuthAccessToken, Host: " + host);
-    
-         OAuth2ClientTokenManager oauth2ClientTokenManager = OAuth2ClientTokenManager.getInstance();
-         OAuth2TokenContext oauth2TokenContext = OAuth2ClientTokenManager.getOAuth2TokenContext();
-         PolicySetFeature policySetFeature = createPolicySetFeature(host);
-         oauth2TokenContext.setPolicySetFeature(policySetFeature);
-    
-         oauth2ClientTokenManager.getAccessToken(oauth2TokenContext);
-         OAuth2TokenResponse oAuthToken = oauth2TokenContext.getOAuth2TokenResponse();
-    
-         logFusion("Method End: getOAuthAccessToken");
-         return oAuthToken;
-     }
-
-    /**
-     * Get AIApps Access Token for the given host.
-     */
-     public static String getAccessTokenFromTopologyManager(String host) {
-         logFusion("Method Start: getAccessTokenFromTopologyManager, Host: " + host);
-         try {
-             OAuth2TokenResponse oauthTokenResponse = getOAuthAccessToken(host);
-             if (oauthTokenResponse != null && oauthTokenResponse.getAccessToken() != null) {
-                 // INFO not SEVERE — success path, PSR rejects SEVERE here.
-                 if (AppsLogger.isEnabled(AppsLogger.INFO)) {
-                     AppsLogger.write(FusionAiProvider.class,
-                             "Token Type: " + oauthTokenResponse.getTokenType()
-                             + " | Expires In: " + oauthTokenResponse.getExpiresIn(),
-                             AppsLogger.INFO);
-                 }
-                 return oauthTokenResponse.getAccessToken();
-             }
-             if (oauthTokenResponse != null && oauthTokenResponse.getError() != null) {
-                 logFusionError("OAuth2 error: " + oauthTokenResponse.getError());
-             }
-         } catch (Exception e) {
-             // SEVERE inside catch — token failure means no AI calls work.
-             AppsLogger.write(FusionAiProvider.class, e, AppsLogger.SEVERE);
-         }
-
-         logFusion("Method End: getAccessTokenFromTopologyManager");
-         return null;
-     }
-
-    // ?? Fusion logging helpers (uncomment in Fusion environment) ??????????
-
-     private static void logFusion(String message) {
-         if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-             AppsLogger.write(FusionAiProvider.class, message, AppsLogger.FINER);
-         }
-     }
-
-     // WARNING-level helpers — PSR's java-appslogger-severe-level rule
-     // rejects AppsLogger.SEVERE outside catch blocks, and static analysis
-     // can't tell that these helpers are only called from catch contexts.
-     // For genuine SEVERE cases inside a catch, inline the
-     // AppsLogger.write call directly so the rule sees the catch frame.
-     private static void logFusionError(String message) {
-         if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-             AppsLogger.write(FusionAiProvider.class, message, AppsLogger.WARNING);
-         }
-     }
-
-     private static void logFusionError(Exception e) {
-         if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-             AppsLogger.write(FusionAiProvider.class, e, AppsLogger.WARNING);
-         }
-     }
-
-    // ???????????????????????????????????????????????????????????????????????
-    // Response parser + Debug/standalone mode
-    // ???????????????????????????????????????????????????????????????????????
-
-    /**
-     * Extract AI response text from Fusion AI API response JSON.
-     */
-    private String extractResponse(String responseBody) {
-        try {
-            JsonNode json = MAPPER.readTree(responseBody);
-            if (json.has("response")) {
-                return json.get("response").asText("");
-            }
-            if (json.has("text")) {
-                return json.get("text").asText("");
-            }
-            if (json.has("generatedText")) {
-                return json.get("generatedText").asText("");
-            }
-            if (json.has("choices")) {
-                return json.at("/choices/0/text").asText("");
-            }
-            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-                AppsLogger.write(this,
-                        "[FusionAI] Unknown response format, returning raw body",
-                        AppsLogger.WARNING);
-            }
-            return responseBody;
-        } catch (Exception e) {
-            // SEVERE inside catch — JSON parse failure means the upstream
-            // returned something unexpected; the raw body is logged at
-            // FINER for diagnosis.
-            AppsLogger.write(this, e, AppsLogger.SEVERE);
-            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                AppsLogger.write(this,
-                        "[FusionAI] raw body that failed to parse:\n" + responseBody,
-                        AppsLogger.FINER);
-            }
-            return responseBody;
-        }
-    }
-
-    /**
-     * Debug/standalone mode: call endpoint using java.net.http.
-     * Set FUSION_AI_DEBUG_URL, FUSION_AI_DEBUG_USER, FUSION_AI_DEBUG_PASS env vars.
-     */
-    private String callDebugEndpoint(String jsonPayload) {
-        String debugUrl = System.getenv("FUSION_AI_DEBUG_URL");
-        if (debugUrl == null || debugUrl.isBlank()) {
-            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-                AppsLogger.write(this,
-                        "[FusionAI] Neither Fusion environment nor FUSION_AI_DEBUG_URL available",
-                        AppsLogger.WARNING);
-            }
-            return null;
-        }
-
-        try {
-            if (!debugUrl.endsWith("/")) {
-                debugUrl = debugUrl + "/";
-            }
-            String fullUrl = debugUrl + COMPLETION_PATH;
-            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
-                AppsLogger.write(this,
-                        "[FusionAI] Debug mode: calling " + fullUrl, AppsLogger.INFO);
-            }
-
-            String user = System.getenv("FUSION_AI_DEBUG_USER");
-            String pass = System.getenv("FUSION_AI_DEBUG_PASS");
-            String authHeader = null;
-            if (user != null && pass != null) {
-                String credentials = user + ":" + pass;
-                authHeader = "Basic " + java.util.Base64.getEncoder()
-                        .encodeToString(credentials.getBytes());
-            }
-
-            java.net.http.HttpRequest.Builder requestBuilder = java.net.http.HttpRequest.newBuilder()
-                    .uri(java.net.URI.create(fullUrl))
-                    .header("Content-Type", "application/json")
-                    .header("Accept", "application/json")
-                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(jsonPayload));
-
-            if (authHeader != null) {
-                requestBuilder.header("Authorization", authHeader);
-            }
-
-            java.net.http.HttpResponse<String> response = java.net.http.HttpClient.newHttpClient()
-                    .send(requestBuilder.build(), java.net.http.HttpResponse.BodyHandlers.ofString());
-
-            int status = response.statusCode();
-            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
-                AppsLogger.write(this,
-                        "[FusionAI] Debug response status: " + status, AppsLogger.INFO);
-            }
-
-            if (status == 200) {
-                return extractResponse(response.body());
-            } else {
-                if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-                    AppsLogger.write(this,
-                            "[FusionAI] Debug error: " + status + " body: " + response.body(),
-                            AppsLogger.WARNING);
-                }
-                return null;
-            }
-        } catch (Exception e) {
-            // SEVERE inside catch — debug endpoint failure is non-recoverable
-            // for the request, log everything we have.
-            AppsLogger.write(this, e, AppsLogger.SEVERE);
-            return null;
-        }
-    }
-}
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<!--$Header: fusionapps/hcm/components/hcmPayroll/formulas/core/dbSchema/database/fusionDB/FUSION/ff_formula_templates.table ff_time/1 2026/04/08 00:00:00 alex Exp $-->
+<!-- adxml:    <src_file bootstrap="~BOOTSTRAP" version="~VERSION" -->
+<!-- adxml:       translation_level="~TRANS_LEVEL" techstack_level="~TXK_LEVEL" -->
+<!-- adxml:       verticalisation_level="~VERT_LEVEL" custom_level="~CUST_LEVEL" -->
+<!-- adxml:       language="~LANG" needs_translation="~TRANSLATION" ship="~SHIP" -->
+<!-- adxml:       localization="~LOCALIZATION" object_type="~OBJECT_TYPE"> -->
+<!-- adxml:     <abstract_file te="~PROD" subdir="~PATH" file_basename="~BASENAME" file_type="~FILE_TYPE"/> -->
+<!-- adxml:     <metadata> -->
+<!-- adxml:       <action identifier="TABLE" category="DD_TABLES" portion="D" online_category="N"> -->
+<!-- adxml:         <apply_action> -->
+<!-- adxml:           <action_details name="java"> -->
+<!-- adxml:             <invoking_exec> -->
+<!-- adxml:               <executable file_basename="oracle.apps.fnd.applxdf.comp.XdfSchemaDeploy" file_type="class"/> -->
+<!-- adxml:             </invoking_exec> -->
+<!-- adxml:             <args>owner_un=#un:fusion# apps_un=#un:fusion# -->
+<!-- adxml:                      jdbc_protocol=#jdbc_protocol# jdbc_db_addr=#jdbc_db_addr# xdf_mode=table -->
+<!-- adxml:                      xdf_file_name=#fullpath:~PROD:~PATH:~FILE#  -->
+<!-- adxml:             </args> -->
+<!-- adxml:           </action_details> -->
+<!-- adxml:         </apply_action> -->
+<!-- adxml:         <analysis_action> -->
+<!-- adxml:           <default_action/> -->
+<!-- adxml:         </analysis_action> -->
+<!-- adxml:         <ahead_of_time_run_conditions> -->
+<!-- adxml:           <check_file check="Y"/> -->
+<!-- adxml:         </ahead_of_time_run_conditions> -->
+<!-- adxml:       </action> -->
+<!-- adxml:     </metadata> -->
+<!-- adxml:   </src_file> -->
+<!--
+Primary Object's Schema : FUSION
+Primary Object Name    : "ff_formula_templates"
+Primary Object Type    : TABLE
+Dependent Objects' Information :
+  Index(es) on "ff_formula_templates" : FF_FORMULA_TEMPLATES_N1, FF_FORMULA_TEMPLATES_U1, FF_FORMULA_TEMPLATES_U2, FF_FORMULA_TEMPLATES_U3
+  Constraint(s) on "ff_formula_templates" : FF_FORMULA_TEMPLATES_PK
+-->
+<COMPOSITE version="1.0" xmlns="http://xmlns.oracle.com/ku">
+   <BASE_OBJECT>
+      <TABLE version="1.0">
+         <SCHEMA>FUSION</SCHEMA>
+         <NAME>ff_formula_templates</NAME>
+         <RELATIONAL_TABLE>
+            <COL_LIST>
+               <COL_LIST_ITEM>
+                  <NAME>TEMPLATE_ID</NAME>
+                  <DATATYPE>NUMBER</DATATYPE>
+                  <PRECISION>18</PRECISION>
+                  <SCALE>0</SCALE>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>TEMPLATE_ID, Unique Id for Fast Formula template.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>TEMPLATE_ID</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>FORMULA_TYPE_ID</NAME>
+                  <DATATYPE>NUMBER</DATATYPE>
+                  <PRECISION>18</PRECISION>
+                  <SCALE>0</SCALE>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Formula Type Id. Foreign key to FF_FORMULA_TYPES. NULL means the template belongs to the built-in Custom type and is not tied to any Fusion formula type row.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>FORMULA_TYPE_ID</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>TEMPLATE_CODE</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>150</LENGTH>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Template Code. Unique machine-readable identifier for the template (for example ORA_OVERTIME_PAY_CALC).</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>TEMPLATE_CODE</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>FORMULA_TEXT</NAME>
+                  <DATATYPE>CLOB</DATATYPE>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Formula Text. Fast Formula source code for the template. NULL is allowed for templates that only provide prompt guidance in ADDITIONAL_PROMPT_TEXT without a starter code body.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>FORMULA_TEXT</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>ADDITIONAL_PROMPT_TEXT</NAME>
+                  <DATATYPE>CLOB</DATATYPE>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Additional Prompt Text. Template-specific guidance appended to the AI system prompt at generation time. NULL when no extra guidance is required.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>ADDITIONAL_PROMPT_TEXT</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>SOURCE_TYPE</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>30</LENGTH>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Source Type. Indicates whether the row is SEEDED (delivered by Oracle) or USER_CREATED.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>SOURCE_TYPE</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>ACTIVE_FLAG</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>1</LENGTH>
+                  <DEFAULT>'Y'</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Active Flag. Y indicates the template is available for selection; N hides it from the UI.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>ACTIVE_FLAG</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>SEMANTIC_FLAG</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>1</LENGTH>
+                  <DEFAULT>'Y'</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Semantic Flag. Y indicates the template participates in semantic (vector-embedding) search and is indexed by the RAG retrieval pipeline; N excludes it from semantic retrieval (template is still available via direct lookup and browse).</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>SEMANTIC_FLAG</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>SYSTEMPROMPT_FLAG</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>1</LENGTH>
+                  <DEFAULT>'N'</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>System Prompt Flag. Y indicates this row holds the AI system prompt text in FORMULA_TEXT. At most one row should have this flag set to Y. When Y and ACTIVE_FLAG is also Y, AiService loads the FORMULA_TEXT as the LLM system prompt instead of the hardcoded default. FORMULA_TYPE_ID should be NULL for system prompt rows.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>SYSTEMPROMPT_FLAG</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>SORT_ORDER</NAME>
+                  <DATATYPE>NUMBER</DATATYPE>
+                  <PRECISION>9</PRECISION>
+                  <SCALE>0</SCALE>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Sort Order. Display order of the template within a formula type.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>SORT_ORDER</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>OBJECT_VERSION_NUMBER</NAME>
+                  <DATATYPE>NUMBER</DATATYPE>
+                  <PRECISION>9</PRECISION>
+                  <SCALE>0</SCALE>
+                  <DEFAULT>1</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Used to implement optimistic locking. This number is incremented every time that the row is updated. The number is compared at the start and end of a transaction to detect whether another session has updated the row since it was queried.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>OBJECT_VERSION_NUMBER</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>LAST_UPDATE_DATE</NAME>
+                  <DATATYPE>TIMESTAMP</DATATYPE>
+                  <SCALE>6</SCALE>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Who column: indicates the date and time of the last update of the row.</COMMENT>
+                        <DEFAULTED_SCALE/>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>LAST_UPDATE_DATE</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>CREATED_BY</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>64</LENGTH>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Who column: indicates the user who created the row.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>CREATED_BY</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>CREATION_DATE</NAME>
+                  <DATATYPE>TIMESTAMP</DATATYPE>
+                  <SCALE>6</SCALE>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Who column: indicates the date and time of the creation of the row.</COMMENT>
+                        <DEFAULTED_SCALE/>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>CREATION_DATE</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>LAST_UPDATED_BY</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>64</LENGTH>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Who column: indicates the user who last updated the row.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>LAST_UPDATED_BY</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>LAST_UPDATE_LOGIN</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>32</LENGTH>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Who column: indicates the session login associated to the user who last updated the row.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>LAST_UPDATE_LOGIN</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>ENTERPRISE_ID</NAME>
+                  <DATATYPE>NUMBER</DATATYPE>
+                  <PRECISION>18</PRECISION>
+                  <SCALE>0</SCALE>
+                  <DEFAULT>nvl(SYS_CONTEXT('FND_VPD_CTX','FND_ENTERPRISE_ID'), 0)</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Foreign key to PER_ENTERPRISES.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>ENTERPRISE_ID</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>SEED_DATA_SOURCE</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>512</LENGTH>
+                  <DEFAULT>SYS_CONTEXT('FND_SDF_CTX', 'SDFFILE')</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Source of seed data record. A value of 'BULK_SEED_DATA_SCRIPT' indicates that record was bulk loaded. Otherwise, specifies the name of the seed data file.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>SEED_DATA_SOURCE</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>MODULE_ID</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>32</LENGTH>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Seed Data Framework: indicates the module that owns the row. A module is an entry in Application Taxonomy such as a Logical Business Area. When the MODULE_ID column exists and the owner of the row is not specified, then the Seed Data Framework will not extract the row as seed data.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>MODULE_ID</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>ORA_SEED_SET1</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>1</LENGTH>
+                  <DEFAULT>'Y'</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Oracle internal use only. Indicates the edition-based redefinition (EBR) context of the row for SET1. Context values are Y or N.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>ORA_SEED_SET1</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>ORA_SEED_SET2</NAME>
+                  <DATATYPE>VARCHAR2</DATATYPE>
+                  <LENGTH>1</LENGTH>
+                  <DEFAULT>'Y'</DEFAULT>
+                  <NOT_NULL/>
+                  <CUSTOMER_AREA>
+                     <ODB_PROPERTY_LIST>
+                        <COMMENT>Oracle internal use only. Indicates the edition-based redefinition (EBR) context of the row for SET2. Context values are Y or N.</COMMENT>
+                     </ODB_PROPERTY_LIST>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>defaultOnNull</NAME>
+                           <VALUE>Y</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>securityClassification</NAME>
+                           <VALUE>Internal</VALUE>
+                        </UDP_LIST_ITEM>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>ORA_SEED_SET2</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </COL_LIST_ITEM>
+            </COL_LIST>
+            <PRIMARY_KEY_CONSTRAINT_LIST>
+               <PRIMARY_KEY_CONSTRAINT_LIST_ITEM>
+                  <NAME>FF_FORMULA_TEMPLATES_PK</NAME>
+                  <COL_LIST>
+                     <COL_LIST_ITEM>
+                        <NAME>TEMPLATE_ID</NAME>
+                     </COL_LIST_ITEM>
+                  </COL_LIST>
+                  <DISABLE/>
+                  <CUSTOMER_AREA>
+                     <UDP_LIST>
+                        <UDP_LIST_ITEM>
+                           <NAME>shortName</NAME>
+                           <VALUE>FF_FORMULA_TEMPLATES_PK</VALUE>
+                        </UDP_LIST_ITEM>
+                     </UDP_LIST>
+                  </CUSTOMER_AREA>
+               </PRIMARY_KEY_CONSTRAINT_LIST_ITEM>
+            </PRIMARY_KEY_CONSTRAINT_LIST>
+            <PHYSICAL_PROPERTIES>
+               <HEAP_TABLE>
+                  <SEGMENT_ATTRIBUTES>
+                     <TABLESPACE>Default</TABLESPACE>
+                  </SEGMENT_ATTRIBUTES>
+                  <COMPRESS>N</COMPRESS>
+               </HEAP_TABLE>
+            </PHYSICAL_PROPERTIES>
+         </RELATIONAL_TABLE>
+         <CUSTOMER_AREA>
+            <ODB_PROPERTY_LIST>
+               <COMMENT>This table contains Fast Formula templates available to users in the AI-assisted formula authoring tool. Seeded rows are delivered by Oracle; user-created rows are saved by users from the UI.</COMMENT>
+            </ODB_PROPERTY_LIST>
+            <UDP_LIST>
+               <UDP_LIST_ITEM>
+                  <NAME>adxml</NAME>
+                  <VALUE> adxml:    &lt;src_file bootstrap="~BOOTSTRAP" version="~VERSION"
+ adxml:       translation_level="~TRANS_LEVEL" techstack_level="~TXK_LEVEL"
+ adxml:       verticalisation_level="~VERT_LEVEL" custom_level="~CUST_LEVEL"
+ adxml:       language="~LANG" needs_translation="~TRANSLATION" ship="~SHIP"
+ adxml:       localization="~LOCALIZATION" object_type="~OBJECT_TYPE">
+ adxml:     &lt;abstract_file te="~PROD" subdir="~PATH" file_basename="~BASENAME" file_type="~FILE_TYPE"/>
+ adxml:     &lt;metadata>
+ adxml:       &lt;action identifier="TABLE" category="DD_TABLES" portion="D" online_category="N">
+ adxml:         &lt;apply_action>
+ adxml:           &lt;action_details name="java">
+ adxml:             &lt;invoking_exec>
+ adxml:               &lt;executable file_basename="oracle.apps.fnd.applxdf.comp.XdfSchemaDeploy" file_type="class"/>
+ adxml:             &lt;/invoking_exec>
+ adxml:             &lt;args>owner_un=#un:fusion# apps_un=#un:fusion#
+ adxml:                      jdbc_protocol=#jdbc_protocol# jdbc_db_addr=#jdbc_db_addr# xdf_mode=table
+ adxml:                      xdf_file_name=#fullpath:~PROD:~PATH:~FILE#
+ adxml:             &lt;/args>
+ adxml:           &lt;/action_details>
+ adxml:         &lt;/apply_action>
+ adxml:         &lt;analysis_action>
+ adxml:           &lt;default_action/>
+ adxml:         &lt;/analysis_action>
+ adxml:         &lt;ahead_of_time_run_conditions>
+ adxml:           &lt;check_file check="Y"/>
+ adxml:         &lt;/ahead_of_time_run_conditions>
+ adxml:       &lt;/action>
+</VALUE>
+               </UDP_LIST_ITEM>
+               <UDP_LIST_ITEM>
+                  <NAME>adxmlDeferredIndexes</NAME>
+                  <VALUE></VALUE>
+               </UDP_LIST_ITEM>
+               <UDP_LIST_ITEM>
+                  <NAME>adxmlFk</NAME>
+                  <VALUE></VALUE>
+               </UDP_LIST_ITEM>
+               <UDP_LIST_ITEM>
+                  <NAME>ebrImdCaptureModel</NAME>
+                  <VALUE>ORACLE_OWNED</VALUE>
+               </UDP_LIST_ITEM>
+               <UDP_LIST_ITEM>
+                  <NAME>logicalTableName</NAME>
+                  <VALUE>FF_FORMULA_TEMPLATES</VALUE>
+               </UDP_LIST_ITEM>
+               <UDP_LIST_ITEM>
+                  <NAME>objectOwner</NAME>
+                  <VALUE>FF</VALUE>
+               </UDP_LIST_ITEM>
+               <UDP_LIST_ITEM>
+                  <NAME>shortName</NAME>
+                  <VALUE>FF_FORMULA_TEMPLATES</VALUE>
+               </UDP_LIST_ITEM>
+               <UDP_LIST_ITEM>
+                  <NAME>tsClassification</NAME>
+                  <VALUE>REFERENCE</VALUE>
+               </UDP_LIST_ITEM>
+            </UDP_LIST>
+         </CUSTOMER_AREA>
+      </TABLE>
+   </BASE_OBJECT>
+   <INDEX_LIST>
+      <INDEX version="1.0">
+         <SCHEMA>FUSION</SCHEMA>
+         <NAME>FF_FORMULA_TEMPLATES_N1</NAME>
+         <TABLE_INDEX>
+            <ON_TABLE>
+               <SCHEMA>FUSION</SCHEMA>
+               <NAME>ff_formula_templates</NAME>
+            </ON_TABLE>
+            <COL_LIST>
+               <COL_LIST_ITEM>
+                  <NAME>FORMULA_TYPE_ID</NAME>
+               </COL_LIST_ITEM>
+            </COL_LIST>
+            <INDEX_ATTRIBUTES>
+               <TABLESPACE>Default</TABLESPACE>
+            </INDEX_ATTRIBUTES>
+         </TABLE_INDEX>
+         <CUSTOMER_AREA>
+            <ODB_PROPERTY_LIST>
+               <SYSTEM_GENERATED>N</SYSTEM_GENERATED>
+            </ODB_PROPERTY_LIST>
+            <UDP_LIST>
+               <UDP_LIST_ITEM>
+                  <NAME>shortName</NAME>
+                  <VALUE>FF_FORMULA_TEMPLATES_N1</VALUE>
+               </UDP_LIST_ITEM>
+            </UDP_LIST>
+         </CUSTOMER_AREA>
+      </INDEX>
+      <INDEX version="1.0">
+         <UNIQUE/>
+         <SCHEMA>FUSION</SCHEMA>
+         <NAME>FF_FORMULA_TEMPLATES_U1</NAME>
+         <TABLE_INDEX>
+            <ON_TABLE>
+               <SCHEMA>FUSION</SCHEMA>
+               <NAME>ff_formula_templates</NAME>
+            </ON_TABLE>
+            <COL_LIST>
+               <COL_LIST_ITEM>
+                  <NAME>TEMPLATE_ID</NAME>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>ORA_SEED_SET1</NAME>
+               </COL_LIST_ITEM>
+            </COL_LIST>
+            <INDEX_ATTRIBUTES>
+               <TABLESPACE>Default</TABLESPACE>
+            </INDEX_ATTRIBUTES>
+         </TABLE_INDEX>
+         <CUSTOMER_AREA>
+            <ODB_PROPERTY_LIST>
+               <SYSTEM_GENERATED>N</SYSTEM_GENERATED>
+            </ODB_PROPERTY_LIST>
+            <UDP_LIST>
+               <UDP_LIST_ITEM>
+                  <NAME>shortName</NAME>
+                  <VALUE>FF_FORMULA_TEMPLATES_U1</VALUE>
+               </UDP_LIST_ITEM>
+            </UDP_LIST>
+         </CUSTOMER_AREA>
+      </INDEX>
+      <INDEX version="1.0">
+         <UNIQUE/>
+         <SCHEMA>FUSION</SCHEMA>
+         <NAME>FF_FORMULA_TEMPLATES_U2</NAME>
+         <TABLE_INDEX>
+            <ON_TABLE>
+               <SCHEMA>FUSION</SCHEMA>
+               <NAME>ff_formula_templates</NAME>
+            </ON_TABLE>
+            <COL_LIST>
+               <COL_LIST_ITEM>
+                  <NAME>TEMPLATE_ID</NAME>
+               </COL_LIST_ITEM>
+               <COL_LIST_ITEM>
+                  <NAME>ORA_SEED_SET2</NAME>
+               </COL_LIST_ITEM>
+            </COL_LIST>
+            <INDEX_ATTRIBUTES>
+               <TABLESPACE>Default</TABLESPACE>
+            </INDEX_ATTRIBUTES>
+         </TABLE_INDEX>
+         <CUSTOMER_AREA>
+            <ODB_PROPERTY_LIST>
+               <SYSTEM_GENERATED>N</SYSTEM_GENERATED>
+            </ODB_PROPERTY_LIST>
+            <UDP_LIST>
+               <UDP_LIST_ITEM>
+                  <NAME>shortName</NAME>
+                  <VALUE>FF_FORMULA_TEMPLATES_U2</VALUE>
+               </UDP_LIST_ITEM>
+            </UDP_LIST>
+         </CUSTOMER_AREA>
+      </INDEX>
+      <INDEX version="1.0">
+         <UNIQUE/>
+         <SCHEMA>FUSION</SCHEMA>
+         <NAME>FF_FORMULA_TEMPLATES_U3</NAME>
+         <TABLE_INDEX>
+            <ON_TABLE>
+               <SCHEMA>FUSION</SCHEMA>
+               <NAME>ff_formula_templates</NAME>
+            </ON_TABLE>
+            <COL_LIST>
+               <COL_LIST_ITEM>
+                  <NAME>TEMPLATE_CODE</NAME>
+               </COL_LIST_ITEM>
+            </COL_LIST>
+            <INDEX_ATTRIBUTES>
+               <TABLESPACE>Default</TABLESPACE>
+            </INDEX_ATTRIBUTES>
+         </TABLE_INDEX>
+         <CUSTOMER_AREA>
+            <ODB_PROPERTY_LIST>
+               <SYSTEM_GENERATED>N</SYSTEM_GENERATED>
+            </ODB_PROPERTY_LIST>
+            <UDP_LIST>
+               <UDP_LIST_ITEM>
+                  <NAME>shortName</NAME>
+                  <VALUE>FF_FORMULA_TEMPLATES_U3</VALUE>
+               </UDP_LIST_ITEM>
+            </UDP_LIST>
+         </CUSTOMER_AREA>
+      </INDEX>
+   </INDEX_LIST>
+</COMPOSITE>

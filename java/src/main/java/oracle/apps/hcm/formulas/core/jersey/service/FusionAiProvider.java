@@ -30,11 +30,12 @@ import oracle.apps.fnd.applcore.log.AppsLogger;
  */
 public class FusionAiProvider implements LlmProvider {
 
-    // promptCode registered in hr_gen_ai_prompts_seed_b. The template
+    // Default promptCode registered in hr_gen_ai_prompts_seed_b. The template
     // (prompt_tmpl column) declares these placeholders:
     //   {systemPrompt} {userPrompt} {formulaType}
     //   {referenceFormula} {editorCode} {additionalRules} {chatHistory}
-    private static final String PROMPT_CODE = "HCM_RAG_DOCUMENTS";
+    // Can be overridden per-request via PromptContext.promptCode().
+    private static final String DEFAULT_PROMPT_CODE = "HCM_FF_GENERATION_LLM405B";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     // FAI Spectra SDK class names — loaded via reflection so this class
@@ -80,10 +81,17 @@ public class FusionAiProvider implements LlmProvider {
 
     @Override
     public String completeWithContext(PromptContext context, int maxTokens) {
+        // Resolve effective promptCode: use per-request override if provided,
+        // otherwise fall back to the default.
+        String effectivePromptCode = context.promptCodeOrNull() != null
+                && !context.promptCodeOrNull().isBlank()
+                ? context.promptCodeOrNull()
+                : DEFAULT_PROMPT_CODE;
+
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
             AppsLogger.write(this,
                     "[FusionAI] completeWithContext"
-                            + " promptCode=" + PROMPT_CODE
+                            + " promptCode=" + effectivePromptCode
                             + " sysLen=" + context.systemPromptOrEmpty().length()
                             + " userLen=" + context.userPromptOrEmpty().length()
                             + " formulaType=" + context.formulaTypeOrEmpty()
@@ -107,7 +115,7 @@ public class FusionAiProvider implements LlmProvider {
         }
 
         String spectraText = callSpectraCompletions(
-                PROMPT_CODE,
+                effectivePromptCode,
                 context.systemPromptOrEmpty(),
                 context.userPromptOrEmpty(),
                 context.formulaTypeOrEmpty(),
@@ -121,11 +129,11 @@ public class FusionAiProvider implements LlmProvider {
         }
         if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
             AppsLogger.write(this,
-                    "[FusionAI] Spectra returned null/empty for promptCode=" + PROMPT_CODE,
+                    "[FusionAI] Spectra returned null/empty for promptCode=" + effectivePromptCode,
                     AppsLogger.WARNING);
         }
         return "Error: Fusion AI Spectra returned empty response. "
-                + "Check promptCode registration for '" + PROMPT_CODE + "'.";
+                + "Check promptCode registration for '" + effectivePromptCode + "'.";
     }
 
     @Override

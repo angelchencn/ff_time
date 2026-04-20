@@ -23,8 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-//@Path("/11.13.18.05/fastFormulaAssistants")
-@Path("/11.13.18.05/calculationEntries")
+//@Path("/11.13.18.05/calculationEntries")
+@Path("/11.13.18.05/fastFormulaAssistants")
 public class FastFormulaResource {
 
     /** Sentinel value for the built-in "Custom Formula" type in requests + dropdowns. */
@@ -53,10 +53,15 @@ public class FastFormulaResource {
         String formulaType = (String) request.getOrDefault("formula_type", "TIME_LABOR");
         String sessionId = (String) request.get("session_id");
 
+        // Optional per-request promptCode override (e.g. HCM_FF_GENERATION_GPT5MINI).
+        // When null/absent, FusionAiProvider uses its default (HCM_FF_GENERATION_LLM405B).
+        String promptCode = (String) request.get("prompt_code");
+
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
             AppsLogger.write(this,
                     "POST /chat: formulaType=" + formulaType
                             + " session=" + sessionId
+                            + " promptCode=" + promptCode
                             + " editorCodeLen=" + (editorCode == null ? 0 : editorCode.length())
                             + " messageLen=" + (message == null ? 0 : message.length()),
                     AppsLogger.INFO);
@@ -114,6 +119,7 @@ public class FastFormulaResource {
         final String sid = sessionId;
         final String csc = customSampleCode;
         final String cr = resolveEffectiveRule(sessionId, templateRule);
+        final String pc = promptCode;
 
         StreamingOutput stream = new StreamingOutput() {
             public void write(OutputStream out) throws IOException {
@@ -129,7 +135,7 @@ public class FastFormulaResource {
 
                 StringBuilder fullResponse = new StringBuilder();
 
-                aiService.streamChat(message, editorCode, formulaType, history, csc, cr, new java.util.function.Consumer<String>() {
+                aiService.streamChat(message, editorCode, formulaType, history, csc, cr, pc, new java.util.function.Consumer<String>() {
                     public void accept(String token) {
                         fullResponse.append(token);
                         try {
@@ -193,10 +199,13 @@ public class FastFormulaResource {
         String formulaType = (String) request.getOrDefault("formula_type", "TIME_LABOR");
         String sessionId = (String) request.get("session_id");
 
+        String promptCode = (String) request.get("prompt_code");
+
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
             AppsLogger.write(this,
                     "POST /chat/sync: formulaType=" + formulaType
                             + " session=" + sessionId
+                            + " promptCode=" + promptCode
                             + " editorCodeLen=" + (editorCode == null ? 0 : editorCode.length())
                             + " messageLen=" + (message == null ? 0 : message.length()),
                     AppsLogger.INFO);
@@ -240,7 +249,7 @@ public class FastFormulaResource {
 
         String rawResponse = aiService.chatOnce(
                 message, editorCode, formulaType, history, customSampleCode,
-                resolveEffectiveRule(sessionId, templateRule));
+                resolveEffectiveRule(sessionId, templateRule), promptCode);
 
         // Mirror streaming's post-process: fix DEFAULT value types.
         String finalResponse = AiService.fixDefaultTypes(rawResponse);

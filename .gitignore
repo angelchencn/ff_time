@@ -40,3 +40,5 @@ java/target/
 *.log
 
 fai-orchestrator-main/
+# Local scratch / command notes (may contain secrets)
+Command.txt

@@ -1,5 +1,5 @@
 <?xml version = '1.0' encoding = 'UTF-8'?>
-<!--$Header: fusionapps/hcm/components/hcmPayroll/formulas/core/dbSchema/database/fusionDB/FUSION/ff_formula_templates_tl.table ff_time/1 2026/04/08 00:00:00 alex Exp $-->
+<!--$Header: fusionapps/hcm/components/hcmPayroll/formulas/core/dbSchema/database/fusionDB/FUSION/ff_formula_templates_tl.table xiaojuch_bug-39168092/3 2026/04/10 00:15:40 xiaojuch Exp $-->
 <!-- adxml:    <src_file bootstrap="~BOOTSTRAP" version="~VERSION" -->
 <!-- adxml:       translation_level="~TRANS_LEVEL" techstack_level="~TXK_LEVEL" -->
 <!-- adxml:       verticalisation_level="~VERT_LEVEL" custom_level="~CUST_LEVEL" -->
@@ -51,7 +51,7 @@
 Primary Object's Schema : FUSION
 Primary Object Name    : "ff_formula_templates_tl"
 Primary Object Type    : TABLE
-Dependent Objects' Information :
+Dependent Objects' Information : 
   Index(es) on "ff_formula_templates_tl" : FF_FORMULA_TEMPLATES_TL_PK, FF_FORMULA_TEMPLATES_TL_PK1
   Constraint(s) on "ff_formula_templates_tl" : FF_FORMULA_TEMPLATES_TL_FK, FF_FORMULA_TEMPLATES_TL_PK
 -->
@@ -487,11 +487,7 @@ Dependent Objects' Information :
                   <REFERENCES>
                      <SCHEMA>FUSION</SCHEMA>
                      <NAME>ff_formula_templates</NAME>
-                     <COL_LIST>
-                        <COL_LIST_ITEM>
-                           <NAME>TEMPLATE_ID</NAME>
-                        </COL_LIST_ITEM>
-                     </COL_LIST>
+                     <COL_LIST/>
                   </REFERENCES>
                   <CUSTOMER_AREA>
                      <UDP_LIST>
@@ -513,7 +509,21 @@ Dependent Objects' Information :
             <PHYSICAL_PROPERTIES>
                <HEAP_TABLE>
                   <SEGMENT_ATTRIBUTES>
+                     <PCTFREE>40</PCTFREE>
+                     <PCTUSED>60</PCTUSED>
+                     <INITRANS>10</INITRANS>
+                     <STORAGE>
+                        <INITIAL>4</INITIAL>
+                        <NEXT>1</NEXT>
+                        <MINEXTENTS>1</MINEXTENTS>
+                        <MAXEXTENTS>2147483645</MAXEXTENTS>
+                        <PCTINCREASE>0</PCTINCREASE>
+                        <FREELISTS>4</FREELISTS>
+                        <FREELIST_GROUPS>32</FREELIST_GROUPS>
+                        <BUFFER_POOL>DEFAULT</BUFFER_POOL>
+                     </STORAGE>
                      <TABLESPACE>Default</TABLESPACE>
+                     <LOGGING>Y</LOGGING>
                   </SEGMENT_ATTRIBUTES>
                   <COMPRESS>N</COMPRESS>
                </HEAP_TABLE>
@@ -526,32 +536,32 @@ Dependent Objects' Information :
             <UDP_LIST>
                <UDP_LIST_ITEM>
                   <NAME>adxml</NAME>
-                  <VALUE> adxml:    &lt;src_file bootstrap="~BOOTSTRAP" version="~VERSION"
- adxml:       translation_level="~TRANS_LEVEL" techstack_level="~TXK_LEVEL"
- adxml:       verticalisation_level="~VERT_LEVEL" custom_level="~CUST_LEVEL"
- adxml:       language="~LANG" needs_translation="~TRANSLATION" ship="~SHIP"
- adxml:       localization="~LOCALIZATION" object_type="~OBJECT_TYPE">
- adxml:     &lt;abstract_file te="~PROD" subdir="~PATH" file_basename="~BASENAME" file_type="~FILE_TYPE"/>
- adxml:     &lt;metadata>
- adxml:       &lt;action identifier="TABLE" category="DD_TABLES" portion="D" online_category="N">
- adxml:         &lt;apply_action>
- adxml:           &lt;action_details name="java">
- adxml:             &lt;invoking_exec>
- adxml:               &lt;executable file_basename="oracle.apps.fnd.applxdf.comp.XdfSchemaDeploy" file_type="class"/>
- adxml:             &lt;/invoking_exec>
- adxml:             &lt;args>owner_un=#un:fusion# apps_un=#un:fusion#
- adxml:                      jdbc_protocol=#jdbc_protocol# jdbc_db_addr=#jdbc_db_addr# xdf_mode=table
- adxml:                      xdf_file_name=#fullpath:~PROD:~PATH:~FILE#
- adxml:             &lt;/args>
- adxml:           &lt;/action_details>
- adxml:         &lt;/apply_action>
- adxml:         &lt;analysis_action>
- adxml:           &lt;default_action/>
- adxml:         &lt;/analysis_action>
- adxml:         &lt;ahead_of_time_run_conditions>
- adxml:           &lt;check_file check="Y"/>
- adxml:         &lt;/ahead_of_time_run_conditions>
- adxml:       &lt;/action>
+                  <VALUE> adxml:    &lt;src_file bootstrap="~BOOTSTRAP" version="~VERSION" 
+ adxml:       translation_level="~TRANS_LEVEL" techstack_level="~TXK_LEVEL" 
+ adxml:       verticalisation_level="~VERT_LEVEL" custom_level="~CUST_LEVEL" 
+ adxml:       language="~LANG" needs_translation="~TRANSLATION" ship="~SHIP" 
+ adxml:       localization="~LOCALIZATION" object_type="~OBJECT_TYPE"> 
+ adxml:     &lt;abstract_file te="~PROD" subdir="~PATH" file_basename="~BASENAME" file_type="~FILE_TYPE"/> 
+ adxml:     &lt;metadata> 
+ adxml:       &lt;action identifier="TABLE" category="DD_TABLES" portion="D" online_category="N"> 
+ adxml:         &lt;apply_action> 
+ adxml:           &lt;action_details name="java"> 
+ adxml:             &lt;invoking_exec> 
+ adxml:               &lt;executable file_basename="oracle.apps.fnd.applxdf.comp.XdfSchemaDeploy" file_type="class"/> 
+ adxml:             &lt;/invoking_exec> 
+ adxml:             &lt;args>owner_un=#un:fusion# apps_un=#un:fusion# 
+ adxml:                      jdbc_protocol=#jdbc_protocol# jdbc_db_addr=#jdbc_db_addr# xdf_mode=table 
+ adxml:                      xdf_file_name=#fullpath:~PROD:~PATH:~FILE#  
+ adxml:             &lt;/args> 
+ adxml:           &lt;/action_details> 
+ adxml:         &lt;/apply_action> 
+ adxml:         &lt;analysis_action> 
+ adxml:           &lt;default_action/> 
+ adxml:         &lt;/analysis_action> 
+ adxml:         &lt;ahead_of_time_run_conditions> 
+ adxml:           &lt;check_file check="Y"/> 
+ adxml:         &lt;/ahead_of_time_run_conditions> 
+ adxml:       &lt;/action> 
 </VALUE>
                </UDP_LIST_ITEM>
                <UDP_LIST_ITEM>
@@ -560,25 +570,25 @@ Dependent Objects' Information :
                </UDP_LIST_ITEM>
                <UDP_LIST_ITEM>
                   <NAME>adxmlFk</NAME>
-                  <VALUE> adxml:       &lt;action identifier="FOREIGN_KEY" category="DD_FOREIGN_KEYS" portion="D" online_category="N">
- adxml:         &lt;apply_action>
- adxml:           &lt;action_details name="java">
- adxml:             &lt;invoking_exec>
- adxml:               &lt;executable file_basename="oracle.apps.fnd.applxdf.comp.XdfSchemaDeploy" file_type="class"/>
- adxml:             &lt;/invoking_exec>
- adxml:             &lt;args>owner_un=#un:fusion# apps_un=#un:fusion#
- adxml:                      jdbc_protocol=#jdbc_protocol# jdbc_db_addr=#jdbc_db_addr# xdf_mode=tablefk
- adxml:                      xdf_file_name=#fullpath:~PROD:~PATH:~FILE#
- adxml:             &lt;/args>
- adxml:           &lt;/action_details>
- adxml:         &lt;/apply_action>
- adxml:         &lt;analysis_action>
- adxml:           &lt;default_action/>
- adxml:         &lt;/analysis_action>
- adxml:         &lt;ahead_of_time_run_conditions>
- adxml:           &lt;check_file check="Y"/>
- adxml:         &lt;/ahead_of_time_run_conditions>
- adxml:       &lt;/action>
+                  <VALUE> adxml:       &lt;action identifier="FOREIGN_KEY" category="DD_FOREIGN_KEYS" portion="D" online_category="N"> 
+ adxml:         &lt;apply_action> 
+ adxml:           &lt;action_details name="java"> 
+ adxml:             &lt;invoking_exec> 
+ adxml:               &lt;executable file_basename="oracle.apps.fnd.applxdf.comp.XdfSchemaDeploy" file_type="class"/> 
+ adxml:             &lt;/invoking_exec> 
+ adxml:             &lt;args>owner_un=#un:fusion# apps_un=#un:fusion# 
+ adxml:                      jdbc_protocol=#jdbc_protocol# jdbc_db_addr=#jdbc_db_addr# xdf_mode=tablefk 
+ adxml:                      xdf_file_name=#fullpath:~PROD:~PATH:~FILE# 
+ adxml:             &lt;/args> 
+ adxml:           &lt;/action_details> 
+ adxml:         &lt;/apply_action> 
+ adxml:         &lt;analysis_action> 
+ adxml:           &lt;default_action/> 
+ adxml:         &lt;/analysis_action> 
+ adxml:         &lt;ahead_of_time_run_conditions> 
+ adxml:           &lt;check_file check="Y"/> 
+ adxml:         &lt;/ahead_of_time_run_conditions> 
+ adxml:       &lt;/action> 
 </VALUE>
                </UDP_LIST_ITEM>
                <UDP_LIST_ITEM>
@@ -631,7 +641,20 @@ Dependent Objects' Information :
                </COL_LIST_ITEM>
             </COL_LIST>
             <INDEX_ATTRIBUTES>
+               <PCTFREE>40</PCTFREE>
+               <INITRANS>11</INITRANS>
+               <STORAGE>
+                  <INITIAL>4096</INITIAL>
+                  <NEXT>1</NEXT>
+                  <MINEXTENTS>1</MINEXTENTS>
+                  <MAXEXTENTS>2147483645</MAXEXTENTS>
+                  <PCTINCREASE>0</PCTINCREASE>
+                  <FREELISTS>4</FREELISTS>
+                  <FREELIST_GROUPS>32</FREELIST_GROUPS>
+                  <BUFFER_POOL>DEFAULT</BUFFER_POOL>
+               </STORAGE>
                <TABLESPACE>Default</TABLESPACE>
+               <LOGGING>Y</LOGGING>
             </INDEX_ATTRIBUTES>
          </TABLE_INDEX>
          <CUSTOMER_AREA>
@@ -667,7 +690,20 @@ Dependent Objects' Information :
                </COL_LIST_ITEM>
             </COL_LIST>
             <INDEX_ATTRIBUTES>
+               <PCTFREE>40</PCTFREE>
+               <INITRANS>11</INITRANS>
+               <STORAGE>
+                  <INITIAL>4096</INITIAL>
+                  <NEXT>1</NEXT>
+                  <MINEXTENTS>1</MINEXTENTS>
+                  <MAXEXTENTS>2147483645</MAXEXTENTS>
+                  <PCTINCREASE>0</PCTINCREASE>
+                  <FREELISTS>4</FREELISTS>
+                  <FREELIST_GROUPS>32</FREELIST_GROUPS>
+                  <BUFFER_POOL>DEFAULT</BUFFER_POOL>
+               </STORAGE>
                <TABLESPACE>Default</TABLESPACE>
+               <LOGGING>Y</LOGGING>
             </INDEX_ATTRIBUTES>
          </TABLE_INDEX>
          <CUSTOMER_AREA>

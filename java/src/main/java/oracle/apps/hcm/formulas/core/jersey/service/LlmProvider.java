@@ -119,9 +119,29 @@ public interface LlmProvider {
         systemMsg.put("content", sys.toString().trim());
         messages.add(systemMsg);
 
+        // Build user message with generation instructions. The Spectra
+        // path gets these from the server-side template; the OpenAI
+        // flatten path needs them inline.
+        StringBuilder user = new StringBuilder();
+        String ft = ctx.formulaTypeOrEmpty();
+        if (!ft.isBlank()) {
+            user.append("Formula type: ").append(ft).append("\n\n");
+        }
+        if (ctx.referenceFormula() != null && !ctx.referenceFormula().isBlank()) {
+            user.append("Use the Reference Formula in the system prompt as the structural template. ")
+                .append("RETURN variables should match the reference formula pattern.\n\n");
+        }
+        if (ctx.editorCode() != null && !ctx.editorCode().isBlank()) {
+            user.append("Modify the current editor code according to the request. ")
+                .append("Return the complete updated formula.\n\n");
+        }
+        user.append("Requirement: ").append(ctx.userPromptOrEmpty()).append("\n\n");
+        user.append("Generate a complete Fast Formula. Return ONLY the formula code — ")
+            .append("no markdown fences, no explanation.");
+
         Map<String, String> userMsg = new LinkedHashMap<>();
         userMsg.put("role", "user");
-        userMsg.put("content", ctx.userPromptOrEmpty());
+        userMsg.put("content", user.toString());
         messages.add(userMsg);
 
         return messages;
