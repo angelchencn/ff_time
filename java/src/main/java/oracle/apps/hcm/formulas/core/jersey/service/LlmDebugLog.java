@@ -76,19 +76,19 @@ public class LlmDebugLog {
 
         // Keep top-level legacy keys populated for UIs that still read them.
         String systemPrompt = context.systemPromptOrEmpty();
-        String userPrompt = context.userPromptOrEmpty();
+        String message = context.messageOrEmpty();
         entry.put("system_prompt", systemPrompt);
         entry.put("system_prompt_length", systemPrompt.length());
-        entry.put("user_message", userPrompt);
+        entry.put("message", message);
         entry.put("messages", List.of(
                 Map.of("role", "system", "content", systemPrompt),
-                Map.of("role", "user", "content", userPrompt)
+                Map.of("role", "user", "content", message)
         ));
 
         // Structured fields — one entry per PromptContext placeholder.
         var pc = new LinkedHashMap<String, Object>();
         putFieldWithLength(pc, "system_prompt",     context.systemPromptOrEmpty());
-        putFieldWithLength(pc, "user_prompt",       context.userPromptOrEmpty());
+        putFieldWithLength(pc, "message",            context.messageOrEmpty());
         putFieldWithLength(pc, "formula_type",      context.formulaTypeOrEmpty());
         putFieldWithLength(pc, "reference_formula", context.referenceFormulaOrEmpty());
         putFieldWithLength(pc, "editor_code",       context.editorCodeOrEmpty());
@@ -101,7 +101,7 @@ public class LlmDebugLog {
         var tokenBreakdown = new ArrayList<Map<String, Object>>();
         int totalChars = 0;
         totalChars += addBreakdown(tokenBreakdown, "system_prompt",     context.systemPromptOrEmpty());
-        totalChars += addBreakdown(tokenBreakdown, "user_prompt",       context.userPromptOrEmpty());
+        totalChars += addBreakdown(tokenBreakdown, "message",            context.messageOrEmpty());
         totalChars += addBreakdown(tokenBreakdown, "formula_type",      context.formulaTypeOrEmpty());
         totalChars += addBreakdown(tokenBreakdown, "reference_formula", context.referenceFormulaOrEmpty());
         totalChars += addBreakdown(tokenBreakdown, "editor_code",       context.editorCodeOrEmpty());

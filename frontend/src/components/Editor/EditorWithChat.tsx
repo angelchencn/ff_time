@@ -41,7 +41,7 @@ export function EditorWithChat() {
   const { formulaTypes } = useFormulaTypes();
   const { templates: dbTemplates, loading: templatesLoading } =
     useTemplatesByFormulaType(formulaType);
-  const [selectedPromptCode, setSelectedPromptCode] = useState<string>('HCM_FF_GENERATION_LLM405B');
+  const [selectedLlm, setSelectedLlm] = useState<string>('GPT5MINI');
   const [chatOpen, setChatOpen] = useState(false);
   const [chatHeight, setChatHeight] = useState(DEFAULT_CHAT_HEIGHT);
   const listEndRef = useRef<HTMLDivElement>(null);
@@ -123,10 +123,10 @@ export function EditorWithChat() {
       message: text,
       formula_type: formulaType,
     };
-    // Only send prompt_code for Fusion environments (has auth).
-    // Local dev uses OpenAI GPT 5.4 — prompt_code is ignored server-side.
+    // Only send llm for Fusion environments (has auth).
+    // Local dev uses OpenAI GPT 5.4 — llm is ignored server-side.
     if (current.auth) {
-      body.prompt_code = selectedPromptCode;
+      body.llm = selectedLlm;
     }
     if (shouldShipEditorCode) {
       body.editor_code = code;
@@ -463,14 +463,14 @@ export function EditorWithChat() {
           </span>
           {current.auth ? (
             <Select
-              value={selectedPromptCode}
-              onChange={setSelectedPromptCode}
+              value={selectedLlm}
+              onChange={setSelectedLlm}
               size="small"
               variant="borderless"
               style={{ width: 160 }}
               options={[
-                { value: 'HCM_FF_GENERATION_LLM405B', label: 'Llama 405B' },
-                { value: 'HCM_FF_GENERATION_GPT5MINI', label: 'GPT-5 Mini' },
+                { value: 'GPT5MINI', label: 'GPT-5 Mini' },
+                { value: 'GPT41MINI', label: 'GPT-4.1 Mini' },
               ]}
             />
           ) : (

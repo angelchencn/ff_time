@@ -8,14 +8,26 @@ FROM FND_APPL_TAXONOMY fat,
     START WITH fath.source_module_id IN
     (SELECT module_id
     FROM FND_APPL_TAXONOMY
-    WHERE module_name like 'HcmPayCore'
+    WHERE module_name like 'HcmCommonFf'
     )
   ) module_id
 WHERE fat.module_id = module_id.source_module_id;
 
-select * from pay_run_balances;
+SELECT fat.module_id,
+  fat.module_name,
+  fat.module_type
+FROM FND_APPL_TAXONOMY fat,
+  (SELECT source_module_id
+  FROM FND_APPL_TAXONOMY_HIERARCHY fath
+    CONNECT BY prior fath.target_module_id = fath.source_module_id
+    START WITH fath.source_module_id IN
+    (SELECT module_id
+    FROM FND_APPL_TAXONOMY
+    WHERE module_id = '61ECAF4AAAC2E990E040449821C61C97'
+    )
+  ) module_id
+where fat.module_id = module_id.source_module_id;
 
-select * from fusion.pay_stats_flow_actions;
 
 SELECT c.constraint_name, c.constraint_type, cc.column_name, cc.position 
     FROM dba_constraints c JOIN dba_cons_columns cc ON c.owner = cc.owner AND c.table_name = cc.table_name AND c.constraint_name = cc.constraint_name 
@@ -152,6 +164,9 @@ GRANT INSERT ON FF_FORMULA_TEMPLATES_TL TO FUSION_RUNTIME;
 GRANT DELETE ON FF_FORMULA_TEMPLATES TO FUSION_RUNTIME;
 GRANT DELETE ON FF_FORMULA_TEMPLATES_TL TO FUSION_RUNTIME;
 GRANT SELECT ON FF_FORMULA_TEMPLATES_VL TO FUSION_RUNTIME;
+
+delete from fusion.FAI_WORKFLOWS_B where workflow_code like 'HCM_FA%';
+select * from fusion.FAI_WORKFLOWS_TL;
 
 
 select * from FF_FORMULA_TEMPLATES_VL where template_code = 'ORA_HCM_FF_SYSTEM_PROMPT';

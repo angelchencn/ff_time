@@ -93,7 +93,7 @@ public class FusionAiProvider implements LlmProvider {
                     "[FusionAI] completeWithContext"
                             + " promptCode=" + effectivePromptCode
                             + " sysLen=" + context.systemPromptOrEmpty().length()
-                            + " userLen=" + context.userPromptOrEmpty().length()
+                            + " userLen=" + context.messageOrEmpty().length()
                             + " formulaType=" + context.formulaTypeOrEmpty()
                             + " refLen=" + context.referenceFormulaOrEmpty().length()
                             + " editorLen=" + context.editorCodeOrEmpty().length()
@@ -117,7 +117,7 @@ public class FusionAiProvider implements LlmProvider {
         String spectraText = callSpectraCompletions(
                 effectivePromptCode,
                 context.systemPromptOrEmpty(),
-                context.userPromptOrEmpty(),
+                context.messageOrEmpty(),
                 context.formulaTypeOrEmpty(),
                 context.referenceFormulaOrEmpty(),
                 context.editorCodeOrEmpty(),

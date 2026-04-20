@@ -35,6 +35,14 @@ public class AiService {
     private static final String FUSION_PROVIDER_CLASS =
             "oracle.apps.hcm.formulas.core.jersey.service.FusionAiProvider";
 
+    /**
+     * Fully-qualified name of {@code AgentStudioProvider}, loaded via
+     * reflection for the same reason as FusionAiProvider — the SDK jar
+     * ({@code FAIOrchestratorAgentClientV2}) is only on the Fusion classpath.
+     */
+    private static final String AGENT_STUDIO_PROVIDER_CLASS =
+            "oracle.apps.hcm.formulas.core.jersey.service.AgentStudioProvider";
+
     private final LlmProvider provider;
     private final RagService ragService = new RagService();
 
@@ -42,15 +50,32 @@ public class AiService {
     private volatile String cachedSystemPrompt;
 
     public AiService() {
-        this.provider = isFusionProviderActive()
-                ? loadFusionProviderOrFallback()
-                : new OpenAiProvider();
+        this.provider = selectProvider();
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
             AppsLogger.write(AiService.class,
                     "AiService initialized with provider: " + provider.name()
                             + " (available=" + provider.isAvailable() + ")",
                     AppsLogger.INFO);
         }
+    }
+
+    /**
+     * Select the LLM provider based on {@code LLM_PROVIDER} env var:
+     *
+     *   - "openai"  → OpenAiProvider (local dev, GPT-5.4)
+     *   - "spectra" → FusionAiProvider (Spectra completions, direct)
+     *   - unset / anything else → AgentStudioProvider (default, Agent Studio workflow)
+     */
+    private static LlmProvider selectProvider() {
+        String providerName = System.getenv("LLM_PROVIDER");
+        if ("openai".equalsIgnoreCase(providerName)) {
+            return new OpenAiProvider();
+        }
+        if ("spectra".equalsIgnoreCase(providerName)) {
+            return loadFusionProviderOrFallback();
+        }
+        // Default: Agent Studio
+        return loadAgentStudioProviderOrFallback();
     }
 
     /**
@@ -150,6 +175,29 @@ public class AiService {
         }
     }
 
+    /**
+     * Try to construct {@code AgentStudioProvider} reflectively. Falls back
+     * to {@link FusionAiProvider} if the Agent Studio SDK is missing, then
+     * to {@link OpenAiProvider} if Spectra SDK is also missing.
+     */
+    private static LlmProvider loadAgentStudioProviderOrFallback() {
+        try {
+            Class<?> cls = Class.forName(AGENT_STUDIO_PROVIDER_CLASS);
+            return (LlmProvider) cls.getDeclaredConstructor().newInstance();
+        } catch (ClassNotFoundException cnfe) {
+            if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+                AppsLogger.write(AiService.class,
+                        AGENT_STUDIO_PROVIDER_CLASS + " not on classpath; "
+                                + "falling back to FusionAiProvider",
+                        AppsLogger.INFO);
+            }
+            return loadFusionProviderOrFallback();
+        } catch (ReflectiveOperationException roe) {
+            AppsLogger.write(AiService.class, roe, AppsLogger.SEVERE);
+            return loadFusionProviderOrFallback();
+        }
+    }
+
     /** Constructor for testing — inject a custom provider. */
     public AiService(LlmProvider provider) {
         this.provider = provider;
@@ -164,14 +212,14 @@ public class AiService {
      * Single source of truth for "are we running in a Fusion central
      * environment?". Reads {@code LLM_PROVIDER} env var:
      *
-     *   - unset / anything but "openai" → Fusion (default)
-     *   - "openai" (case-insensitive)   → OpenAI (local dev)
+     *   - "openai" (case-insensitive)   → false (local dev)
+     *   - unset / "spectra" / anything else → true (Fusion: Agent Studio or Spectra)
      *
-     * Used by this class's no-arg constructor AND by {@code DbConfig} to
-     * decide whether to open a JDBC connection via ADF BC ApplicationModule
-     * (Fusion path) or via the plain DriverManager + FF_DB_URL env vars
-     * (local dev path). Keeping the check static + public means the two
-     * layers always agree on the runtime mode.
+     * Used by {@code DbConfig} to decide whether to open a JDBC connection
+     * via ADF BC ApplicationModule (Fusion path) or via the plain
+     * DriverManager + FF_DB_URL env vars (local dev path). Keeping the
+     * check static + public means the two layers always agree on the
+     * runtime mode.
      */
     public static boolean isFusionProviderActive() {
         String providerName = System.getenv("LLM_PROVIDER");
@@ -289,7 +337,7 @@ public class AiService {
             String customSampleCode, String customRule, String promptCode) {
 
         String systemPrompt = getSystemPrompt();
-        String userPrompt = extractUserRequestText(message, formulaType);
+        String msg = extractUserRequestText(message, formulaType);
         String referenceFormula = extractReferenceFormula(message, customSampleCode);
         String normalizedEditor = (editorCode == null || editorCode.isBlank()) ? "" : editorCode;
         String additionalRules = (customRule == null || customRule.isBlank()) ? "" : customRule;
@@ -297,7 +345,7 @@ public class AiService {
 
         return new PromptContext(
                 systemPrompt,
-                userPrompt,
+                msg,
                 formulaType == null ? "" : formulaType,
                 referenceFormula,
                 normalizedEditor,

@@ -53,15 +53,18 @@ public class FastFormulaResource {
         String formulaType = (String) request.getOrDefault("formula_type", "TIME_LABOR");
         String sessionId = (String) request.get("session_id");
 
-        // Optional per-request promptCode override (e.g. HCM_FF_GENERATION_GPT5MINI).
-        // When null/absent, FusionAiProvider uses its default (HCM_FF_GENERATION_LLM405B).
-        String promptCode = (String) request.get("prompt_code");
+        // LLM model selector (e.g. "GPT5MINI", "GPT41MINI").
+        // For AgentStudioProvider: passed as the "LLM" workflow parameter.
+        // For FusionAiProvider: used as prompt_code override.
+        // Falls back to prompt_code for backward compatibility.
+        String llm = (String) request.get("llm");
+        if (llm == null) llm = (String) request.get("prompt_code");
 
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
             AppsLogger.write(this,
                     "POST /chat: formulaType=" + formulaType
                             + " session=" + sessionId
-                            + " promptCode=" + promptCode
+                            + " llm=" + llm
                             + " editorCodeLen=" + (editorCode == null ? 0 : editorCode.length())
                             + " messageLen=" + (message == null ? 0 : message.length()),
                     AppsLogger.INFO);
@@ -119,7 +122,7 @@ public class FastFormulaResource {
         final String sid = sessionId;
         final String csc = customSampleCode;
         final String cr = resolveEffectiveRule(sessionId, templateRule);
-        final String pc = promptCode;
+        final String pc = llm;
 
         StreamingOutput stream = new StreamingOutput() {
             public void write(OutputStream out) throws IOException {
@@ -199,13 +202,14 @@ public class FastFormulaResource {
         String formulaType = (String) request.getOrDefault("formula_type", "TIME_LABOR");
         String sessionId = (String) request.get("session_id");
 
-        String promptCode = (String) request.get("prompt_code");
+        String llm = (String) request.get("llm");
+        if (llm == null) llm = (String) request.get("prompt_code");
 
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
             AppsLogger.write(this,
                     "POST /chat/sync: formulaType=" + formulaType
                             + " session=" + sessionId
-                            + " promptCode=" + promptCode
+                            + " llm=" + llm
                             + " editorCodeLen=" + (editorCode == null ? 0 : editorCode.length())
                             + " messageLen=" + (message == null ? 0 : message.length()),
                     AppsLogger.INFO);
@@ -249,7 +253,7 @@ public class FastFormulaResource {
 
         String rawResponse = aiService.chatOnce(
                 message, editorCode, formulaType, history, customSampleCode,
-                resolveEffectiveRule(sessionId, templateRule), promptCode);
+                resolveEffectiveRule(sessionId, templateRule), llm);
 
         // Mirror streaming's post-process: fix DEFAULT value types.
         String finalResponse = AiService.fixDefaultTypes(rawResponse);

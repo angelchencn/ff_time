@@ -135,7 +135,7 @@ public interface LlmProvider {
             user.append("Modify the current editor code according to the request. ")
                 .append("Return the complete updated formula.\n\n");
         }
-        user.append("Requirement: ").append(ctx.userPromptOrEmpty()).append("\n\n");
+        user.append("Requirement: ").append(ctx.messageOrEmpty()).append("\n\n");
         user.append("Generate a complete Fast Formula. Return ONLY the formula code — ")
             .append("no markdown fences, no explanation.");
 
