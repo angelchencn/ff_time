@@ -1,19 +1,21 @@
-# HCM Fast Formula AI Generator — Uptake Guide for AI Agent Studio
+# HCM Fast Formula AI Generator — Uptake Guide
 
 ## Overview
 
-The Fast Formula AI Generator exposes two REST endpoints that accept a natural language requirement and return complete, syntactically valid Oracle Fast Formula source code. The endpoints are hosted on the **HCM Payroll REST service** (`calculationEntries`) and route through the Fusion AI Spectra completions pipeline.
+The Fast Formula AI Generator provides REST endpoints that accept a natural language requirement and return complete, syntactically valid Oracle Fast Formula source code. The backend routes through the **Fusion AI Agent Studio** workflow engine (`FAIOrchestratorAgentClientV2`), which handles LLM selection, prompt rendering, and conversation management.
 
-**AI Agent Studio integration**: Configure your agent to call `/chat/sync` (recommended) as a tool/action. The agent sends the user's request as the `message` field and receives the generated formula code in the response.
+The default Agent Studio workflow code is `HCM_FF_GENERATOR`.
 
 ---
 
 ## Endpoints
 
-| Endpoint | Method | Content-Type | Response | Use Case |
-|---|---|---|---|---|
-| `/chat/sync` | POST | `application/json` | `application/json` | **Recommended for Agent Studio** — blocking, returns full response as JSON |
-| `/chat` | POST | `application/json` | `text/event-stream` | Streaming SSE — for UIs that need token-by-token display |
+| Endpoint | Method | Response | Behavior |
+|---|---|---|---|
+| `POST /chat/sync` | POST | JSON | **Recommended** -- blocking, waits for LLM to complete, returns full response |
+| `POST /chat` | POST | JSON | Async -- submits job, returns `jobId` immediately |
+| `GET /chat/status/{jobId}` | GET | JSON | Poll async job status |
+| `POST /chat/stream` | POST | SSE | True streaming via Agent Studio `invokeStream` |
 
 **Base URL (Fusion):**
 
@@ -25,51 +27,54 @@ https://<pod>/hcmRestApi/redwood/11.13.18.05/calculationEntries
 
 ## 1. POST `/chat/sync` (Recommended)
 
-Blocking endpoint. Sends request, waits for the LLM to complete, returns full formula code in one JSON response.
+Blocking endpoint. Submits to Agent Studio, polls internally until complete, returns the full formula code.
 
 ### Request Body
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `message` | string | **Yes** | — | Natural language requirement. e.g. "Generate an overtime pay formula that calculates 1.5x rate for hours over 40" |
-| `formula_type` | string | No | `"TIME_LABOR"` | Formula type name. Determines which DBIs, contexts, inputs, and RETURN variables are valid. See [Formula Types](#formula-types) below |
+| `message` | string | **Yes** | -- | Natural language requirement. e.g. "Generate an overtime pay formula that calculates 1.5x rate for hours over 40" |
+| `formula_type` | string | No | `"TIME_LABOR"` | Formula type name. Determines DBIs, contexts, inputs, and RETURN variables. See [Formula Types](#formula-types) |
 | `editor_code` | string | No | `""` | Existing formula code to modify/refine. When provided, the LLM edits this code instead of generating from scratch |
 | `session_id` | string | No | auto-generated | Session ID for multi-turn conversation. Reuse the value from the first response to continue refining |
-| `template_code` | string | No | — | Business key from `FF_FORMULA_TEMPLATES.TEMPLATE_CODE`. Server fetches the template's formula body and additional rules from DB. e.g. `"ORA_HCM_FF_FLOW_SCHEDULE_838595"` |
-| `prompt_code` | string | No | `"HCM_FF_GENERATION_LLM405B"` | Spectra prompt code selecting the LLM backend. Available: `"HCM_FF_GENERATION_LLM405B"` (Llama 405B), `"HCM_FF_GENERATION_GPT5MINI"` (GPT-5 Mini) |
+| `template_code` | string | No | -- | Business key from `FF_FORMULA_TEMPLATES.TEMPLATE_CODE`. Server fetches the template's formula body and additional rules from DB |
+| `llm` | string | No | `"GPT5MINI"` | LLM model selector. Available: `"GPT5MINI"` (GPT-5 Mini), `"GPT41MINI"` (GPT-4.1 Mini). Passed as the `LLM` workflow variable in Agent Studio |
 
-### Response Body
+### Response
 
-| Field | Type | Description |
-|---|---|---|
-| `text` | string | Complete generated Fast Formula source code |
-| `session_id` | string | Session ID — pass back in subsequent requests for multi-turn conversation |
+**Success (HTTP 200):**
+
+```json
+{
+  "text": "/******************************************************************************\n * Formula Name : ...\n/* End Formula Text */",
+  "session_id": "8fcaf9bc-a176-4238-8fcc-cfa98d0c191f"
+}
+```
+
+**Error (HTTP 500):**
+
+```json
+{
+  "error": "Error: Agent Studio job failed: user can not execute this workflow.",
+  "session_id": "8fcaf9bc-a176-4238-8fcc-cfa98d0c191f"
+}
+```
 
 ### Example: Simple Request
 
 ```json
-// POST /chat/sync
 {
   "message": "Generate a time calculation rule formula that calculates overtime at 1.5x for hours exceeding 40 per week",
   "formula_type": "WFM Time Calculation Rules"
 }
 ```
 
-```json
-// Response
-{
-  "text": "/******************************************************************************\n * Formula Name : ORA_WFM_TCR_WEEKLY_OVERTIME_1_5X_AP\n * Formula Type : WFM Time Calculation Rules\n * Description  : Calculates overtime at 1.5x rate for hours exceeding 40 per week.\n ...\n/* End Formula Text */",
-  "session_id": "8fcaf9bc-a176-4238-8fcc-cfa98d0c191f"
-}
-```
-
 ### Example: With Template Reference
 
 ```json
-// POST /chat/sync
 {
-  "message": "Generate a flow schedule formula that returns the next scheduled date",
-  "formula_type": "Custom",
+  "message": "Generate a flow schedule formula that returns the next scheduled date every 2 weeks",
+  "formula_type": "Flow Schedule",
   "template_code": "ORA_HCM_FF_FLOW_SCHEDULE_838595"
 }
 ```
@@ -83,7 +88,7 @@ Blocking endpoint. Sends request, waits for the LLM to complete, returns full fo
   "formula_type": "Element Skip"
 }
 
-// Turn 2 — pass back session_id from Turn 1
+// Turn 2 -- pass back session_id from Turn 1
 {
   "message": "Add a check for unpaid leave type as well",
   "formula_type": "Element Skip",
@@ -91,30 +96,112 @@ Blocking endpoint. Sends request, waits for the LLM to complete, returns full fo
 }
 ```
 
-### Example: Modify Existing Code
+### Example: Select LLM Model
 
 ```json
 {
-  "message": "Add PAY_INTERNAL_LOG_WRITE at entry and exit",
+  "message": "Generate an overtime formula",
   "formula_type": "Oracle Payroll",
-  "editor_code": "/* existing formula code here */\nDEFAULT FOR hours IS 0\nINPUTS ARE hours\nl_pay = hours * 25\nRETURN l_pay"
+  "llm": "GPT41MINI"
 }
 ```
 
 ---
 
-## 2. POST `/chat` (Streaming SSE)
+## 2. POST `/chat` (Async)
 
-Same request body as `/chat/sync`. Response is a stream of Server-Sent Events.
+Submits the job to Agent Studio and returns immediately with a `jobId`. The client polls `/chat/status/{jobId}` for the result.
+
+### Request Body
+
+Same fields as `/chat/sync`.
+
+### Response (HTTP 200)
+
+```json
+{
+  "jobId": "8c266ccc-983f-408d-9bda-0c3a81a23820",
+  "session_id": "8fcaf9bc-a176-4238-8fcc-cfa98d0c191f",
+  "status": "SUBMITTED"
+}
+```
+
+---
+
+## 3. GET `/chat/status/{jobId}` (Poll)
+
+Poll the status of an async job submitted via `POST /chat`.
+
+### Response
+
+**Running:**
+
+```json
+{
+  "status": "RUNNING",
+  "jobId": "8c266ccc-983f-408d-9bda-0c3a81a23820"
+}
+```
+
+**Complete:**
+
+```json
+{
+  "status": "COMPLETE",
+  "jobId": "8c266ccc-983f-408d-9bda-0c3a81a23820",
+  "text": "/******************************************************************************\n * Formula Name : ...\n/* End Formula Text */",
+  "conversationId": "484B044033C78457E0639C71060AC075_..."
+}
+```
+
+**Error:**
+
+```json
+{
+  "status": "ERROR",
+  "jobId": "8c266ccc-983f-408d-9bda-0c3a81a23820",
+  "error": "user can not execute this workflow."
+}
+```
+
+### Polling Pattern
+
+```
+1. POST /chat -> {"jobId": "abc-123", "status": "SUBMITTED"}
+2. GET /chat/status/abc-123 -> {"status": "RUNNING"}
+   ... (poll every 2 seconds)
+3. GET /chat/status/abc-123 -> {"status": "COMPLETE", "text": "..."}
+```
+
+---
+
+## 4. POST `/chat/stream` (SSE Streaming)
+
+True token-by-token streaming via Agent Studio's `invokeStream` endpoint.
+
+### Request Body
+
+Same fields as `/chat/sync`.
 
 ### SSE Frame Sequence
 
 | Order | Frame | Description |
 |---|---|---|
 | 1 | `data: {"session_id":"<uuid>"}` | Session ID for multi-turn |
-| 2..N | `data: {"text":"<token>"}` | Streamed tokens — append to build response |
+| 2..N | `data: {"text":"<token>"}` | Incremental tokens -- append to build response |
 | Optional | `data: {"replace":"<full_code>"}` | Post-processed replacement (if DEFAULT types were fixed) |
 | Last | `data: [DONE]` | End of stream |
+
+---
+
+## LLM Model Selection
+
+| Value | Model | Notes |
+|---|---|---|
+| `GPT5MINI` | GPT-5 Mini (Oracle Premium) | **Default** |
+| `GPT41MINI` | GPT-4.1 Mini (Oracle Premium) | Alternative |
+
+The `llm` field is passed as the `LLM` workflow variable in Agent Studio. The workflow's Switch node routes to the corresponding LLM Node.
 
 ---
 
@@ -131,68 +218,153 @@ Common formula types for Time & Labor:
 | `WFM Time Device Rules` | `ORA_WFM_TDR_*` | As defined by device rule |
 | `Oracle Payroll` | varies | Depends on element classification |
 | `Element Skip` | varies | `skip_flag` ('Y'/'N') |
+| `Flow Schedule` | varies | `NEXT_SCHEDULED_DATE` |
 | `Custom` | user-defined | user-defined |
 
 Full list: 123 formula types available via `GET /formula-types`.
 
 ---
 
-## prompt_code Selection
+## Agent Studio Workflow
 
-| prompt_code | LLM Backend | Notes |
+### Workflow Code
+
+`HCM_FF_GENERATOR`
+
+### Workflow Variables
+
+| Variable | Scope | Description |
 |---|---|---|
-| `HCM_FF_GENERATION_LLM405B` | Llama 3.1 405B (OCI_META) | **Default** — highest quality, slower |
-| `HCM_FF_GENERATION_GPT5MINI` | GPT-5 Mini (OCI_ON_DEMAND) | Faster, lower cost |
+| `SystemPrompt` | Conversation | Full Fast Formula language specification (~730 lines, 18 sections) |
+| `FormulaType` | Conversation | Formula type name |
+| `ReferenceFormula` | Conversation | Template body or RAG-retrieved examples |
+| `AdditionalRules` | Conversation | Per-template prompt overlay |
+| `LLM` | Conversation | LLM model selector (GPT5MINI / GPT41MINI) |
+| `EditorCode` | User Question | Current editor code (per-turn, may change) |
 
----
+### First Turn vs Subsequent Turns
 
-## AI Agent Studio Configuration
+| Turn | Parameters Sent | conversationId |
+|---|---|---|
+| First | ALL variables (SystemPrompt, FormulaType, ReferenceFormula, AdditionalRules, EditorCode, LLM) | empty (new conversation) |
+| Subsequent | EditorCode only (Conversation-scoped variables retained by Agent Studio) | reused from first response |
 
-### Tool Definition
-
-```yaml
-name: generate_fast_formula
-description: Generate Oracle HCM Fast Formula source code from natural language requirements
-endpoint: POST /hcmRestApi/redwood/11.13.18.05/calculationEntries/chat/sync
-input_schema:
-  message: string (required) - what the formula should do
-  formula_type: string (optional) - e.g. "WFM Time Calculation Rules"
-  template_code: string (optional) - reference template from FF_FORMULA_TEMPLATES
-  prompt_code: string (optional) - LLM model selection
-output_schema:
-  text: string - the generated formula code
-  session_id: string - for follow-up refinements
-```
-
-### Agent Prompt Guidance
-
-When configuring the agent's system prompt, include:
+### Workflow Structure
 
 ```
-When the user asks to create or generate a Fast Formula:
-1. Identify the formula type from the user's request (default: "WFM Time Calculation Rules" for Time & Labor)
-2. Call generate_fast_formula with the user's requirement as "message" and the identified "formula_type"
-3. Return the generated formula code from the "text" field
-4. If the user wants to refine the formula, pass the "session_id" from the previous response
+Start
+  |
+  v
+Choose LLM (Switch on $variables.LLM)
+  |
+  +-- GPT5MINI --> LLM Node (GPT-5 Mini, Oracle Premium)
+  |
+  +-- GPT41MINI --> LLM Node (GPT-4.1 Mini, Oracle Premium)
+  |
+  v
+End
 ```
 
----
+### LLM Node Prompt Template
 
-## Authentication
+The LLM Node prompt references workflow variables via `{{$context.$variables.*}}` and system context via `{{$context.$system.*}}`:
 
-Standard Fusion REST authentication — the AI Agent Studio handles this automatically when the agent is deployed within the Fusion environment. No additional auth configuration needed.
+```
+<role>
+You are an Oracle HCM Fast Formula code generator...
+</role>
+<rules>
+{{$context.$variables.SystemPrompt}}
+</rules>
+<formula_type>{{$context.$variables.FormulaType}}</formula_type>
+<reference_formula>{{$context.$variables.ReferenceFormula}}</reference_formula>
+<current_editor_code>{{$context.$variables.EditorCode}}</current_editor_code>
+<additional_rules>{{$context.$variables.AdditionalRules}}</additional_rules>
+<chat_history>{{$context.$system.$chatHistory}}</chat_history>
+<user_request>{{$context.$system.$inputMessage}}</user_request>
+
+Task: Generate a complete Oracle Fast Formula based on <rules> and <formula_type>...
+```
+
+### LLM Node Properties
+
+| Parameter | Value |
+|---|---|
+| Temperature | 0.1 |
+| Max Tokens | 10240 |
+| Top P | 0.9 |
+| Top K | 0 |
+| Verbosity | LOW |
+| Reasoning Effort | HIGH |
 
 ---
 
 ## Error Handling
 
-| Scenario | Response |
+| HTTP Status | Scenario |
 |---|---|
-| LLM provider unavailable | `{"text": "Error: <provider> is not available.", "session_id": "..."}` |
-| Spectra routing disabled | `{"text": "Error: ORA_FAI_SDK_ENABLE_SPECTRA_ROUTE is not enabled...", "session_id": "..."}` |
-| Empty response from LLM | `{"text": "Error: Fusion AI Spectra returned empty response...", "session_id": "..."}` |
+| **200** | Success -- `text` field contains formula code |
+| **400** | Provider doesn't support async (e.g. OpenAI provider for `/chat` async endpoint) |
+| **500** | Agent Studio error -- `error` field contains details (e.g. permission denied, timeout, empty response) |
 
-Errors are returned inline in the `text` field (HTTP 200) — the agent should check if `text` starts with `"Error:"` and handle accordingly.
+Error responses always include an `error` field with the error message.
+
+---
+
+## Authentication
+
+Standard Fusion REST authentication. The AI Agent Studio SDK (`FAIOrchestratorAgentClientV2`) handles OAuth token acquisition and host resolution via TopologyManager internally.
+
+---
+
+## Architecture
+
+```
+Client (UI / AI Agent Studio / REST)
+  |
+  v
+POST /chat/sync (or /chat, /chat/stream)
+  |
+  v
+FastFormulaResource (Jersey)
+  +-- TemplateService.findByTemplateCode()  --> FF_FORMULA_TEMPLATES (DB)
+  +-- ChatSessionStore (in-memory history)
+  |
+  v
+AiService.chatOnce() / submitAsync() / streamChat()
+  +-- getSystemPrompt()                     --> FF_FORMULA_TEMPLATES (SYSTEMPROMPT_FLAG=Y)
+  +-- extractReferenceFormula()             --> RagService or template body
+  +-- buildPromptContext()                  --> PromptContext (message, systemPrompt,
+  |                                             formulaType, referenceFormula, editorCode,
+  |                                             additionalRules, chatHistory, llm)
+  |
+  v
+AgentStudioProvider (default)
+  +-- FAIOrchestratorAgentClientV2 (SDK, reflection)
+  +-- invokeAgentAsyncAsUser() -> POST /agent/v2/HCM_FF_GENERATOR/invokeAsync
+  +-- getAgentRequestStatusAsUser() -> GET /agent/v2/HCM_FF_GENERATOR/status/{jobId}
+  +-- parameters: {SystemPrompt, FormulaType, ReferenceFormula,
+  |                AdditionalRules, EditorCode, LLM}
+  |
+  v
+Agent Studio Workflow (HCM_FF_GENERATOR)
+  +-- Switch on LLM variable
+  +-- GPT5MINI node or GPT41MINI node
+  |
+  v
+LLM (GPT-5 Mini / GPT-4.1 Mini)
+  |
+  v
+Response: generated Fast Formula source code
+```
+
+### Provider Selection (LLM_PROVIDER env var)
+
+| Value | Provider | Use Case |
+|---|---|---|
+| unset (default) | **AgentStudioProvider** | Fusion -- Agent Studio workflow |
+| `spectra` | FusionAiProvider | Fusion -- direct Spectra completions |
+| `openai` | OpenAiProvider | Local dev -- GPT-5.4 |
 
 ---
 
@@ -200,49 +372,13 @@ Errors are returned inline in the `text` field (HTTP 200) — the agent should c
 
 | Component | Requirement |
 |---|---|
-| Profile Option | `ORA_FAI_SDK_ENABLE_SPECTRA_ROUTE = Y` |
-| Spectra Prompt | `HCM_FF_GENERATION_LLM405B` and/or `HCM_FF_GENERATION_GPT5MINI` registered in `hr_gen_ai_prompts_seed_b` |
+| FAI SDK | `AdfHcmFaiGenAiSdk.jar` on classpath (for `FAIOrchestratorAgentClientV2`) |
+| Agent Studio Workflow | `HCM_FF_GENERATOR` workflow published in Agent Studio |
 | System Prompt | At least one active row in `FF_FORMULA_TEMPLATES` with `SYSTEMPROMPT_FLAG='Y'` and `ACTIVE_FLAG='Y'` |
-| FAI SDK | `AdfHcmFaiGenAiSdk.jar` on classpath |
-
----
-
-## Architecture
-
-```
-AI Agent Studio
-  |
-  v
-POST /chat/sync (JSON)
-  |
-  v
-FastFormulaResource (Jersey)
-  |
-  +-- TemplateService.findByTemplateCode()  --> FF_FORMULA_TEMPLATES (DB)
-  +-- ChatSessionStore (in-memory history)
-  |
-  v
-AiService.chatOnce()
-  +-- getSystemPrompt()                     --> FF_FORMULA_TEMPLATES (SYSTEMPROMPT_FLAG=Y)
-  +-- extractReferenceFormula()             --> RagService (vector search) or template body
-  +-- buildPromptContext()                  --> PromptContext (7 named fields + promptCode)
-  |
-  v
-FusionAiProvider.completeWithContext()
-  +-- FAICompletionsClient (Spectra SDK, reflection)
-  +-- promptCode: HCM_FF_GENERATION_LLM405B or HCM_FF_GENERATION_GPT5MINI
-  +-- properties: {systemPrompt, userPrompt, formulaType, referenceFormula,
-  |                editorCode, additionalRules, chatHistory}
-  |
-  v
-FAI Spectra Orchestrator --> LLM (Llama 405B / GPT-5 Mini)
-  |
-  v
-Response: generated Fast Formula source code
-```
+| Agent Studio Security | Calling user must have permission to execute the workflow |
 
 ---
 
 ## Contact
 
-Fast Formula AI Generator team — HCM Payroll, Formulas Core
+Fast Formula AI Generator team -- HCM Payroll, Formulas Core

@@ -52,12 +52,6 @@ public class OpenAiProvider implements LlmProvider {
     @Override
     public void streamChat(List<Map<String, String>> messages, int maxTokens,
                            Consumer<String> tokenCallback) {
-        String sysPrompt = messages.stream()
-                .filter(m -> "system".equals(m.get("role")))
-                .map(m -> m.get("content"))
-                .findFirst().orElse("");
-        LlmDebugLog.getInstance().record(CHAT_MODEL, maxTokens, sysPrompt, messages, "stream", "");
-
         try {
             if (AppsLogger.isEnabled(AppsLogger.INFO)) {
                 AppsLogger.write(this,
@@ -171,13 +165,6 @@ public class OpenAiProvider implements LlmProvider {
      */
     private String callChatCompletion(List<Map<String, String>> messages, int maxTokens,
                                       String model, String endpointLabel) {
-        String sysPrompt = messages.stream()
-                .filter(m -> "system".equals(m.get("role")))
-                .map(m -> m.get("content"))
-                .findFirst().orElse("");
-        LlmDebugLog.getInstance().record(model, maxTokens, sysPrompt, messages,
-                endpointLabel, "");
-
         try {
             if (AppsLogger.isEnabled(AppsLogger.INFO)) {
                 AppsLogger.write(this,

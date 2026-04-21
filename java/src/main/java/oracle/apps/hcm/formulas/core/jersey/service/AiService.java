@@ -209,6 +209,14 @@ public class AiService {
     }
 
     /**
+     * Returns the Agent Studio conversationId from the last completed request.
+     * Returns null for non-Agent Studio providers.
+     */
+    public String getLastConversationId() {
+        return provider.getLastConversationId();
+    }
+
+    /**
      * Single source of truth for "are we running in a Fusion central
      * environment?". Reads {@code LLM_PROVIDER} env var:
      *
@@ -224,6 +232,16 @@ public class AiService {
     public static boolean isFusionProviderActive() {
         String providerName = System.getenv("LLM_PROVIDER");
         return !"openai".equalsIgnoreCase(providerName);
+    }
+
+    /**
+     * Returns true if the default provider is AgentStudioProvider
+     * (LLM_PROVIDER is unset or anything other than "openai"/"spectra").
+     */
+    public static boolean isAgentStudioActive() {
+        String providerName = System.getenv("LLM_PROVIDER");
+        return !"openai".equalsIgnoreCase(providerName)
+                && !"spectra".equalsIgnoreCase(providerName);
     }
 
     // ── Chat ────────────────────────────────────────────────────────────────
@@ -310,7 +328,13 @@ public class AiService {
                     "chatOnce returned " + (response == null ? 0 : response.length()) + " chars",
                     AppsLogger.FINER);
         }
-        return response == null ? "" : response;
+        String result = response == null ? "" : response;
+
+        // Record to DB log — covers all providers (OpenAI, Spectra, AgentStudio)
+        LlmDebugDBLog.getInstance().record(
+                provider.name(), MAX_TOKENS_CHAT, "chatOnce", context, result);
+
+        return result;
     }
 
     // ── Structured prompt context ───────────────────────────────────────────
@@ -422,6 +446,8 @@ public class AiService {
             String role = turn.get("role");
             String content = turn.get("content");
             if (content == null || content.isBlank()) continue;
+            // Special: Agent Studio conversationId passed through as-is
+            if ("conversationId".equals(role)) return content;
             String label = "assistant".equalsIgnoreCase(role) ? "Assistant" : "User";
             if (sb.length() > 0) sb.append("\n\n");
             sb.append(label).append(": ").append(content);

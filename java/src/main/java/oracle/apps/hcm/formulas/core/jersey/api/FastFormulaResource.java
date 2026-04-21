@@ -353,24 +353,70 @@ public class FastFormulaResource {
             customSampleCode = "";
         }
 
-        sessionId = sessionStore.getOrCreateSession(sessionId);
-        List<Map<String, String>> history = new ArrayList<>(sessionStore.getHistory(sessionId));
+        // For Agent Studio: the incoming session_id IS the conversationId
+        // from a previous turn. Pass it as chatHistory so the provider can
+        // detect subsequent turns and reuse the conversation.
+        // For non-Agent Studio: use ChatSessionStore as before.
+        boolean isAgentStudio = AiService.isAgentStudioActive();
+        String conversationId = sessionId;  // may be null on first turn
+        List<Map<String, String>> history;
+
+        if (isAgentStudio) {
+            // Agent Studio manages its own chat history via conversationId.
+            // Pass conversationId as a single-entry "history" so that
+            // formatChatHistory() produces it as the chatHistory text.
+            // AgentStudioProvider detects this (no newlines, not "User:" prefix)
+            // and uses it as the conversationId directly.
+            if (conversationId != null && !conversationId.isBlank()) {
+                history = List.of(Map.of("role", "conversationId", "content", conversationId));
+            } else {
+                history = List.of();
+            }
+        } else {
+            sessionId = sessionStore.getOrCreateSession(sessionId);
+            history = new ArrayList<>(sessionStore.getHistory(sessionId));
+        }
 
         String rawResponse = aiService.chatOnce(
                 message, editorCode, formulaType, history, customSampleCode,
-                resolveEffectiveRule(sessionId, templateRule), llm);
+                isAgentStudio ? templateRule : resolveEffectiveRule(sessionId, templateRule), llm);
+
+        // Check if the provider returned an error
+        if (rawResponse != null && rawResponse.startsWith("Error:")) {
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "chatSync: provider returned error: " + rawResponse,
+                        AppsLogger.WARNING);
+            }
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of(
+                            "error", rawResponse,
+                            "session_id", sessionId != null ? sessionId : ""
+                    )).build();
+        }
 
         // Mirror streaming's post-process: fix DEFAULT value types.
         String finalResponse = AiService.fixDefaultTypes(rawResponse);
 
-        // Persist the turn so subsequent calls with the same session_id
-        // see this exchange in their history.
-        sessionStore.addTurn(sessionId, "user", message);
-        sessionStore.addTurn(sessionId, "assistant", finalResponse);
+        // Determine the session_id to return to the client.
+        String returnSessionId;
+        if (isAgentStudio) {
+            // Use Agent Studio's conversationId as session_id
+            String convId = aiService.getLastConversationId();
+            returnSessionId = (convId != null && !convId.isBlank()) ? convId : sessionId;
+        } else {
+            // Persist the turn in local ChatSessionStore
+            sessionStore.addTurn(sessionId, "user", message);
+            sessionStore.addTurn(sessionId, "assistant", finalResponse);
+            returnSessionId = sessionId;
+        }
+
+        // Record session_id to DB debug log
+        LlmDebugDBLog.getInstance().recordSessionId(returnSessionId);
 
         return Response.ok(Map.of(
                 "text", finalResponse,
-                "session_id", sessionId
+                "session_id", returnSessionId != null ? returnSessionId : ""
         )).build();
     }
 
@@ -434,7 +480,7 @@ public class FastFormulaResource {
         return Response.ok(dbiService.getModules()).build();
     }
 
-    // ── Debug (GET, DELETE) ────────────────────────────────────────────────
+    // ── Debug (GET) — persistent logs in PAY_ACTION_LOGS/LINES ─────────────
 
     @GET
     @Path("/debug/llm-logs")
@@ -443,7 +489,7 @@ public class FastFormulaResource {
         if (AppsLogger.isEnabled(AppsLogger.FINER)) {
             AppsLogger.write(this, "GET /debug/llm-logs", AppsLogger.FINER);
         }
-        return Response.ok(LlmDebugLog.getInstance().getAll()).build();
+        return Response.ok(LlmDebugDBLog.getInstance().getAll()).build();
     }
 
     @GET
@@ -453,18 +499,17 @@ public class FastFormulaResource {
         if (AppsLogger.isEnabled(AppsLogger.FINER)) {
             AppsLogger.write(this, "GET /debug/llm-logs/latest", AppsLogger.FINER);
         }
-        return Response.ok(LlmDebugLog.getInstance().getLatest()).build();
+        return Response.ok(LlmDebugDBLog.getInstance().getLatest()).build();
     }
 
-    @DELETE
-    @Path("/debug/llm-logs")
+    @GET
+    @Path("/debug/llm-logs/{id}")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response clearDebugLogs() {
-        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
-            AppsLogger.write(this, "DELETE /debug/llm-logs (clear)", AppsLogger.INFO);
+    public Response getDebugLogDetail(@PathParam("id") long id) {
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this, "GET /debug/llm-logs/" + id, AppsLogger.FINER);
         }
-        LlmDebugLog.getInstance().clear();
-        return Response.ok(Map.of("status", "cleared")).build();
+        return Response.ok(LlmDebugDBLog.getInstance().getLogDetail(id)).build();
     }
 
     // ── Explain (POST streaming) ──────────────────────────────────────────

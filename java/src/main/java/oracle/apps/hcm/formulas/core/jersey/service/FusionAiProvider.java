@@ -101,9 +101,6 @@ public class FusionAiProvider implements LlmProvider {
                             + " historyLen=" + context.chatHistoryOrEmpty().length(),
                     AppsLogger.INFO);
         }
-        LlmDebugLog.getInstance().record(
-                "fusion-ai-apps", maxTokens, "fusion-spectra", context);
-
         if (!isSpectraRoutingEnabled()) {
             if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
                 AppsLogger.write(this,

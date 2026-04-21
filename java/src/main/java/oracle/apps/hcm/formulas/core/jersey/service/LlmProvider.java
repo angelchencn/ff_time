@@ -58,6 +58,12 @@ public interface LlmProvider {
      */
     String name();
 
+    /**
+     * Returns the conversationId from the last completed request.
+     * Only meaningful for AgentStudioProvider — other providers return null.
+     */
+    default String getLastConversationId() { return null; }
+
     // ───────────────────────────────────────────────────────────────────────
     // Async job submission — providers that support async (AgentStudioProvider)
     // override these; others throw UnsupportedOperationException.

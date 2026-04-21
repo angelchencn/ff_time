@@ -63,6 +63,18 @@ public class AgentStudioProvider implements LlmProvider {
     private static final ConcurrentHashMap<String, String> conversationIds =
             new ConcurrentHashMap<>();
 
+    /**
+     * Stores the conversationId from the most recent completed request
+     * on the current thread, so the caller can retrieve it via
+     * {@link #getLastConversationId()} after {@code completeWithContext} returns.
+     */
+    private static final ThreadLocal<String> lastConversationId = new ThreadLocal<>();
+
+    @Override
+    public String getLastConversationId() {
+        return lastConversationId.get();
+    }
+
     @Override
     public boolean isAvailable() {
         return true;
@@ -109,8 +121,9 @@ public class AgentStudioProvider implements LlmProvider {
             String response = invokeAsync(workflowCode, agentRequest);
             return response;
         } catch (Throwable t) {
-            AppsLogger.write(this, t, AppsLogger.SEVERE);
-            return "{\"error\":\"" + t.getMessage().replace("\"", "'") + "\"}";
+            Throwable cause = unwrap(t);
+            AppsLogger.write(this, cause, AppsLogger.SEVERE);
+            return "{\"error\":\"" + errorMessage(t).replace("\"", "'") + "\"}";
         }
     }
 
@@ -134,8 +147,9 @@ public class AgentStudioProvider implements LlmProvider {
 
             return response;
         } catch (Throwable t) {
-            AppsLogger.write(this, t, AppsLogger.SEVERE);
-            return "{\"status\":\"ERROR\",\"error\":\"" + t.getMessage().replace("\"", "'") + "\"}";
+            Throwable cause = unwrap(t);
+            AppsLogger.write(this, cause, AppsLogger.SEVERE);
+            return "{\"status\":\"ERROR\",\"error\":\"" + errorMessage(t).replace("\"", "'") + "\"}";
         }
     }
 
@@ -158,20 +172,26 @@ public class AgentStudioProvider implements LlmProvider {
                             + " historyLen=" + context.chatHistoryOrEmpty().length(),
                     AppsLogger.INFO);
         }
-        LlmDebugLog.getInstance().record(
-                "agent-studio", maxTokens, workflowCode, context);
-
-        // Derive a session key from chatHistory to detect first vs subsequent turn.
-        // ChatSessionStore formats history as "User: ...\n\nAssistant: ..." — if
-        // non-empty, this is a follow-up turn and we should reuse the Agent Studio
-        // conversationId.
+        // Detect first vs subsequent turn.
+        // In Agent Studio mode, the chatHistory field may carry a previous
+        // conversationId (passed through from the frontend's session_id).
+        // If empty, this is the first turn — Agent Studio creates a new conversation.
         String chatHistory = context.chatHistoryOrEmpty();
         boolean isFirstTurn = chatHistory.isBlank();
 
-        // Look up existing Agent Studio conversationId for this session.
-        // Key: hash of formulaType + systemPrompt prefix (stable across turns).
+        // Look up existing Agent Studio conversationId.
+        // Priority: chatHistory (if it looks like a conversationId, not formatted history),
+        // then the conversationIds map, then empty (new conversation).
         String sessionKey = deriveSessionKey(context);
-        String conversationId = isFirstTurn ? "" : conversationIds.getOrDefault(sessionKey, "");
+        String conversationId;
+        if (!isFirstTurn && !chatHistory.contains("\n") && !chatHistory.startsWith("User:")) {
+            // chatHistory looks like a raw conversationId, not formatted history
+            conversationId = chatHistory;
+        } else if (!isFirstTurn) {
+            conversationId = conversationIds.getOrDefault(sessionKey, "");
+        } else {
+            conversationId = "";
+        }
 
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
             AppsLogger.write(this,
@@ -217,11 +237,13 @@ public class AgentStudioProvider implements LlmProvider {
             }
 
             // 3. Poll for completion
-            return pollForCompletion(workflowCode, jobId, sessionKey);
+            String result = pollForCompletion(workflowCode, jobId, sessionKey);
+            return result;
 
         } catch (Throwable t) {
-            AppsLogger.write(this, t, AppsLogger.SEVERE);
-            return "Error: Agent Studio call failed: " + t.getMessage();
+            Throwable cause = unwrap(t);
+            AppsLogger.write(this, cause, AppsLogger.SEVERE);
+            return "Error: Agent Studio call failed: " + errorMessage(t);
         }
     }
 
@@ -257,8 +279,9 @@ public class AgentStudioProvider implements LlmProvider {
             parseStreamResponse(streamResponse, sessionKey, tokenCallback);
 
         } catch (Throwable t) {
-            AppsLogger.write(this, t, AppsLogger.SEVERE);
-            tokenCallback.accept("Error: Agent Studio stream failed: " + t.getMessage());
+            Throwable cause = unwrap(t);
+            AppsLogger.write(this, cause, AppsLogger.SEVERE);
+            tokenCallback.accept("Error: Agent Studio stream failed: " + errorMessage(t));
         }
     }
 
@@ -586,6 +609,7 @@ public class AgentStudioProvider implements LlmProvider {
         String convId = responseNode.path("conversationId").asText(null);
         if (convId != null && !convId.isBlank()) {
             conversationIds.put(sessionKey, convId);
+            lastConversationId.set(convId);
             if (AppsLogger.isEnabled(AppsLogger.INFO)) {
                 AppsLogger.write(this,
                         "[AgentStudio] Stored conversationId=" + convId
@@ -642,5 +666,23 @@ public class AgentStudioProvider implements LlmProvider {
             }
         }
         return PromptContext.of(sys, user, "");
+    }
+
+    /**
+     * Unwrap {@link java.lang.reflect.InvocationTargetException} to get the
+     * real cause. Reflection wraps the actual exception — {@code getMessage()}
+     * on the wrapper is null but the cause has the real error message.
+     */
+    private static Throwable unwrap(Throwable t) {
+        if (t instanceof java.lang.reflect.InvocationTargetException && t.getCause() != null) {
+            return t.getCause();
+        }
+        return t;
+    }
+
+    private static String errorMessage(Throwable t) {
+        Throwable cause = unwrap(t);
+        String msg = cause.getMessage();
+        return msg != null ? msg : cause.toString();
     }
 }

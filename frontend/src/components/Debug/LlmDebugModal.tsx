@@ -1,65 +1,37 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal, Button, Tabs, Select, Space, message } from 'antd';
-import { ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
+import { ReloadOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useServerStore } from '../../stores/serverStore';
 
-interface TokenPart {
-  part: string;
-  chars: number;
-  est_tokens: number;
-}
-
-interface PromptContextFields {
-  system_prompt: string;
-  system_prompt_length: number;
-  user_prompt: string;
-  user_prompt_length: number;
-  formula_type: string;
-  formula_type_length: number;
-  reference_formula: string;
-  reference_formula_length: number;
-  editor_code: string;
-  editor_code_length: number;
-  additional_rules: string;
-  additional_rules_length: number;
-  chat_history: string;
-  chat_history_length: number;
-}
-
-interface LlmLogEntry {
+/** Summary row from GET /debug/llm-logs */
+interface LogSummary {
+  log_id: number;
+  name: string;
+  status: string;
+  source_type: string;
+  creator_type: string;
   timestamp: string;
-  endpoint: string;
-  model: string;
-  max_completion_tokens: number;
-  mode?: 'flat' | 'structured';
-  system_prompt: string;
-  system_prompt_length: number;
-  messages: Array<{ role: string; content: string }>;
-  estimated_input_tokens: number;
-  total_chars: number;
-  token_breakdown: TokenPart[];
-  user_message: string;
-  // Structured mode only (FusionAiProvider → Spectra path). Each field maps
-  // to one {placeholder} in the server-side prompt template.
-  prompt_context?: PromptContextFields;
+  summary: string;
+  message: string;
 }
 
-// Order matches the Spectra template's XML tag order so the UI walks the
-// reader top-to-bottom through the actual prompt structure.
-const STRUCTURED_FIELDS: Array<{
-  key: keyof PromptContextFields;
-  lengthKey: keyof PromptContextFields;
-  label: string;
-}> = [
-  { key: 'system_prompt',     lengthKey: 'system_prompt_length',     label: 'System Prompt' },
-  { key: 'user_prompt',       lengthKey: 'user_prompt_length',       label: 'User Prompt' },
-  { key: 'formula_type',      lengthKey: 'formula_type_length',      label: 'Formula Type' },
-  { key: 'reference_formula', lengthKey: 'reference_formula_length', label: 'Reference Formula' },
-  { key: 'editor_code',       lengthKey: 'editor_code_length',       label: 'Editor Code' },
-  { key: 'additional_rules',  lengthKey: 'additional_rules_length',  label: 'Additional Rules' },
-  { key: 'chat_history',      lengthKey: 'chat_history_length',      label: 'Chat History' },
-];
+/** Detail from GET /debug/llm-logs/{id} */
+interface LogDetail {
+  log_id: number;
+  summary: string;
+  message: string;
+  system_prompt: string;
+  system_prompt_length: number;
+  formula_type: string;
+  reference_formula: string;
+  additional_rules: string;
+  editor_code: string;
+  chat_history: string;
+  token_breakdown: string;
+  response?: string;
+  session_id?: string;
+}
 
 interface Props {
   open: boolean;
@@ -68,8 +40,9 @@ interface Props {
 
 export function LlmDebugModal({ open, onClose }: Props) {
   const { current } = useServerStore();
-  const [logs, setLogs] = useState<LlmLogEntry[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [logs, setLogs] = useState<LogSummary[]>([]);
+  const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
+  const [detail, setDetail] = useState<LogDetail | null>(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const dragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
@@ -77,6 +50,10 @@ export function LlmDebugModal({ open, onClose }: Props) {
   useEffect(() => {
     if (open) loadLogs();
   }, [open]);
+
+  useEffect(() => {
+    if (selectedLogId != null) loadDetail(selectedLogId);
+  }, [selectedLogId]);
 
   function getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {};
@@ -88,27 +65,31 @@ export function LlmDebugModal({ open, onClose }: Props) {
 
   async function loadLogs() {
     try {
-      const resp = await axios.get<LlmLogEntry[]>(
+      const resp = await axios.get<LogSummary[]>(
         `${current.baseUrl}${current.apiPrefix}/debug/llm-logs`,
         { headers: getHeaders() }
       );
       setLogs(resp.data);
-      setSelectedIndex(0);
+      if (resp.data.length > 0) {
+        setSelectedLogId(resp.data[0].log_id);
+      } else {
+        setSelectedLogId(null);
+        setDetail(null);
+      }
     } catch {
-      message.error('Failed to load debug logs');
+      message.error('Failed to load debug logs from DB');
     }
   }
 
-  async function clearLogs() {
+  async function loadDetail(logId: number) {
     try {
-      await axios.delete(
-        `${current.baseUrl}${current.apiPrefix}/debug/llm-logs`,
+      const resp = await axios.get<LogDetail>(
+        `${current.baseUrl}${current.apiPrefix}/debug/llm-logs/${logId}`,
         { headers: getHeaders() }
       );
-      setLogs([]);
-      message.success('Logs cleared');
+      setDetail(resp.data);
     } catch {
-      message.error('Failed to clear logs');
+      message.error('Failed to load log detail');
     }
   }
 
@@ -131,8 +112,6 @@ export function LlmDebugModal({ open, onClose }: Props) {
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
   };
-
-  const entry = logs[selectedIndex];
 
   return (
     <Modal
@@ -157,7 +136,6 @@ export function LlmDebugModal({ open, onClose }: Props) {
       <div style={{ padding: '8px 16px', borderBottom: '1px solid #d6cdc2', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Space>
           <Button size="small" icon={<ReloadOutlined />} onClick={loadLogs}>Refresh</Button>
-          <Button size="small" icon={<DeleteOutlined />} danger onClick={clearLogs}>Clear</Button>
           <span style={{ fontSize: 12, color: '#5c4a3e' }}>{logs.length} request(s)</span>
         </Space>
       </div>
@@ -166,64 +144,61 @@ export function LlmDebugModal({ open, onClose }: Props) {
       {logs.length > 0 && (
         <div style={{ padding: '6px 16px', borderBottom: '1px solid #d6cdc2' }}>
           <Select
-            value={selectedIndex}
-            onChange={(val: number) => setSelectedIndex(val)}
+            value={selectedLogId}
+            onChange={(val: number) => setSelectedLogId(val)}
             style={{ width: '100%' }}
             size="small"
-            options={logs.map((log, i) => {
+            options={logs.map((log) => {
               const ts = new Date(log.timestamp);
               const date = ts.toLocaleDateString('en-CA');
               const time = ts.toLocaleTimeString('en-GB');
-              // Extract the user's actual request text, not the full formatted prompt
-              const lastUser = [...log.messages].reverse().find((m) => m.role === 'user');
-              let preview = log.user_message || log.endpoint;
-              if (lastUser) {
-                const reqMatch = lastUser.content.match(/(?:Requirement|Request):\s*(.+)/);
-                preview = reqMatch ? reqMatch[1].trim() : lastUser.content.replace(/\s+/g, ' ');
-              }
-              preview = preview.substring(0, 100);
+              const preview = (log.message || '').substring(0, 80);
               return {
-                value: i,
-                label: `${date} ${time} — ${preview}${preview.length >= 100 ? '…' : ''}`,
+                value: log.log_id,
+                label: `${date} ${time} — [${log.status === 'S' ? 'OK' : 'ERR'}] ${log.source_type || ''} — ${preview}${preview.length >= 80 ? '...' : ''}`,
               };
             })}
           />
         </div>
       )}
 
-      {entry ? (
+      {detail ? (
         <div style={{ padding: 16 }}>
           {/* Summary */}
           <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <InfoTag label="Time" value={new Date(entry.timestamp).toLocaleTimeString()} />
-            <InfoTag label="Model" value={entry.model} />
-            <InfoTag label="Endpoint" value={entry.endpoint} />
-            <InfoTag label="Max Output Tokens" value={String(entry.max_completion_tokens)} />
-            <ModeBadge mode={entry.mode} />
+            <InfoTag label="Log ID" value={String(detail.log_id)} />
+            <InfoTag label="Formula Type" value={detail.formula_type || ''} />
+            <InfoTag label="Message" value={(detail.message || '').substring(0, 80)} />
+            <StatusBadge status={logs.find(l => l.log_id === selectedLogId)?.status} />
+            {detail.session_id && (
+              <InfoTag label="Session ID" value={detail.session_id} />
+            )}
           </div>
 
           {/* Token Breakdown */}
-          <div style={{
-            marginBottom: 16, padding: '8px 12px', backgroundColor: '#faf8f5',
-            border: '1px solid #d6cdc2', borderRadius: 6, fontSize: 12,
-            fontFamily: "'JetBrains Mono', monospace",
-          }}>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>Input Token Breakdown:</div>
-            {(entry.token_breakdown || []).map((t, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                <span>{t.part}</span>
-                <span>{t.chars.toLocaleString()} chars → ~{t.est_tokens.toLocaleString()} tokens</span>
-              </div>
-            ))}
-            <div style={{ borderTop: '1px solid #d6cdc2', marginTop: 4, paddingTop: 4, fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
-              <span>Total</span>
-              <span>{(entry.total_chars || 0).toLocaleString()} chars → ~{entry.estimated_input_tokens.toLocaleString()} tokens</span>
+          {detail.token_breakdown && (
+            <div style={{
+              marginBottom: 16, padding: '8px 12px', backgroundColor: '#faf8f5',
+              border: '1px solid #d6cdc2', borderRadius: 6, fontSize: 12,
+              fontFamily: "'JetBrains Mono', monospace",
+            }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Input Token Breakdown:</div>
+              {detail.token_breakdown.split(',').map((part, i) => {
+                const [name, sizes] = part.split(':');
+                const [chars, tokens] = (sizes || '0/0').split('/');
+                return (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                    <span>{name}</span>
+                    <span>{Number(chars).toLocaleString()} chars &rarr; ~{Number(tokens).toLocaleString()} tokens</span>
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          )}
 
           <Tabs
             size="small"
-            items={buildTabs(entry)}
+            items={buildTabs(detail)}
           />
         </div>
       ) : (
@@ -244,9 +219,9 @@ function InfoTag({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ModeBadge({ mode }: { mode?: 'flat' | 'structured' }) {
-  if (!mode) return null;
-  const isStructured = mode === 'structured';
+function StatusBadge({ status }: { status?: string }) {
+  if (!status) return null;
+  const isSuccess = status === 'S';
   return (
     <span
       style={{
@@ -254,88 +229,76 @@ function ModeBadge({ mode }: { mode?: 'flat' | 'structured' }) {
         fontWeight: 600,
         padding: '2px 8px',
         borderRadius: 10,
-        backgroundColor: isStructured ? '#e8f3e4' : '#f3ece4',
-        color: isStructured ? '#2e5e23' : '#6b4a2e',
-        border: `1px solid ${isStructured ? '#8cb87b' : '#c9a87e'}`,
+        backgroundColor: isSuccess ? '#e8f3e4' : '#f9e4e4',
+        color: isSuccess ? '#2e5e23' : '#8b2020',
+        border: `1px solid ${isSuccess ? '#8cb87b' : '#d49090'}`,
       }}
-      title={
-        isStructured
-          ? 'Structured mode: each PromptContext field sent as its own Spectra property'
-          : 'Flat mode: system + user messages flattened for OpenAI / hybrid path'
-      }
     >
-      {isStructured ? 'STRUCTURED' : 'FLAT'}
+      {isSuccess ? 'SUCCESS' : 'ERROR'}
     </span>
   );
 }
 
+const DETAIL_FIELDS: Array<{ key: keyof LogDetail; breakdownKey: string; label: string }> = [
+  { key: 'system_prompt',     breakdownKey: 'system_prompt',     label: 'System Prompt' },
+  { key: 'message',           breakdownKey: 'message',           label: 'Message' },
+  { key: 'formula_type',      breakdownKey: 'formula_type',      label: 'Formula Type' },
+  { key: 'reference_formula', breakdownKey: 'reference_formula', label: 'Reference Formula' },
+  { key: 'additional_rules',  breakdownKey: 'additional_rules',  label: 'Additional Rules' },
+  { key: 'editor_code',       breakdownKey: 'editor_code',       label: 'Editor Code' },
+  { key: 'chat_history',      breakdownKey: 'chat_history',      label: 'Chat History' },
+  { key: 'response',          breakdownKey: '',                   label: 'Response' },
+];
+
 /**
- * Build the Tabs items for a log entry. In structured mode (FusionAiProvider
- * → Spectra), we emit one tab per non-empty PromptContext field so the user
- * can inspect exactly what went into each XML placeholder in the template.
- * In flat mode (OpenAI / hybrid), we fall back to the original
- * system-prompt + user-messages tabs.
+ * Parse the token_breakdown string to get real (untruncated) char counts.
+ * Format: "system_prompt:12537/3134,message:50/12,..."
  */
-function buildTabs(entry: LlmLogEntry) {
-  const isStructured = entry.mode === 'structured' && entry.prompt_context;
-
-  if (isStructured && entry.prompt_context) {
-    const pc = entry.prompt_context;
-    const fieldTabs = STRUCTURED_FIELDS
-      .filter((f) => (pc[f.lengthKey] as number) > 0)
-      .map((f) => ({
-        key: `pc-${f.key}`,
-        label: `${f.label} (${(pc[f.lengthKey] as number).toLocaleString()} chars)`,
-        children: <CodeBlock content={pc[f.key] as string} />,
-      }));
-
-    // If literally every field is empty (pathological case), still give
-    // the user something rather than a bare Tabs with only "Full JSON".
-    const hasAny = fieldTabs.length > 0;
-
-    return [
-      ...(hasAny
-        ? fieldTabs
-        : [
-            {
-              key: 'pc-empty',
-              label: 'Prompt Context (all empty)',
-              children: (
-                <div style={{ padding: 16, color: '#5c4a3e', fontSize: 12 }}>
-                  All PromptContext fields were empty or whitespace. Check the
-                  AiService.buildPromptContext implementation.
-                </div>
-              ),
-            },
-          ]),
-      {
-        key: 'full',
-        label: 'Full Request JSON',
-        children: <CodeBlock content={JSON.stringify(entry, null, 2)} />,
-      },
-    ];
+function parseBreakdownChars(breakdown: string | undefined): Record<string, number> {
+  const result: Record<string, number> = {};
+  if (!breakdown) return result;
+  for (const part of breakdown.split(',')) {
+    const colonIdx = part.indexOf(':');
+    if (colonIdx < 0) continue;
+    const name = part.substring(0, colonIdx).trim();
+    const sizes = part.substring(colonIdx + 1).trim();
+    if (name && sizes) {
+      const chars = parseInt(sizes.split('/')[0], 10);
+      if (!isNaN(chars)) result[name] = chars;
+    }
   }
+  return result;
+}
 
-  // Flat mode — legacy rendering preserved.
-  return [
-    {
-      key: 'system',
-      label: `System Prompt (${entry.system_prompt_length} chars)`,
-      children: <CodeBlock content={entry.system_prompt} />,
-    },
-    ...entry.messages
-      .filter((m) => m.role !== 'system')
-      .map((msg, i) => ({
-        key: `msg-${i}`,
-        label: `${msg.role === 'user' ? 'User Prompt' : 'Assistant'} (${msg.content.length} chars)`,
-        children: <CodeBlock content={msg.content} />,
-      })),
-    {
-      key: 'full',
-      label: 'Full Request JSON',
-      children: <CodeBlock content={JSON.stringify(entry, null, 2)} />,
-    },
-  ];
+function buildTabs(detail: LogDetail) {
+  const realChars = parseBreakdownChars(detail.token_breakdown);
+
+  const tabs = DETAIL_FIELDS
+    .filter((f) => {
+      const val = detail[f.key];
+      return val != null && typeof val === 'string' && val.length > 0;
+    })
+    .map((f) => {
+      const content = detail[f.key] as string;
+      // Use real (untruncated) char count from token_breakdown if available
+      const chars = f.breakdownKey && realChars[f.breakdownKey] != null
+        ? realChars[f.breakdownKey]
+        : content.length;
+      return {
+        key: f.key,
+        label: `${f.label} (${chars.toLocaleString()} chars)`,
+        children: <CodeBlock content={content} />,
+      };
+    });
+
+  // Full JSON tab
+  tabs.push({
+    key: 'full',
+    label: 'Full Request JSON',
+    children: <CodeBlock content={JSON.stringify(detail, null, 2)} />,
+  });
+
+  return tabs;
 }
 
 function CodeBlock({ content }: { content: string }) {
@@ -345,14 +308,15 @@ function CodeBlock({ content }: { content: string }) {
         backgroundColor: '#faf8f5',
         border: '1px solid #d6cdc2',
         borderRadius: 6,
-        padding: 12,
-        fontSize: 12,
+        padding: '12px 16px',
+        fontSize: 11,
         fontFamily: "'JetBrains Mono', monospace",
         whiteSpace: 'pre-wrap',
-        wordBreak: 'break-word',
-        maxHeight: 400,
+        wordBreak: 'break-all',
+        maxHeight: '55vh',
         overflow: 'auto',
         lineHeight: 1.5,
+        margin: 0,
       }}
     >
       {content}
