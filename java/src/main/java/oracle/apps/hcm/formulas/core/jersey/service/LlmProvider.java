@@ -59,6 +59,31 @@ public interface LlmProvider {
     String name();
 
     // ───────────────────────────────────────────────────────────────────────
+    // Async job submission — providers that support async (AgentStudioProvider)
+    // override these; others throw UnsupportedOperationException.
+    // ───────────────────────────────────────────────────────────────────────
+
+    /**
+     * Submit an async job and return immediately with a job ID.
+     * Only supported by AgentStudioProvider.
+     *
+     * @return JSON string containing at least {@code jobId} and {@code session_id}
+     */
+    default String submitAsync(PromptContext context) {
+        throw new UnsupportedOperationException(name() + " does not support async submission");
+    }
+
+    /**
+     * Poll the status of a previously submitted async job.
+     *
+     * @param jobId the job ID returned by {@link #submitAsync}
+     * @return JSON string with {@code status}, {@code output}, {@code conversationId}
+     */
+    default String getJobStatus(String jobId) {
+        throw new UnsupportedOperationException(name() + " does not support async status polling");
+    }
+
+    // ───────────────────────────────────────────────────────────────────────
     // Structured prompt context (Plan B) — lets providers with named-property
     // templates (FusionAiProvider → Spectra) receive each prompt section as
     // its own property instead of a flattened blob. Providers that don't

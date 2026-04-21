@@ -23,8 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-//@Path("/11.13.18.05/calculationEntries")
-@Path("/11.13.18.05/fastFormulaAssistants")
+@Path("/11.13.18.05/calculationEntries")
+//@Path("/11.13.18.05/fastFormulaAssistants")
 public class FastFormulaResource {
 
     /** Sentinel value for the built-in "Custom Formula" type in requests + dropdowns. */
@@ -44,25 +44,156 @@ public class FastFormulaResource {
     @POST
     @Path("/chat")
     @Consumes(MediaType.APPLICATION_JSON)
-    @Produces("text/event-stream")
+    @Produces(MediaType.APPLICATION_JSON)
     public Response chat(Map<String, Object> request) {
         String message = (String) request.get("message");
-        // `editor_code`: the content currently in the Monaco editor. Renamed
-        // from the former `code` field to avoid confusion with `template_code`.
         String editorCode = (String) request.getOrDefault("editor_code", "");
         String formulaType = (String) request.getOrDefault("formula_type", "TIME_LABOR");
         String sessionId = (String) request.get("session_id");
-
-        // LLM model selector (e.g. "GPT5MINI", "GPT41MINI").
-        // For AgentStudioProvider: passed as the "LLM" workflow parameter.
-        // For FusionAiProvider: used as prompt_code override.
-        // Falls back to prompt_code for backward compatibility.
         String llm = (String) request.get("llm");
         if (llm == null) llm = (String) request.get("prompt_code");
 
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
             AppsLogger.write(this,
-                    "POST /chat: formulaType=" + formulaType
+                    "POST /chat (async): formulaType=" + formulaType
+                            + " session=" + sessionId
+                            + " llm=" + llm,
+                    AppsLogger.INFO);
+        }
+
+        // Template lookup
+        String templateCodeKey = (String) request.get("template_code");
+        String templateBody = null;
+        String templateRule = null;
+        if (templateCodeKey != null && !templateCodeKey.isBlank()) {
+            try {
+                Map<String, Object> template = templateService.findByTemplateCode(templateCodeKey);
+                if (template != null) {
+                    templateBody = (String) template.get("code");
+                    templateRule = (String) template.get("rule");
+                }
+            } catch (SQLException e) {
+                AppsLogger.write(this, e, AppsLogger.SEVERE);
+            }
+        }
+
+        String customSampleCode = templateBody;
+        if (CUSTOM_TYPE.equalsIgnoreCase(formulaType)
+                && (customSampleCode == null || customSampleCode.isBlank())) {
+            customSampleCode = "";
+        }
+
+        sessionId = sessionStore.getOrCreateSession(sessionId);
+        List<Map<String, String>> history = new ArrayList<>(sessionStore.getHistory(sessionId));
+
+        try {
+            String asyncResponse = aiService.submitAsync(
+                    message, editorCode, formulaType, history, customSampleCode,
+                    resolveEffectiveRule(sessionId, templateRule), llm);
+
+            // Parse jobId from the provider response
+            String jobId = "";
+            try {
+                var node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(asyncResponse);
+                jobId = node.path("jobId").asText("");
+            } catch (Exception e) {
+                // response might not be JSON
+            }
+
+            return Response.ok(Map.of(
+                    "jobId", jobId,
+                    "session_id", sessionId,
+                    "status", "SUBMITTED"
+            )).build();
+        } catch (UnsupportedOperationException uoe) {
+            // Provider doesn't support async — return error
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "Async not supported by provider: " + uoe.getMessage()))
+                    .build();
+        } catch (Exception e) {
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of("error", "Async submission failed: " + e.getMessage()))
+                    .build();
+        }
+    }
+
+    // ── Chat Status (GET, poll async job) ─────────────────────────────────
+
+    @GET
+    @Path("/chat/status/{jobId}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response chatStatus(@PathParam("jobId") String jobId) {
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this,
+                    "GET /chat/status/" + jobId, AppsLogger.FINER);
+        }
+
+        try {
+            String statusResponse = aiService.getJobStatus(jobId);
+            if (statusResponse == null || statusResponse.isBlank()) {
+                return Response.ok(Map.of("status", "UNKNOWN", "jobId", jobId)).build();
+            }
+
+            // Parse and forward the Agent Studio response
+            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            var node = mapper.readTree(statusResponse);
+            String status = node.path("status").asText("UNKNOWN");
+            String output = node.path("output").asText("");
+            String conversationId = node.path("conversationId").asText("");
+
+            var result = new java.util.LinkedHashMap<String, Object>();
+            result.put("status", status);
+            result.put("jobId", jobId);
+            if ("COMPLETE".equals(status) && !output.isEmpty()) {
+                // Post-process: fix DEFAULT value types
+                result.put("text", AiService.fixDefaultTypes(output));
+            } else if (!output.isEmpty()) {
+                result.put("text", output);
+            }
+            if (!conversationId.isEmpty()) {
+                result.put("conversationId", conversationId);
+            }
+            // Forward error if present
+            if (node.has("error") && !node.path("error").isNull()) {
+                result.put("error", node.path("error").asText(""));
+            }
+
+            return Response.ok(result).build();
+        } catch (UnsupportedOperationException uoe) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "Status polling not supported: " + uoe.getMessage()))
+                    .build();
+        } catch (Exception e) {
+            AppsLogger.write(this, e, AppsLogger.SEVERE);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of("error", "Status poll failed: " + e.getMessage()))
+                    .build();
+        }
+    }
+
+    // ── Chat Stream (POST streaming via Agent Studio invokeStream) ──────────
+    //
+    // Uses the Agent Studio's native SSE invokeStream endpoint for true
+    // token-by-token streaming. Same request body as /chat and /chat/sync.
+    // Preferred for Agent Studio environments where real-time token display
+    // is needed.
+
+    @POST
+    @Path("/chat/stream")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces("text/event-stream")
+    public Response chatStream(Map<String, Object> request) {
+        String message = (String) request.get("message");
+        String editorCode = (String) request.getOrDefault("editor_code", "");
+        String formulaType = (String) request.getOrDefault("formula_type", "TIME_LABOR");
+        String sessionId = (String) request.get("session_id");
+        String llm = (String) request.get("llm");
+        if (llm == null) llm = (String) request.get("prompt_code");
+
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(this,
+                    "POST /chat/stream: formulaType=" + formulaType
                             + " session=" + sessionId
                             + " llm=" + llm
                             + " editorCodeLen=" + (editorCode == null ? 0 : editorCode.length())
@@ -70,46 +201,22 @@ public class FastFormulaResource {
                     AppsLogger.INFO);
         }
 
-        // `template_code`: when the frontend user picks a template from the
-        // "Start with" dropdown we only receive its business key — a short
-        // identifier like `ORA_FFT_CUSTOM_OVERTIME_PAY_CALCULATION_001` that
-        // matches FF_FORMULA_TEMPLATES.TEMPLATE_CODE. The server then goes
-        // back to the DB to fetch the CLOBs (FORMULA_TEXT + ADDITIONAL_PROMPT_TEXT),
-        // so the HTTP payload stays small and the frontend can't get out of
-        // sync with the authoritative template store.
+        // Template lookup — same logic as /chat and /chat/sync.
         String templateCodeKey = (String) request.get("template_code");
-        String templateBody = null;   // FORMULA_TEXT
-        String templateRule = null;   // ADDITIONAL_PROMPT_TEXT
+        String templateBody = null;
+        String templateRule = null;
         if (templateCodeKey != null && !templateCodeKey.isBlank()) {
             try {
                 Map<String, Object> template = templateService.findByTemplateCode(templateCodeKey);
                 if (template != null) {
                     templateBody = (String) template.get("code");
                     templateRule = (String) template.get("rule");
-                    if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                        AppsLogger.write(this,
-                                "Resolved template_code=" + templateCodeKey
-                                        + " body=" + (templateBody == null ? 0 : templateBody.length())
-                                        + " rule=" + (templateRule == null ? 0 : templateRule.length()),
-                                AppsLogger.FINER);
-                    }
-                } else if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-                    AppsLogger.write(this,
-                            "Chat request referenced unknown TEMPLATE_CODE: " + templateCodeKey,
-                            AppsLogger.WARNING);
                 }
             } catch (SQLException e) {
-                // SEVERE in catch — DB lookup failure swallowed; the chat
-                // path still continues so the user isn't blocked on a
-                // template fetch, but ops needs to see the failure.
                 AppsLogger.write(this, e, AppsLogger.SEVERE);
             }
         }
 
-        // For the AiService contract: customSampleCode == "" means "Custom
-        // type but no reference formula" (skips RAG — the Custom bucket is
-        // general-purpose so off-topic RAG examples hurt more than help).
-        // For non-Custom types with no reference, leave it null so RAG kicks in.
         String customSampleCode = templateBody;
         if (CUSTOM_TYPE.equalsIgnoreCase(formulaType)
                 && (customSampleCode == null || customSampleCode.isBlank())) {
@@ -126,18 +233,17 @@ public class FastFormulaResource {
 
         StreamingOutput stream = new StreamingOutput() {
             public void write(OutputStream out) throws IOException {
-                // Session id frame — first SSE event so the client knows
-                // which id to reuse on subsequent turns.
                 try {
                     String sessionFrame = "data: {\"session_id\":\"" + escapeJson(sid) + "\"}\n\n";
                     out.write(sessionFrame.getBytes(StandardCharsets.UTF_8));
                     out.flush();
                 } catch (IOException e) {
-                    // client disconnected before we could even start
+                    return;
                 }
 
                 StringBuilder fullResponse = new StringBuilder();
 
+                // Uses streamChatWithContext → Agent Studio invokeStream (true SSE)
                 aiService.streamChat(message, editorCode, formulaType, history, csc, cr, pc, new java.util.function.Consumer<String>() {
                     public void accept(String token) {
                         fullResponse.append(token);
@@ -168,7 +274,6 @@ public class FastFormulaResource {
                 sessionStore.addTurn(sid, "user", message);
                 sessionStore.addTurn(sid, "assistant", response);
 
-                // Send done signal
                 try {
                     out.write("data: [DONE]\n\n".getBytes(StandardCharsets.UTF_8));
                     out.flush();

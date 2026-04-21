@@ -86,6 +86,59 @@ public class AgentStudioProvider implements LlmProvider {
         tokenCallback.accept(complete(messages, maxTokens));
     }
 
+    // ── Async job submission ──────────────────────────────────────────────
+
+    @Override
+    public String submitAsync(PromptContext context) {
+        String workflowCode = DEFAULT_WORKFLOW_CODE;
+        String chatHistory = context.chatHistoryOrEmpty();
+        boolean isFirstTurn = chatHistory.isBlank();
+        String sessionKey = deriveSessionKey(context);
+        String conversationId = isFirstTurn ? "" : conversationIds.getOrDefault(sessionKey, "");
+
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(this,
+                    "[AgentStudio] submitAsync"
+                            + " workflowCode=" + workflowCode
+                            + " isFirstTurn=" + isFirstTurn,
+                    AppsLogger.INFO);
+        }
+
+        try {
+            Object agentRequest = buildAgentRequest(context, isFirstTurn, conversationId);
+            String response = invokeAsync(workflowCode, agentRequest);
+            return response;
+        } catch (Throwable t) {
+            AppsLogger.write(this, t, AppsLogger.SEVERE);
+            return "{\"error\":\"" + t.getMessage().replace("\"", "'") + "\"}";
+        }
+    }
+
+    @Override
+    public String getJobStatus(String jobId) {
+        String workflowCode = DEFAULT_WORKFLOW_CODE;
+        try {
+            ensureClientReflection();
+            Object client = cachedClientConstructor.newInstance();
+            String response = (String) cachedGetStatus.invoke(client, workflowCode, jobId);
+
+            // Store conversationId if job is complete
+            if (response != null) {
+                JsonNode node = MAPPER.readTree(response);
+                String status = node.path("status").asText("");
+                if ("COMPLETE".equalsIgnoreCase(status)) {
+                    // Use a generic session key since we don't have context here
+                    storeConversationId(workflowCode + "|" + jobId, node);
+                }
+            }
+
+            return response;
+        } catch (Throwable t) {
+            AppsLogger.write(this, t, AppsLogger.SEVERE);
+            return "{\"status\":\"ERROR\",\"error\":\"" + t.getMessage().replace("\"", "'") + "\"}";
+        }
+    }
+
     // ── Structured prompt context (primary path) ───────────────────────────
 
     @Override
@@ -175,7 +228,38 @@ public class AgentStudioProvider implements LlmProvider {
     @Override
     public void streamChatWithContext(PromptContext context, int maxTokens,
                                       Consumer<String> tokenCallback) {
-        tokenCallback.accept(completeWithContext(context, maxTokens));
+        String workflowCode = DEFAULT_WORKFLOW_CODE;
+        String chatHistory = context.chatHistoryOrEmpty();
+        boolean isFirstTurn = chatHistory.isBlank();
+        String sessionKey = deriveSessionKey(context);
+        String conversationId = isFirstTurn ? "" : conversationIds.getOrDefault(sessionKey, "");
+
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(this,
+                    "[AgentStudio] streamChatWithContext"
+                            + " workflowCode=" + workflowCode
+                            + " isFirstTurn=" + isFirstTurn,
+                    AppsLogger.INFO);
+        }
+
+        try {
+            Object agentRequest = buildAgentRequest(context, isFirstTurn, conversationId);
+            // Enable token-by-token streaming on the request
+            invokeSetter(agentRequest.getClass(), agentRequest, "setStreamOutput", boolean.class, true);
+
+            // Use invokeStream via the parent FAIOrchestratorClient's post()
+            // to get an SSE stream. The endpoint is the same as invokeAsync
+            // but with /invokeStream path.
+            String streamResponse = invokeStream(workflowCode, agentRequest);
+
+            // The invokeStream returns SSE frames. Each frame has an accumulated
+            // "output" field. We diff to extract incremental tokens.
+            parseStreamResponse(streamResponse, sessionKey, tokenCallback);
+
+        } catch (Throwable t) {
+            AppsLogger.write(this, t, AppsLogger.SEVERE);
+            tokenCallback.accept("Error: Agent Studio stream failed: " + t.getMessage());
+        }
     }
 
     // ── Agent Studio SDK helpers (reflection-based) ────────────────────────
@@ -220,7 +304,7 @@ public class AgentStudioProvider implements LlmProvider {
         invokeSetter(reqClass, request, "setInvocationMode", String.class, "ADMIN");
 
         // status = DRAFT (use draft version of the workflow)
-        invokeSetter(reqClass, request, "setStatus", String.class, "DRAFT");
+        invokeSetter(reqClass, request, "setStatus", String.class, "PUBLISHED");
 
         // Build parameters based on turn
         Map<String, Object> params = new HashMap<>();
@@ -304,6 +388,101 @@ public class AgentStudioProvider implements LlmProvider {
         ensureClientReflection();
         Object client = cachedClientConstructor.newInstance();
         return (String) cachedInvokeAsync.invoke(client, workflowCode, agentRequest);
+    }
+
+    /**
+     * Call the Agent Studio invokeStream endpoint. Reuses the SDK's
+     * parent {@code FAIOrchestratorClient.post()} method which handles
+     * OAuth token acquisition and host resolution. The invokeStream
+     * endpoint returns SSE frames concatenated into a single response
+     * string when called via the SDK's synchronous post().
+     *
+     * <p>The stream path is {@code /orchestrator/agent/v2/{code}/invokeStream}.
+     */
+    private static final String AGENT_INVOKE_STREAM_ENDPOINT = "/orchestrator/agent/v2/%s/invokeStream";
+
+    private static volatile java.lang.reflect.Method cachedPostMethod;
+
+    private String invokeStream(String workflowCode, Object agentRequest) throws Exception {
+        ensureClientReflection();
+        // Resolve the post() method from FAIOrchestratorClient (parent class)
+        if (cachedPostMethod == null) {
+            Class<?> clientClass = Class.forName(AGENT_CLIENT_CLASS);
+            // post(String path, Object body, Map headers, Class responseType, boolean asUser)
+            cachedPostMethod = clientClass.getMethod("post",
+                    String.class, Object.class, java.util.Map.class, Class.class, boolean.class);
+        }
+        Object client = cachedClientConstructor.newInstance();
+        String path = String.format(AGENT_INVOKE_STREAM_ENDPOINT, workflowCode);
+
+        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+            AppsLogger.write(this,
+                    "[AgentStudio] invokeStream: path=" + path, AppsLogger.FINER);
+        }
+
+        return (String) cachedPostMethod.invoke(client, path, agentRequest,
+                new HashMap<>(), String.class, true);
+    }
+
+    /**
+     * Parse the SSE response from invokeStream. The response contains
+     * one or more {@code data: {...}} frames. Each frame's {@code output}
+     * field is the <b>accumulated</b> text so far (not incremental).
+     * We diff consecutive outputs to extract new tokens and forward them
+     * via the callback.
+     *
+     * <p>From the Agent Studio docs: "this field shows collected token
+     * till that time so ui does not need to append it just can replace."
+     */
+    private void parseStreamResponse(String sseResponse, String sessionKey,
+                                      Consumer<String> tokenCallback) {
+        if (sseResponse == null || sseResponse.isBlank()) {
+            tokenCallback.accept("Error: Agent Studio invokeStream returned empty.");
+            return;
+        }
+
+        String lastOutput = "";
+        String[] lines = sseResponse.split("\n");
+
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+
+            String dataStr = trimmed.substring(5).trim();
+            if (dataStr.isEmpty() || "[DONE]".equals(dataStr)) continue;
+
+            try {
+                JsonNode node = MAPPER.readTree(dataStr);
+
+                // Check for errors
+                String status = node.path("status").asText("");
+                if ("ERROR".equalsIgnoreCase(status)) {
+                    String error = node.path("error").asText("Unknown error");
+                    tokenCallback.accept("Error: " + error);
+                    return;
+                }
+
+                // Extract accumulated output and diff
+                String currentOutput = node.path("output").asText("");
+                if (currentOutput.length() > lastOutput.length()) {
+                    String newTokens = currentOutput.substring(lastOutput.length());
+                    tokenCallback.accept(newTokens);
+                    lastOutput = currentOutput;
+                }
+
+                // Store conversationId when complete
+                if ("COMPLETE".equalsIgnoreCase(status)) {
+                    storeConversationId(sessionKey, node);
+                }
+
+            } catch (Exception e) {
+                if (AppsLogger.isEnabled(AppsLogger.FINER)) {
+                    AppsLogger.write(this,
+                            "[AgentStudio] Failed to parse SSE frame: " + trimmed,
+                            AppsLogger.FINER);
+                }
+            }
+        }
     }
 
     /**

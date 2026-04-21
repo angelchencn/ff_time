@@ -429,6 +429,28 @@ public class AiService {
         return sb.toString();
     }
 
+    // ── Async ──────────────────────────────────────────────────────────────
+
+    /**
+     * Submit an async job to the provider and return immediately.
+     * Returns the raw JSON response from the provider (contains jobId etc.).
+     */
+    public String submitAsync(String message, String editorCode, String formulaType,
+                              List<Map<String, String>> history,
+                              String customSampleCode, String customRule, String promptCode) {
+        PromptContext context = buildPromptContext(
+                message, editorCode, formulaType, history, customSampleCode, customRule, promptCode);
+        return provider.submitAsync(context);
+    }
+
+    /**
+     * Poll the status of a previously submitted async job.
+     * Returns the raw JSON response from the provider.
+     */
+    public String getJobStatus(String jobId) {
+        return provider.getJobStatus(jobId);
+    }
+
     // ── Complete ────────────────────────────────────────────────────────────
 
     public String complete(String code, int cursorLine) {
