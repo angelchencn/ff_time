@@ -50,12 +50,15 @@ public class LlmDebugDBLog {
 
     public static LlmDebugDBLog getInstance() { return INSTANCE; }
 
+    private static final String NEXT_ID_SQL =
+            "SELECT S_ROW_ID_SEQ.NEXTVAL FROM DUAL";
+
     private static final String INSERT_LOG_SQL =
             "INSERT INTO PAY_ACTION_LOGS ("
             + "ACTION_LOG_ID, NAME, STATUS, LOG_TYPE, SOURCE_TYPE, CREATOR_TYPE, "
             + "CREATED_BY, CREATION_DATE, LAST_UPDATED_BY, LAST_UPDATE_DATE"
             + ") VALUES ("
-            + "S_ROW_ID_SEQ.NEXTVAL, ?, ?, 'LLM_DEBUG', ?, ?, "
+            + "?, ?, ?, 'LLM_DEBUG', ?, ?, "
             + "'SEED_DATA_FROM_APPLICATION', SYSTIMESTAMP, 'SEED_DATA_FROM_APPLICATION', SYSTIMESTAMP"
             + ")";
 
@@ -98,23 +101,25 @@ public class LlmDebugDBLog {
     public void record(String model, int maxTokens, String endpoint,
                        PromptContext context, String response) {
         try (Connection conn = DbConfig.getConnection()) {
-            // 1. Insert header
+            // 1. Pre-fetch sequence value (getGeneratedKeys() not reliable
+            //    on ADF BC DBTransaction proxy connections in Fusion).
             long logId;
-            try (PreparedStatement ps = conn.prepareStatement(INSERT_LOG_SQL,
-                    new String[]{"ACTION_LOG_ID"})) {
-                ps.setString(1, "FF_AI_GENERATE");
-                ps.setString(2, response != null && response.startsWith("Error:") ? "E" : "S");
-                ps.setString(3, truncate(model, 30));
-                ps.setString(4, truncate(endpoint, 30));
-                ps.executeUpdate();
-
-                try (ResultSet keys = ps.getGeneratedKeys()) {
-                    if (keys.next()) {
-                        logId = keys.getLong(1);
-                    } else {
-                        throw new SQLException("No generated key for PAY_ACTION_LOGS insert");
-                    }
+            try (PreparedStatement seqPs = conn.prepareStatement(NEXT_ID_SQL);
+                 ResultSet seqRs = seqPs.executeQuery()) {
+                if (!seqRs.next()) {
+                    throw new SQLException("S_ROW_ID_SEQ.NEXTVAL returned no rows");
                 }
+                logId = seqRs.getLong(1);
+            }
+
+            // Insert header with pre-fetched ID
+            try (PreparedStatement ps = conn.prepareStatement(INSERT_LOG_SQL)) {
+                ps.setLong(1, logId);
+                ps.setString(2, "FF_AI_GENERATE");
+                ps.setString(3, response != null && response.startsWith("Error:") ? "E" : "S");
+                ps.setString(4, truncate(model, 30));
+                ps.setString(5, truncate(endpoint, 30));
+                ps.executeUpdate();
             }
 
             // 2. Insert lines — one line per field, truncated to 3900 chars.
