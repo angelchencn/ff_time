@@ -29,7 +29,7 @@ import oracle.apps.fnd.applcore.log.AppsLogger;
  */
 public class AgentStudioProvider implements LlmProvider {
 
-    private static final String DEFAULT_WORKFLOW_CODE = "HCM_FF_GENERATOR";
+    private static final String DEFAULT_WORKFLOW_CODE = "ORA_HCM_FF_GENERATOR";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     /** Poll interval in milliseconds. */

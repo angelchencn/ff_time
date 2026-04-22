@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--$Header: fusionapps/hcm/hrc/db/data/HRC/HcmCommonTop/HcmCommonFf/SupportedObjectSD.xml xiaojuch_bug-39240436/1 2026/04/22 20:03:53 xiaojuch Exp $-->
+<!--<sdxml>
+   <conflict_detection_sql run="false">
+      <view name="SupportedObject">
+         <sql_check_def type="PRIMARY_KEY" name="base_customization" table="FAI_SUPPT_OBJECTS_B" columns="[OBJECT_SOURCE, FAMILY, PRODUCT, OBJECT_CODE, SEEDED_FLAG]" run="true">
+            <query>SELECT 1 from FAI_SUPPT_OBJECTS_B FaiSupptObjectsB where FaiSupptObjectsB.OBJECT_SOURCE = ? and FaiSupptObjectsB.FAMILY = ? and FaiSupptObjectsB.PRODUCT = ? and FaiSupptObjectsB.OBJECT_CODE = ? and FaiSupptObjectsB.SEEDED_FLAG = ? and FaiSupptObjectsB.last_updated_by not in ('0', 'SEED_DATA_FROM_APPLICATION')</query>
+            <bind type="String">ObjectSource</bind>
+            <bind type="String">Family</bind>
+            <bind type="String">Product</bind>
+            <bind type="String">ObjectCode</bind>
+            <bind type="String">SeededFlag</bind>
+         </sql_check_def>
+         <sql_check_def type="PRIMARY_KEY" name="translation_customization" table="FAI_SUPPT_OBJECTS_TL" columns="[OBJECT_SOURCE, FAMILY, PRODUCT, OBJECT_CODE, SEEDED_FLAG]" run="true">
+            <query>SELECT 1 from FAI_SUPPT_OBJECTS_TL FaiSupptObjectsTl, FAI_SUPPT_OBJECTS_B FaiSupptObjectsB where FaiSupptObjectsB.OBJECT_SOURCE = ? and FaiSupptObjectsB.FAMILY = ? and FaiSupptObjectsB.PRODUCT = ? and FaiSupptObjectsB.OBJECT_CODE = ? and FaiSupptObjectsB.SEEDED_FLAG = ? AND FaiSupptObjectsB.SUPPT_OBJECT_ID=FaiSupptObjectsTl.SUPPT_OBJECT_ID AND FaiSupptObjectsTl.LANGUAGE=USERENV('LANG') and FaiSupptObjectsTl.last_updated_by not in ('0', 'SEED_DATA_FROM_APPLICATION')</query>
+            <bind type="String">ObjectSource</bind>
+            <bind type="String">Family</bind>
+            <bind type="String">Product</bind>
+            <bind type="String">ObjectCode</bind>
+            <bind type="String">SeededFlag</bind>
+         </sql_check_def>
+         <sql_check_def type="ALTERNATE_KEY" name="AltKey" table="FAI_SUPPT_OBJECTS_B" columns="[OBJECT_SOURCE, FAMILY, PRODUCT, OBJECT_CODE, SEEDED_FLAG]" run="true">
+            <query>SELECT 1 FROM FAI_SUPPT_OBJECTS_B T1  WHERE T1.OBJECT_SOURCE = ? AND T1.FAMILY = ? AND T1.PRODUCT = ? AND T1.OBJECT_CODE = ? AND T1.SEEDED_FLAG = ? AND EXISTS (SELECT 1 FROM FAI_SUPPT_OBJECTS_B FaiSupptObjectsB where FaiSupptObjectsB.OBJECT_SOURCE = ? and FaiSupptObjectsB.FAMILY = ? and FaiSupptObjectsB.PRODUCT = ? and FaiSupptObjectsB.OBJECT_CODE = ? and FaiSupptObjectsB.SEEDED_FLAG = ? AND FaiSupptObjectsB.LAST_UPDATED_BY IN ('0', 'SEED_DATA_FROM_APPLICATION') AND T1.ROWID &lt;> FaiSupptObjectsB.ROWID)</query>
+            <bind type="String">ObjectSource</bind>
+            <bind type="String">Family</bind>
+            <bind type="String">Product</bind>
+            <bind type="String">ObjectCode</bind>
+            <bind type="String">SeededFlag</bind>
+            <bind type="String">ObjectSource</bind>
+            <bind type="String">Family</bind>
+            <bind type="String">Product</bind>
+            <bind type="String">ObjectCode</bind>
+            <bind type="String">SeededFlag</bind>
+         </sql_check_def>
+      </view>
+      <view name="SupportedObjectField">
+         <sql_check_def type="PRIMARY_KEY" name="base_customization" table="FAI_SUPPT_OBJECT_FIELDS_B" columns="[SUPPT_OBJECT_ID, FIELD_NAME, SEEDED_FLAG]" run="true">
+            <query>SELECT 1 from FAI_SUPPT_OBJECT_FIELDS_B FaiSupptObjectFieldsB, FAI_SUPPT_OBJECTS_B FaiSupptObjectsB where FaiSupptObjectsB.SUPPT_OBJECT_ID = FaiSupptObjectFieldsB.SUPPT_OBJECT_ID and FaiSupptObjectFieldsB.FIELD_NAME = ? and FaiSupptObjectFieldsB.SEEDED_FLAG = ? and FaiSupptObjectsB.OBJECT_SOURCE = ? and FaiSupptObjectsB.FAMILY = ? and FaiSupptObjectsB.PRODUCT = ? and FaiSupptObjectsB.OBJECT_CODE = ? and FaiSupptObjectsB.SEEDED_FLAG = ? and FaiSupptObjectFieldsB.last_updated_by not in ('0', 'SEED_DATA_FROM_APPLICATION')</query>
+            <bind type="String">FieldName</bind>
+            <bind type="String">SeededFlag</bind>
+            <bind type="String">SupportedObject.ObjectSource</bind>
+            <bind type="String">SupportedObject.Family</bind>
+            <bind type="String">SupportedObject.Product</bind>
+            <bind type="String">SupportedObject.ObjectCode</bind>
+            <bind type="String">SupportedObject.SeededFlag</bind>
+         </sql_check_def>
+         <sql_check_def type="PRIMARY_KEY" name="translation_customization" table="FAI_SUPPT_OBJECT_FIELDS_TL" columns="[SUPPT_OBJECT_ID, FIELD_NAME, SEEDED_FLAG]" run="true">
+            <query>SELECT 1 from FAI_SUPPT_OBJECT_FIELDS_TL FaiSupptObjectFieldsTl, FAI_SUPPT_OBJECT_FIELDS_B FaiSupptObjectFieldsB, FAI_SUPPT_OBJECTS_B FaiSupptObjectsB where FaiSupptObjectsB.SUPPT_OBJECT_ID = FaiSupptObjectFieldsB.SUPPT_OBJECT_ID and FaiSupptObjectFieldsB.FIELD_NAME = ? and FaiSupptObjectFieldsB.SEEDED_FLAG = ? and FaiSupptObjectsB.OBJECT_SOURCE = ? and FaiSupptObjectsB.FAMILY = ? and FaiSupptObjectsB.PRODUCT = ? and FaiSupptObjectsB.OBJECT_CODE = ? and FaiSupptObjectsB.SEEDED_FLAG = ? AND FaiSupptObjectFieldsB.FIELD_ID=FaiSupptObjectFieldsTl.FIELD_ID AND FaiSupptObjectFieldsTl.LANGUAGE=USERENV('LANG') and FaiSupptObjectFieldsTl.last_updated_by not in ('0', 'SEED_DATA_FROM_APPLICATION')</query>
+            <bind type="String">FieldName</bind>
+            <bind type="String">SeededFlag</bind>
+            <bind type="String">SupportedObject.ObjectSource</bind>
+            <bind type="String">SupportedObject.Family</bind>
+            <bind type="String">SupportedObject.Product</bind>
+            <bind type="String">SupportedObject.ObjectCode</bind>
+            <bind type="String">SupportedObject.SeededFlag</bind>
+         </sql_check_def>
+         <sql_check_def type="ALTERNATE_KEY" name="AltKey" table="FAI_SUPPT_OBJECT_FIELDS_B" columns="[SUPPT_OBJECT_ID, FIELD_NAME, SEEDED_FLAG]" run="true">
+            <query>SELECT 1 FROM FAI_SUPPT_OBJECTS_B T1, FAI_SUPPT_OBJECT_FIELDS_B T2  WHERE T1.SUPPT_OBJECT_ID = T2.SUPPT_OBJECT_ID AND T1.OBJECT_SOURCE = ? AND T1.FAMILY = ? AND T1.PRODUCT = ? AND T1.OBJECT_CODE = ? AND T1.SEEDED_FLAG = ? AND T2.FIELD_NAME = ? AND T2.SEEDED_FLAG = ? AND EXISTS (SELECT 1 FROM FAI_SUPPT_OBJECT_FIELDS_B FaiSupptObjectFieldsB, FAI_SUPPT_OBJECTS_B FaiSupptObjectsB where FaiSupptObjectsB.SUPPT_OBJECT_ID = FaiSupptObjectFieldsB.SUPPT_OBJECT_ID and FaiSupptObjectFieldsB.FIELD_NAME = ? and FaiSupptObjectFieldsB.SEEDED_FLAG = ? and FaiSupptObjectsB.OBJECT_SOURCE = ? and FaiSupptObjectsB.FAMILY = ? and FaiSupptObjectsB.PRODUCT = ? and FaiSupptObjectsB.OBJECT_CODE = ? and FaiSupptObjectsB.SEEDED_FLAG = ? AND FaiSupptObjectFieldsB.LAST_UPDATED_BY IN ('0', 'SEED_DATA_FROM_APPLICATION') AND T1.ROWID &lt;> FaiSupptObjectFieldsB.ROWID AND T2.ROWID &lt;> FaiSupptObjectFieldsB.ROWID)</query>
+            <bind type="String">SupportedObject.ObjectSource</bind>
+            <bind type="String">SupportedObject.Family</bind>
+            <bind type="String">SupportedObject.Product</bind>
+            <bind type="String">SupportedObject.ObjectCode</bind>
+            <bind type="String">SupportedObject.SeededFlag</bind>
+            <bind type="String">FieldName</bind>
+            <bind type="String">SeededFlag</bind>
+            <bind type="String">FieldName</bind>
+            <bind type="String">SeededFlag</bind>
+            <bind type="String">SupportedObject.ObjectSource</bind>
+            <bind type="String">SupportedObject.Family</bind>
+            <bind type="String">SupportedObject.Product</bind>
+            <bind type="String">SupportedObject.ObjectCode</bind>
+            <bind type="String">SupportedObject.SeededFlag</bind>
+         </sql_check_def>
+      </view>
+   </conflict_detection_sql>
+</sdxml>-->
+
+<!-- adxml: <src_file bootstrap="N" version="~VERSION" translation_level="~TRANS_LEVEL" techstack_level="~TXK_LEVEL" verticalisation_level="~VERT_LEVEL" custom_level="~CUST_LEVEL" language="~LANG" needs_translation="~NEEDS_TRANS" ship="~SHIP" localization="~LOCALIZATION" object_type="DATABASE"> -->
+<!-- adxml:    <abstract_file te="~PROD" subdir="~PATH" file_basename="~BASENAME" file_type="~FILE_TYPE"/> -->
+<!-- adxml:    <metadata> -->
+<!-- adxml:       <action portion="D" category="SD_DATA" online_category="N" identifier="UPLOAD"> -->
+<!-- adxml:          <apply_action> -->
+<!-- adxml:             <action_details name="java"> -->
+<!-- adxml:                <invoking_exec> -->
+<!-- adxml:                   <executable file_basename="oracle.apps.fnd.applseed.rt.loader.Loader" file_type="class"/> -->
+<!-- adxml:                </invoking_exec> -->
+<!-- adxml:                <args>-am oracle.apps.hcm.fai.publicModel.seedDataLoader.applicationModule.FaiAgentSDAM -dburl jdbc:oracle:#jdbc_protocol_fusion#:@#jdbc_db_addr# -dbuser #un:fusion# -file #fullpath:~PROD:~PATH:~FILE# -cfver #last_applied_version# </args> -->
+<!-- adxml:             </action_details> -->
+<!-- adxml:          </apply_action> -->
+<!-- adxml:          <analysis_action> -->
+<!-- adxml:             <default_action/> -->
+<!-- adxml:          </analysis_action> -->
+<!-- adxml:          <ahead_of_time_run_conditions> -->
+<!-- adxml:             <check_file check="Y"/> -->
+<!-- adxml:          </ahead_of_time_run_conditions> -->
+<!-- adxml:       </action> -->
+<!-- adxml:    </metadata> -->
+<!-- adxml: </src_file>  -->
+
+<SEEDDATA am="oracle.apps.hcm.fai.publicModel.seedDataLoader.applicationModule.FaiAgentSDAM" vo="SupportedObject" translatable="true" effective_dated="false" xmlns="http://www.oracle.com/apps/fnd/applseed" fileversion="0" partitionkey_attrib="ModuleId" partitionkey_value="61ECAF4AAAC2E990E040449821C61C97" deliverymode="ship" rowcount="1" GUID="6d858ba7-22d9-4cb5-a7b8-ae6af91b1bdf" extract_date="22-Apr-2026.19.01.13" enterprise_id="0" version_jbo_label="14.1.2.16.17" version_sdf_label="BB_2507B.GENERIC.1" version_sdf_filefmt="1.0">       
+   <SupportedObject rowkey="HCM_SEARCH.HCM.GLOBAL_PAYROLL.ORA_HCM_FF_FASTFORMULAGENERATORBUSINESSOBJECT.N" rowver="0" checksum="A0A9AEC9300DAA0F24A30FF374642BA99A3D9C180763BA67A0845ACF5634D63251B6C4E7F9463158F8297D1A9EE44ADF9499410F0CF4C6498AC527D47C8AA363">
+      <ApiSpec></ApiSpec>
+      <Category isNull="true"></Category>
+      <CreatedBy>SEED_DATA_FROM_APPLICATION</CreatedBy>
+      <CreationDate>2026-04-22 18:18:00.840766</CreationDate>
+      <Description></Description>
+      <Family>HCM</Family>
+      <LastUpdateDate>2026-04-22 18:48:56.190096</LastUpdateDate>
+      <LastUpdateLogin isNull="true"></LastUpdateLogin>
+      <LastUpdatedBy>SEED_DATA_FROM_APPLICATION</LastUpdatedBy>
+      <MandatoryFlag>N</MandatoryFlag>
+      <ModuleId>61ECAF4AAAC2E990E040449821C61C97</ModuleId>
+      <ObjectCode>ORA_HCM_FF_FASTFORMULAGENERATORBUSINESSOBJECT</ObjectCode>
+      <ObjectDisplayName>Fast Formulas Generator</ObjectDisplayName>
+      <ObjectProperties>{"jsonSchemaName":"SupportedBusinessObject.objectProperties","jsonSchemaVersion":1,"tools":[{"headers":{"Content-Type":"application/json"},"bodyTemplate":"{\n  \"message\": \"{pMessage}\",\n  \"template_code\": \"{pTemplate_code}\",\n  \"llm\": \"{pLlm}\",\n   \"editor_code\":\"{pEditor_code}\",\n   \"session_id\":\"{pSession_id}\"\n}","description":"Generate Fast Formula from natural language. Blocking - waits for LLM completion. Returns formula code in text field.","id":0,"isNew":true,"name":"generateFormulaSync","operationType":"POST","parameterDefinitions":[{"dataType":"string","description":"Natural language requirement describing what the formula should do. Example: Generate a time entry rule formula that validates minimum hours per period.","id":19,"isToken":true,"name":"pMessage"},{"dataType":"string","description":"Business key from FF_FORMULA_TEMPLATES.TEMPLATE_CODE. Identifies the reference formula template. Always required. Example: ORA_HCM_FF_TER_MIN_HOURS_001","id":20,"isToken":true,"name":"pTemplate_code"},{"dataType":"string","description":"LLM model selector. Values: GPT5MINI (default, GPT-5 Mini) or GPT41MINI (GPT-4.1 Mini). Optional.","id":21,"isToken":true,"name":"pLlm"},{"dataType":"string","description":"Current formula code in the editor. When provided, the LLM modifies this code instead of generating from scratch. Optional.","id":22,"isToken":true,"name":"pEditor_code"},{"dataType":"string","description":"Session ID (Agent Studio conversationId) for multi-turn conversation. Pass back the value from a previous response to continue refining. Optional.","id":23,"isToken":true,"name":"pSession_id"}],"resourcePath":"/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/chat/sync","resourceType":"HCM_SEARCH","sampleQueries":[{"query":{"message":"Generate a time entry rule formula that validates minimum hours","template_code":"ORA_HCM_FF_TER_MIN_HOURS_001","llm":"GPT5MINI"},"description":"Generate a time entry rule formula with minimum hours validation using GPT-5 Mini model.","id":13,"stringValue":"{\"message\":\"Generate a time entry rule formula that validates minimum hours\",\"template_code\":\"ORA_HCM_FF_TER_MIN_HOURS_001\",\"llm\":\"GPT5MINI\"}"}],"type":"BUS_OBJECT","useNativeAuthentication":true},{"headers":{"Content-Type":"application/json"},"bodyTemplate":"{\n  \"message\": \"{pMessage}\",\n  \"template_code\": \"{pTemplate_code}\",\n  \"llm\": \"{pLlm}\",\n   \"editor_code\":\"{pEditor_code}\",\n   \"session_id\":\"{pSession_id}\"\n}","description":"Submit formula generation job. Returns jobId immediately. Poll status via pollJobStatus.","id":1,"isNew":true,"name":"generateFormulaAsync","operationType":"POST","parameterDefinitions":[{"dataType":"string","description":"Natural language requirement describing what the formula should do. Example: Generate a time entry rule formula that validates minimum hours per period.","id":36,"isToken":true,"name":"pMessage"},{"dataType":"string","description":"Business key from FF_FORMULA_TEMPLATES.TEMPLATE_CODE. Identifies the reference formula template. Always required. Example: ORA_HCM_FF_TER_MIN_HOURS_001","id":37,"isToken":true,"name":"pTemplate_code"},{"dataType":"string","description":"LLM model selector. Values: GPT5MINI (default, GPT-5 Mini) or GPT41MINI (GPT-4.1 Mini). Optional.","id":38,"isToken":true,"name":"pLlm"},{"dataType":"string","description":"Current formula code in the editor. When provided, the LLM modifies this code instead of generating from scratch. Optional.","id":39,"isToken":true,"name":"pEditor_code"},{"dataType":"string","description":"Session ID (Agent Studio conversationId) for multi-turn conversation. Pass back the value from a previous response to continue refining. Optional.","id":40,"isToken":true,"name":"pSession_id"}],"resourcePath":"/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/chat","resourceType":"HCM_SEARCH","sampleQueries":[{"query":{"message":"Generate an element skip formula","template_code":"ORA_HCM_FF_ELEMENT_SKIP_001","llm":"GPT5MINI"},"description":"Generate a time entry rule formula with minimum hours validation using GPT-5 Mini model.","id":30,"stringValue":"{\"message\":\"Generate an element skip formula\",\"template_code\":\"ORA_HCM_FF_ELEMENT_SKIP_001\",\"llm\":\"GPT5MINI\"}"}],"type":"BUS_OBJECT","useNativeAuthentication":true},{"headers":{},"bodyTemplate":"","description":"Poll async job status by jobId. Returns status (RUNNING/COMPLETE/ERROR) and formula code when complete.","id":2,"isNew":true,"name":"pollJobStatus","operationType":"GET","parameterDefinitions":[{"dataType":"string","description":"Job ID returned by the async Generate Formula endpoint (POST /chat). Used to poll execution status until COMPLETE or ERROR.","id":43,"isToken":true,"name":"pJob_Id"}],"resourcePath":"/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/chat/status/{pJob_Id}","resourceType":"HCM_SEARCH","sampleQueries":[],"type":"BUS_OBJECT","useNativeAuthentication":true},{"headers":{},"bodyTemplate":"","description":"List available formula templates filtered by formula type. Each template has reference code and additional rules.","id":3,"isNew":true,"name":"listTemplates","operationType":"GET","parameterDefinitions":[],"resourcePath":"/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/templates","resourceType":"HCM_SEARCH","sampleQueries":[],"type":"BUS_OBJECT","useNativeAuthentication":true},{"headers":{},"bodyTemplate":"","description":"List all formula types with display names.","id":4,"isNew":true,"name":"listFormulaTypes","operationType":"GET","parameterDefinitions":[],"resourcePath":"/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/formula-types","resourceType":"HCM_SEARCH","sampleQueries":[],"type":"BUS_OBJECT","useNativeAuthentication":true},{"headers":{"Content-Type":"application/json"},"bodyTemplate":"{\n  \"code\": \"{pCode}\"\n}","description":"Validate Fast Formula syntax with 3-layer checks (syntax, semantic, rules).","id":5,"isNew":true,"name":"validateFormula","operationType":"POST","parameterDefinitions":[{"dataType":"string","description":"Fast Formula source code to validate. The validator runs 3-layer checks: syntax parsing, semantic analysis (undeclared variables, unassigned outputs), and business rules (missing RETURN).","id":48,"isToken":true,"name":"pCode"}],"resourcePath":"/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/validate","resourceType":"HCM_SEARCH","sampleQueries":[{"query":{"code":"DEFAULT FOR hours IS 0\nINPUTS ARE hours\nl_pay = hours * 25\nRETURN l_pay"},"description":"Validate a simple hourly pay formula with DEFAULT, INPUTS ARE, and RETURN.","id":46,"stringValue":"{\"code\":\"DEFAULT FOR hours IS 0\\nINPUTS ARE hours\\nl_pay = hours * 25\\nRETURN l_pay\"}"}],"type":"BUS_OBJECT","useNativeAuthentication":true},{"headers":{},"bodyTemplate":"","description":"Health check endpoint.","id":6,"isNew":true,"name":"healthCheck","operationType":"GET","parameterDefinitions":[],"resourcePath":"/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/health","resourceType":"HCM_SEARCH","sampleQueries":[],"type":"BUS_OBJECT","useNativeAuthentication":true}]}</ObjectProperties>
+      <ObjectSource>HCM_SEARCH</ObjectSource>
+      <Product>GLOBAL_PAYROLL</Product>
+      <RestResourceIdentifier>identifier_not_known</RestResourceIdentifier>
+      <RestResourcePath>/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants</RestResourcePath>
+      <RestSupportedOperations>{"allowedOperations": {"GET": true, "POST": true, "PATCH": true, "DELETE": true}}</RestSupportedOperations>
+      <SampleQueries></SampleQueries>
+      <SeededFlag>N</SeededFlag>
+      <InternalDescription>AI-powered Fast Formula code generator for Oracle HCM. Accepts natural language requirements and returns syntactically valid Fast Formula source code. Supports formula types including Payroll, Time and Labor, and Absence Management. Provides sync, async, and streaming endpoints with multi-turn conversation support via Agent Studio.</InternalDescription>
+      <InternalName>Fast Formula Generator Business Object</InternalName>
+      <SupportedObject2.ObjectSource></SupportedObject2.ObjectSource>
+      <SupportedObject2.Family></SupportedObject2.Family>
+      <SupportedObject2.Product></SupportedObject2.Product>
+      <SupportedObject2.ObjectCode></SupportedObject2.ObjectCode>
+      <SupportedObject2.SeededFlag></SupportedObject2.SeededFlag>
+   </SupportedObject>
+</SEEDDATA>
