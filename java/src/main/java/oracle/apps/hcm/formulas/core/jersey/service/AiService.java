@@ -281,7 +281,8 @@ public class AiService {
             return;
         }
         PromptContext context = buildPromptContext(
-                message, editorCode, formulaType, history, customSampleCode, customRule, promptCode);
+                message, editorCode, formulaType, history, customSampleCode, customRule,
+                promptCode, true);
         provider.streamChatWithContext(context, MAX_TOKENS_CHAT, tokenCallback);
     }
 
@@ -303,13 +304,15 @@ public class AiService {
                            List<Map<String, String>> history,
                            String customSampleCode,
                            String customRule,
-                           String promptCode) {
+                           String promptCode,
+                           boolean useSystemPrompt) {
         if (AppsLogger.isEnabled(AppsLogger.FINER)) {
             AppsLogger.write(this,
                     "chatOnce: provider=" + provider.name()
                             + " formulaType=" + formulaType
                             + " historyTurns=" + history.size()
-                            + " promptCode=" + promptCode,
+                            + " promptCode=" + promptCode
+                            + " useSystemPrompt=" + useSystemPrompt,
                     AppsLogger.FINER);
         }
         if (!provider.isAvailable()) {
@@ -321,7 +324,8 @@ public class AiService {
             return "Error: " + provider.name() + " is not available.";
         }
         PromptContext context = buildPromptContext(
-                message, editorCode, formulaType, history, customSampleCode, customRule, promptCode);
+                message, editorCode, formulaType, history, customSampleCode, customRule,
+                promptCode, useSystemPrompt);
         String response = provider.completeWithContext(context, MAX_TOKENS_CHAT);
         if (AppsLogger.isEnabled(AppsLogger.FINER)) {
             AppsLogger.write(this,
@@ -358,9 +362,10 @@ public class AiService {
     PromptContext buildPromptContext(
             String message, String editorCode, String formulaType,
             List<Map<String, String>> history,
-            String customSampleCode, String customRule, String promptCode) {
+            String customSampleCode, String customRule, String promptCode,
+            boolean useSystemPrompt) {
 
-        String systemPrompt = getSystemPrompt();
+        String systemPrompt = useSystemPrompt ? getSystemPrompt() : "";
         String msg = extractUserRequestText(message, formulaType);
         String referenceFormula = extractReferenceFormula(message, customSampleCode);
         String normalizedEditor = (editorCode == null || editorCode.isBlank()) ? "" : editorCode;
@@ -465,7 +470,8 @@ public class AiService {
                               List<Map<String, String>> history,
                               String customSampleCode, String customRule, String promptCode) {
         PromptContext context = buildPromptContext(
-                message, editorCode, formulaType, history, customSampleCode, customRule, promptCode);
+                message, editorCode, formulaType, history, customSampleCode, customRule,
+                promptCode, true);
         return provider.submitAsync(context);
     }
 

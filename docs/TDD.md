@@ -91,11 +91,13 @@ Fallback chain: AgentStudioProvider -> FusionAiProvider -> OpenAiProvider
 User: "Write overtime formula for Time Calculation Rules"
   |
   v
-Frontend: POST /chat/sync {message, formula_type, llm?, template_code?}
+Frontend: POST /chat/sync {message, llm?, template_code}
   |
   v
 FastFormulaResource: extract request fields
   |-- Resolve template_code -> TemplateService.findByTemplateCode() -> DB
+  |-- Derive formulaType from template FK (null -> "Custom")
+  |-- Read USE_SYSTEM_PROMPT_FLAG from template ('Y'/'N')
   |-- Agent Studio mode: skip ChatSessionStore, use conversationId
   |
   v
@@ -183,6 +185,8 @@ public interface LlmProvider {
 Uses `FAIOrchestratorAgentClientV2` SDK (loaded via reflection) to call the Agent Studio workflow `HCM_FF_GENERATOR`.
 
 **Key behaviors:**
+- `formula_type` is derived from the template's `FORMULA_TYPE_ID` FK (null -> "Custom"), not from the request body
+- `USE_SYSTEM_PROMPT_FLAG` on the template controls whether the system prompt (~730 lines FF language spec) is included. 'N' = skip, rely only on reference formula + additional rules
 - First turn: passes ALL variables (SystemPrompt, FormulaType, ReferenceFormula, AdditionalRules, EditorCode, LLM)
 - Subsequent turns: passes only EditorCode (Conversation-scoped variables retained by Agent Studio)
 - Manages `conversationId` via ThreadLocal + ConcurrentHashMap for multi-turn conversations
@@ -230,17 +234,17 @@ Workflow code: `HCM_FF_GENERATOR`
 
 #### 3.2.6 Debug Logging (DB-backed)
 
-`LlmDebugDBLog` writes to `PAY_ACTION_LOGS` (header) + `PAY_ACTION_LOG_LINES` (detail). Cross-server visible, persistent across restarts. Called from `AiService.chatOnce()` -- single entry point for all providers.
+`LlmDebugDBLog` writes to `PAY_ACTION_LOGS` (header) + `PAY_ACTION_LOG_LINES` (detail). Cross-server visible, persistent across restarts. Called from `AiService.chatOnce()` -- single entry point for all providers. Uses `SELECT S_ROW_ID_SEQ.NEXTVAL FROM DUAL` to pre-fetch IDs (ADF BC DBTransaction proxy does not support `getGeneratedKeys()`). Each field truncated to 3900 chars with `...` suffix; TOKEN_BREAKDOWN retains original untruncated lengths for accurate metrics.
 
 **LINE_NUMBER layout:**
 
 | Line | Content | Truncation |
 |---|---|---|
-| 1 | Summary (model, endpoint, totalChars, estTokens) | No |
+| 1 | Summary (model, endpoint, formulaType, totalChars, estTokens) | No |
 | 2 | MESSAGE | 3900 chars + `...` |
 | 3 | SESSION_ID (conversationId) | No |
 | 10 | SYSTEM_PROMPT | 3900 chars + `...` |
-| 20 | FORMULA_TYPE | No |
+| 20 | FORMULA_TYPE (derived from template FK) | No |
 | 30 | REFERENCE_FORMULA | 3900 chars + `...` |
 | 40 | ADDITIONAL_RULES | 3900 chars + `...` |
 | 50 | EDITOR_CODE | 3900 chars + `...` |
@@ -256,6 +260,8 @@ Workflow code: `HCM_FF_GENERATOR`
 | GET | `/chat/status/{jobId}` | `{status, text, jobId}` | Poll async job status |
 | POST | `/chat/sync` | `{text, session_id}` | **Blocking** -- wait for completion (HTTP 500 on error) |
 | POST | `/chat/stream` | SSE stream | **Streaming** via Agent Studio invokeStream |
+
+Chat request body: `{message, template_code, llm?, editor_code?, session_id?}`. `formula_type` is derived server-side from the template's `FORMULA_TYPE_ID` FK (null FK -> "Custom"). `template_code` is always required.
 | POST | `/complete` | `{suggestions[]}` | Editor autocomplete |
 | POST | `/explain` | SSE stream | Formula explanation |
 | POST | `/validate` | `{valid, diagnostics[]}` | 3-layer validation |

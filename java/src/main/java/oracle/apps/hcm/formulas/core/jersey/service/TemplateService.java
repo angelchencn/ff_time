@@ -59,7 +59,8 @@ public class TemplateService {
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT v.TEMPLATE_ID, v.FORMULA_TYPE_ID, v.TEMPLATE_CODE, ")
            .append("       v.FORMULA_TEXT, v.ADDITIONAL_PROMPT_TEXT, v.SOURCE_TYPE, ")
-           .append("       v.ACTIVE_FLAG, v.SEMANTIC_FLAG, v.SYSTEMPROMPT_FLAG, v.SORT_ORDER, ")
+           .append("       v.ACTIVE_FLAG, v.SEMANTIC_FLAG, v.SYSTEMPROMPT_FLAG, ")
+           .append("       v.USE_SYSTEM_PROMPT_FLAG, v.SORT_ORDER, ")
            .append("       v.NAME, v.DESCRIPTION, v.OBJECT_VERSION_NUMBER, ")
            .append("       ft.FORMULA_TYPE_NAME ")
            .append("  FROM FF_FORMULA_TEMPLATES_VL v ")
@@ -172,7 +173,8 @@ public class TemplateService {
         String sql =
             "SELECT v.TEMPLATE_ID, v.FORMULA_TYPE_ID, v.TEMPLATE_CODE, " +
             "       v.FORMULA_TEXT, v.ADDITIONAL_PROMPT_TEXT, v.SOURCE_TYPE, " +
-            "       v.ACTIVE_FLAG, v.SEMANTIC_FLAG, v.SYSTEMPROMPT_FLAG, v.SORT_ORDER, " +
+            "       v.ACTIVE_FLAG, v.SEMANTIC_FLAG, v.SYSTEMPROMPT_FLAG, " +
+            "       v.USE_SYSTEM_PROMPT_FLAG, v.SORT_ORDER, " +
             "       v.NAME, v.DESCRIPTION, v.OBJECT_VERSION_NUMBER, " +
             "       ft.FORMULA_TYPE_NAME " +
             "  FROM FF_FORMULA_TEMPLATES_VL v " +
@@ -229,7 +231,8 @@ public class TemplateService {
         String sql =
             "SELECT v.TEMPLATE_ID, v.FORMULA_TYPE_ID, v.TEMPLATE_CODE, " +
             "       v.FORMULA_TEXT, v.ADDITIONAL_PROMPT_TEXT, v.SOURCE_TYPE, " +
-            "       v.ACTIVE_FLAG, v.SEMANTIC_FLAG, v.SYSTEMPROMPT_FLAG, v.SORT_ORDER, " +
+            "       v.ACTIVE_FLAG, v.SEMANTIC_FLAG, v.SYSTEMPROMPT_FLAG, " +
+            "       v.USE_SYSTEM_PROMPT_FLAG, v.SORT_ORDER, " +
             "       v.NAME, v.DESCRIPTION, v.OBJECT_VERSION_NUMBER, " +
             "       ft.FORMULA_TYPE_NAME " +
             "  FROM FF_FORMULA_TEMPLATES_VL v " +
@@ -279,6 +282,7 @@ public class TemplateService {
         String activeFlag = str(req.get("active_flag"), "Y");
         String semanticFlag = str(req.get("semantic_flag"), "N");
         String systempromptFlag = str(req.get("systemprompt_flag"), "N");
+        String useSystemPromptFlag = str(req.get("use_system_prompt_flag"), "Y");
 
         try (Connection conn = DbConfig.getConnection()) {
             conn.setAutoCommit(false);
@@ -287,7 +291,8 @@ public class TemplateService {
                 Long formulaTypeId = resolveFormulaTypeId(conn, formulaTypeName);
 
                 insertBase(conn, templateId, formulaTypeId, templateCode, code, rule,
-                        sortOrder, createdBy, activeFlag, semanticFlag, systempromptFlag);
+                        sortOrder, createdBy, activeFlag, semanticFlag, systempromptFlag,
+                        useSystemPromptFlag);
                 insertTl(conn, templateId, name, description, createdBy);
 
                 conn.commit();
@@ -543,16 +548,17 @@ public class TemplateService {
     private void insertBase(Connection conn, long templateId, Long formulaTypeId,
                             String templateCode, String formulaText, String additionalPromptText,
                             int sortOrder, String createdBy,
-                            String activeFlag, String semanticFlag, String systempromptFlag) throws SQLException {
+                            String activeFlag, String semanticFlag, String systempromptFlag,
+                            String useSystemPromptFlag) throws SQLException {
         String sql =
             "INSERT INTO FF_FORMULA_TEMPLATES ( " +
             "  TEMPLATE_ID, FORMULA_TYPE_ID, TEMPLATE_CODE, FORMULA_TEXT, " +
             "  ADDITIONAL_PROMPT_TEXT, SOURCE_TYPE, ACTIVE_FLAG, SEMANTIC_FLAG, " +
-            "  SYSTEMPROMPT_FLAG, SORT_ORDER, OBJECT_VERSION_NUMBER, " +
+            "  SYSTEMPROMPT_FLAG, USE_SYSTEM_PROMPT_FLAG, SORT_ORDER, OBJECT_VERSION_NUMBER, " +
             "  CREATED_BY, CREATION_DATE, LAST_UPDATED_BY, LAST_UPDATE_DATE, " +
             "  ENTERPRISE_ID, SEED_DATA_SOURCE, MODULE_ID " +
             ") VALUES ( " +
-            "  ?, ?, ?, ?, ?, 'USER_CREATED', ?, ?, ?, ?, 1, " +
+            "  ?, ?, ?, ?, ?, 'USER_CREATED', ?, ?, ?, ?, ?, 1, " +
             "  ?, SYSTIMESTAMP, ?, SYSTIMESTAMP, " +
             "  nvl(SYS_CONTEXT('FND_VPD_CTX','FND_ENTERPRISE_ID'), 0), " +
             "  'USER_CREATED', 'HXT' " +
@@ -570,9 +576,10 @@ public class TemplateService {
             ps.setString(6, activeFlag);
             ps.setString(7, semanticFlag);
             ps.setString(8, systempromptFlag);
-            ps.setInt(9, sortOrder);
-            ps.setString(10, createdBy);
+            ps.setString(9, useSystemPromptFlag);
+            ps.setInt(10, sortOrder);
             ps.setString(11, createdBy);
+            ps.setString(12, createdBy);
             ps.executeUpdate();
         }
     }
@@ -635,6 +642,10 @@ public class TemplateService {
         if (updates.containsKey("systemprompt_flag")) {
             sets.add("SYSTEMPROMPT_FLAG = ?");
             params.add(str(updates.get("systemprompt_flag"), "N"));
+        }
+        if (updates.containsKey("use_system_prompt_flag")) {
+            sets.add("USE_SYSTEM_PROMPT_FLAG = ?");
+            params.add(str(updates.get("use_system_prompt_flag"), "Y"));
         }
         if (updates.containsKey("formula_type")) {
             Long ftId = resolveFormulaTypeId(conn, str(updates.get("formula_type"), null));
@@ -722,6 +733,8 @@ public class TemplateService {
         m.put("active_flag", rs.getString("ACTIVE_FLAG"));
         m.put("semantic_flag", rs.getString("SEMANTIC_FLAG"));
         m.put("systemprompt_flag", rs.getString("SYSTEMPROMPT_FLAG"));
+        String useSpFlag = rs.getString("USE_SYSTEM_PROMPT_FLAG");
+        m.put("use_system_prompt_flag", useSpFlag != null ? useSpFlag : "Y");
         int sort = rs.getInt("SORT_ORDER");
         m.put("sort_order", rs.wasNull() ? 0 : sort);
         m.put("name", rs.getString("NAME"));

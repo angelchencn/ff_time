@@ -9,7 +9,7 @@ export interface ServerConfig {
 
 const DEFAULT_SERVERS: ServerConfig[] = [
   {
-    name: 'Agent Studio',
+    name: 'VP DEV Agent',
     baseUrl: '/fusion-proxy',
     apiPrefix: '/hcmRestApi/redwood/11.13.18.05/calculationEntries',
     auth: { username: 'tm-mfitzimmons', password: 'Welcome1' },

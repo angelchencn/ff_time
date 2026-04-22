@@ -34,11 +34,12 @@ Blocking endpoint. Submits to Agent Studio, polls internally until complete, ret
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `message` | string | **Yes** | -- | Natural language requirement. e.g. "Generate an overtime pay formula that calculates 1.5x rate for hours over 40" |
-| `formula_type` | string | No | `"TIME_LABOR"` | Formula type name. Determines DBIs, contexts, inputs, and RETURN variables. See [Formula Types](#formula-types) |
+| `template_code` | string | **Yes** | -- | Business key from `FF_FORMULA_TEMPLATES.TEMPLATE_CODE`. Server fetches the template's formula body, additional rules, formula type (from FK), and `USE_SYSTEM_PROMPT_FLAG` from DB. Always required -- even on multi-turn follow-ups |
 | `editor_code` | string | No | `""` | Existing formula code to modify/refine. When provided, the LLM edits this code instead of generating from scratch |
-| `session_id` | string | No | auto-generated | Session ID for multi-turn conversation. Reuse the value from the first response to continue refining |
-| `template_code` | string | No | -- | Business key from `FF_FORMULA_TEMPLATES.TEMPLATE_CODE`. Server fetches the template's formula body and additional rules from DB |
+| `session_id` | string | No | auto-generated | Session ID (Agent Studio conversationId) for multi-turn conversation. Reuse the value from the first response to continue refining |
 | `llm` | string | No | `"GPT5MINI"` | LLM model selector. Available: `"GPT5MINI"` (GPT-5 Mini), `"GPT41MINI"` (GPT-4.1 Mini). Passed as the `LLM` workflow variable in Agent Studio |
+
+Note: `formula_type` is **not** in the request body. It is derived server-side from the template's `FORMULA_TYPE_ID` FK in `FF_FORMULA_TYPES`. NULL FK defaults to "Custom".
 
 ### Response
 
@@ -65,17 +66,17 @@ Blocking endpoint. Submits to Agent Studio, polls internally until complete, ret
 ```json
 {
   "message": "Generate a time calculation rule formula that calculates overtime at 1.5x for hours exceeding 40 per week",
-  "formula_type": "WFM Time Calculation Rules"
+  "template_code": "ORA_HCM_FF_TCR_OVERTIME_001"
 }
 ```
 
-### Example: With Template Reference
+### Example: With LLM Selection
 
 ```json
 {
   "message": "Generate a flow schedule formula that returns the next scheduled date every 2 weeks",
-  "formula_type": "Flow Schedule",
-  "template_code": "ORA_HCM_FF_FLOW_SCHEDULE_838595"
+  "template_code": "ORA_HCM_FF_FLOW_SCHEDULE_838595",
+  "llm": "GPT41MINI"
 }
 ```
 
@@ -85,24 +86,14 @@ Blocking endpoint. Submits to Agent Studio, polls internally until complete, ret
 // Turn 1
 {
   "message": "Generate an element skip formula that skips processing when employee is on leave",
-  "formula_type": "Element Skip"
+  "template_code": "ORA_HCM_FF_ELEMENT_SKIP_001"
 }
 
-// Turn 2 -- pass back session_id from Turn 1
+// Turn 2 -- pass back session_id (conversationId) from Turn 1
 {
   "message": "Add a check for unpaid leave type as well",
-  "formula_type": "Element Skip",
-  "session_id": "8fcaf9bc-a176-4238-8fcc-cfa98d0c191f"
-}
-```
-
-### Example: Select LLM Model
-
-```json
-{
-  "message": "Generate an overtime formula",
-  "formula_type": "Oracle Payroll",
-  "llm": "GPT41MINI"
+  "template_code": "ORA_HCM_FF_ELEMENT_SKIP_001",
+  "session_id": "484B044033C78457E0639C71060AC075_..."
 }
 ```
 
@@ -246,8 +237,8 @@ Full list: 123 formula types available via `GET /formula-types`.
 
 | Turn | Parameters Sent | conversationId |
 |---|---|---|
-| First | ALL variables (SystemPrompt, FormulaType, ReferenceFormula, AdditionalRules, EditorCode, LLM) | empty (new conversation) |
-| Subsequent | EditorCode only (Conversation-scoped variables retained by Agent Studio) | reused from first response |
+| First | ALL variables (SystemPrompt, FormulaType, ReferenceFormula, AdditionalRules, EditorCode, LLM). SystemPrompt is empty if template has `USE_SYSTEM_PROMPT_FLAG='N'`. FormulaType is derived from template FK. | empty (new conversation) |
+| Subsequent | EditorCode only (Conversation-scoped variables retained by Agent Studio). template_code is always re-sent for server-side lookup. | reused from first response |
 
 ### Workflow Structure
 
@@ -375,6 +366,7 @@ Response: generated Fast Formula source code
 | FAI SDK | `AdfHcmFaiGenAiSdk.jar` on classpath (for `FAIOrchestratorAgentClientV2`) |
 | Agent Studio Workflow | `HCM_FF_GENERATOR` workflow published in Agent Studio |
 | System Prompt | At least one active row in `FF_FORMULA_TEMPLATES` with `SYSTEMPROMPT_FLAG='Y'` and `ACTIVE_FLAG='Y'` |
+| Template Config | Each template needs `USE_SYSTEM_PROMPT_FLAG` ('Y' = include system prompt, 'N' = skip). Column added to `FF_FORMULA_TEMPLATES` with default 'Y' |
 | Agent Studio Security | Calling user must have permission to execute the workflow |
 
 ---

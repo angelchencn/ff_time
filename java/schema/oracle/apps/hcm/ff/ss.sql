@@ -28,6 +28,12 @@ FROM FND_APPL_TAXONOMY fat,
   ) module_id
 where fat.module_id = module_id.source_module_id;
 
+select * from PAY_ACTION_LOGs where name = 'FF_AI_GENERATE' order by creation_date desc;
+select * from PAY_ACTION_LOG_LINES where action_log_id = 100107017904941;
+
+
+select * from fusion.FAI_WORKFLOWS_B where workflow_code like 'HCM_F%';
+update FAI_WORKFLOWS_B set workflow_code = 'HCM_FF_GENERATOR' where workflow_id = 300100652725594;
 
 SELECT c.constraint_name, c.constraint_type, cc.column_name, cc.position 
     FROM dba_constraints c JOIN dba_cons_columns cc ON c.owner = cc.owner AND c.table_name = cc.table_name AND c.constraint_name = cc.constraint_name 
@@ -178,7 +184,7 @@ delete from "ff_formula_templates" where template_id in (300100646124592, 100106
 
 update ff_formula_templates_tl set description = 'Complete Oracle Fusion Cloud HCM Fast Formula language specification for LLM code generation. Covers data types, statement ordering, operators, control flow, built-in functions, formula type output contracts, naming conventions, and guardrails against hallucinated syntax.' where template_id = 300100646125593;
 
-update ff_formula_templates set module_id = '61ECAF4AABAFE911E040449821C61C97' where template_id = 300100646125592;
+update ff_formula_templates set module_id = '61ECAF4AAAC2E990E040449821C61C97' where template_id = 300100646125593;
 update "ff_formula_templates_tl" set name = 'Fast Formula Language Reference', description = 'Complete Oracle Fusion Cloud HCM Fast Formula language specification for LLM code generation — covers data types, statement ordering, operators, control flow, built-in functions, formula type output contracts, naming conventions, and anti-hallucination rules.' where template_id = 100106861371859;
 
 select * from ff_formula_types;
@@ -532,3 +538,79 @@ Insert into HR_GEN_AI_PROMPTS_SEED_TL (PROMPT_TMPL_AI_ID,LANGUAGE,SOURCE_LANG,SE
   COMMIT;
 
   SET DEFINE ON;
+  
+  
+  
+  select * from fai_workflows_vl where workflow_code like 'ORA_HCM_FF_GENERATOR%';
+  select * from fai_workflows_b;
+  update fai_workflows_tl set description = 'Generates syntactically valid Oracle HCM Fast Formula source code from natural language requirements. Supports all formula types including Payroll, Time and Labor, Absence Management, and WFM rules. Features multi-turn conversation for iterative refinement, template-based generation with reference formulas, and configurable LLM backend.' where workflow_id = 100106861375610;
+  update fai_workflows_b set internal_name = 'Fast Formula Generator' where workflow_id = 100106861375610;
+
+  
+  select * from FAI_WORKFLOW_TAGS where workflow_id =100106861375610;
+  select GENERATED_DESCRIPTION from fai_workflows_b;
+  
+update "ff_formula_templates" set USE_SYSTEM_PROMPT_FLAG = 'Y';
+  
+  ALTER TABLE "ff_formula_templates"
+ADD (
+  USE_SYSTEM_PROMPT_FLAG VARCHAR2(1) default 'Y'
+);
+
+
+  CREATE OR REPLACE FORCE EDITIONABLE VIEW "FUSION"."FF_FORMULA_TEMPLATES" ("TEMPLATE_ID", "FORMULA_TYPE_ID", "TEMPLATE_CODE", "FORMULA_TEXT", "ADDITIONAL_PROMPT_TEXT", "SOURCE_TYPE", "SYSTEMPROMPT_FLAG", "ACTIVE_FLAG", "SEMANTIC_FLAG", "USE_SYSTEM_PROMPT_FLAG", "SORT_ORDER", "SEED_DATA_SOURCE", "CREATED_BY", "CREATION_DATE", "LAST_UPDATE_DATE", "LAST_UPDATE_LOGIN", "LAST_UPDATED_BY", "MODULE_ID", "ENTERPRISE_ID", "OBJECT_VERSION_NUMBER") AS 
+  SELECT
+    fft.TEMPLATE_ID TEMPLATE_ID,
+    fft.FORMULA_TYPE_ID FORMULA_TYPE_ID,
+    fft.TEMPLATE_CODE TEMPLATE_CODE,
+    fft.FORMULA_TEXT FORMULA_TEXT,
+    fft.ADDITIONAL_PROMPT_TEXT ADDITIONAL_PROMPT_TEXT,
+    fft.SOURCE_TYPE SOURCE_TYPE,
+    fft.SYSTEMPROMPT_FLAG SYSTEMPROMPT_FLAG,
+    fft.ACTIVE_FLAG ACTIVE_FLAG,
+    fft.SEMANTIC_FLAG SEMANTIC_FLAG,
+    fft.USE_SYSTEM_PROMPT_FLAG USE_SYSTEM_PROMPT_FLAG,
+    fft.SORT_ORDER SORT_ORDER,
+    fft.SEED_DATA_SOURCE SEED_DATA_SOURCE,
+    fft.CREATED_BY CREATED_BY,
+    fft.CREATION_DATE CREATION_DATE,
+    fft.LAST_UPDATE_DATE LAST_UPDATE_DATE,
+    fft.LAST_UPDATE_LOGIN LAST_UPDATE_LOGIN,
+    fft.LAST_UPDATED_BY LAST_UPDATED_BY,
+    fft.MODULE_ID MODULE_ID,
+    fft.ENTERPRISE_ID ENTERPRISE_ID,
+    fft.OBJECT_VERSION_NUMBER OBJECT_VERSION_NUMBER
+FROM "ff_formula_templates" fft;
+
+
+
+  CREATE OR REPLACE FORCE EDITIONABLE VIEW "FUSION"."FF_FORMULA_TEMPLATES_VL" ("TEMPLATE_ID", "FORMULA_TYPE_ID", "TEMPLATE_CODE", "FORMULA_TEXT", "ADDITIONAL_PROMPT_TEXT", "SOURCE_TYPE", "SYSTEMPROMPT_FLAG", "ACTIVE_FLAG", "SEMANTIC_FLAG", "USE_SYSTEM_PROMPT_FLAG", "SORT_ORDER", "SEED_DATA_SOURCE", "CREATED_BY", "CREATION_DATE", "LAST_UPDATE_DATE", "LAST_UPDATE_LOGIN", "LAST_UPDATED_BY", "MODULE_ID", "ENTERPRISE_ID", "OBJECT_VERSION_NUMBER", "NAME", "DESCRIPTION") AS 
+  SELECT
+    fft.TEMPLATE_ID TEMPLATE_ID,
+    fft.FORMULA_TYPE_ID FORMULA_TYPE_ID,
+    fft.TEMPLATE_CODE TEMPLATE_CODE,
+    fft.FORMULA_TEXT FORMULA_TEXT,
+    fft.ADDITIONAL_PROMPT_TEXT ADDITIONAL_PROMPT_TEXT,
+    fft.SOURCE_TYPE SOURCE_TYPE,
+    fft.SYSTEMPROMPT_FLAG SYSTEMPROMPT_FLAG,
+    fft.ACTIVE_FLAG ACTIVE_FLAG,
+    fft.SEMANTIC_FLAG SEMANTIC_FLAG,
+    fft.USE_SYSTEM_PROMPT_FLAG USE_SYSTEM_PROMPT_FLAG,
+    fft.SORT_ORDER SORT_ORDER,
+    fft.SEED_DATA_SOURCE SEED_DATA_SOURCE,
+    fft.CREATED_BY CREATED_BY,
+    fft.CREATION_DATE CREATION_DATE,
+    fft.LAST_UPDATE_DATE LAST_UPDATE_DATE,
+    fft.LAST_UPDATE_LOGIN LAST_UPDATE_LOGIN,
+    fft.LAST_UPDATED_BY LAST_UPDATED_BY,
+    fft.MODULE_ID MODULE_ID,
+    fft.ENTERPRISE_ID ENTERPRISE_ID,
+    fft.OBJECT_VERSION_NUMBER OBJECT_VERSION_NUMBER,
+    ffttl.NAME NAME,
+    ffttl.DESCRIPTION DESCRIPTION
+FROM
+    FF_FORMULA_TEMPLATES fft,
+    FF_FORMULA_TEMPLATES_TL ffttl
+WHERE
+    fft.TEMPLATE_ID = ffttl.TEMPLATE_ID AND ffttl.LANGUAGE = USERENV('LANG');
+

@@ -47,6 +47,7 @@ interface Template {
   active_flag?: string;        // 'Y' or 'N', default 'Y'
   semantic_flag?: string;      // 'Y' or 'N', default 'Y'
   systemprompt_flag?: string;  // 'Y' or 'N', default 'N'
+  use_system_prompt_flag?: string; // 'Y' or 'N', default 'Y'
   sort_order?: number;
   object_version_number?: number;
   /** Local-only marker for rows that haven't been saved yet. */
@@ -403,6 +404,7 @@ export function TemplatesPanel({ onBack }: Props) {
   const [editActive, setEditActive] = useState(true);
   const [editSemantic, setEditSemantic] = useState(true);
   const [editSystemPrompt, setEditSystemPrompt] = useState(false);
+  const [editUseSystemPrompt, setEditUseSystemPrompt] = useState(true);
   const [isDirty, setIsDirty] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -463,6 +465,7 @@ export function TemplatesPanel({ onBack }: Props) {
     setEditRule('');
     setEditActive(true);
     setEditSemantic(true);
+    setEditUseSystemPrompt(true);
     setIsDirty(false);
   }
 
@@ -479,6 +482,7 @@ export function TemplatesPanel({ onBack }: Props) {
     setEditActive(t.active_flag !== 'N');
     setEditSemantic(t.semantic_flag !== 'N');
     setEditSystemPrompt(t.systemprompt_flag === 'Y');
+    setEditUseSystemPrompt(t.use_system_prompt_flag !== 'N');
     setIsDirty(false);
   }
 
@@ -553,6 +557,7 @@ RETURN l_result
       active_flag: editActive ? 'Y' : 'N',
       semantic_flag: editSemantic ? 'Y' : 'N',
       systemprompt_flag: editSystemPrompt ? 'Y' : 'N',
+      use_system_prompt_flag: editUseSystemPrompt ? 'Y' : 'N',
       formula_type: current.formula_type_name || CUSTOM_FORMULA_TYPE,
     };
 
@@ -1271,7 +1276,7 @@ RETURN l_result
 
                   {/* Behavior */}
                   <section style={{ marginBottom: 22 }}>
-                    <SectionLabel hint="active_flag · semantic_flag">Behavior</SectionLabel>
+                    <SectionLabel hint="active_flag · semantic_flag · use_system_prompt_flag">Behavior</SectionLabel>
                     <div
                       style={{
                         display: 'grid',
@@ -1434,6 +1439,54 @@ RETURN l_result
                           {editSystemPrompt
                             ? 'This row\'s FORMULA_TEXT is the LLM system prompt.'
                             : 'Normal template (not a system prompt).'}
+                        </span>
+                      </label>
+
+                      {/* Use System Prompt toggle */}
+                      <label
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 3,
+                          marginLeft: 24,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: editUseSystemPrompt
+                                ? 'var(--text-tertiary)'
+                                : 'var(--accent-amber)',
+                              fontFamily: 'var(--font-body)',
+                              letterSpacing: '0.06em',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            Use System Prompt
+                          </span>
+                          <Switch
+                            size="small"
+                            checked={editUseSystemPrompt}
+                            onChange={(v) => {
+                              setEditUseSystemPrompt(v);
+                              setIsDirty(true);
+                            }}
+                          />
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: editUseSystemPrompt
+                              ? 'var(--text-tertiary)'
+                              : 'var(--accent-amber)',
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          {editUseSystemPrompt
+                            ? 'Include full FF language spec when generating with this template.'
+                            : 'Skip system prompt. Rely only on reference formula and additional rules.'}
                         </span>
                       </label>
                     </div>

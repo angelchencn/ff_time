@@ -153,9 +153,6 @@ public class LlmDebugDBLog {
                 // Line 50: EditorCode
                 safeInsertLine(ps, logId, 50, "EDITOR_CODE|" + truncateWithEllipsis(context.editorCodeOrEmpty()));
 
-                // Line 60: ChatHistory
-                safeInsertLine(ps, logId, 60, "CHAT_HISTORY|" + truncateWithEllipsis(context.chatHistoryOrEmpty()));
-
                 // Line 90: Token breakdown (uses original lengths)
                 String breakdown = buildTokenBreakdown(context);
                 safeInsertLine(ps, logId, 90, "TOKEN_BREAKDOWN|" + breakdown);
@@ -345,8 +342,6 @@ public class LlmDebugDBLog {
                         entry.put("additional_rules", stripPrefix(text, "ADDITIONAL_RULES|"));
                     } else if (lineNum == 50) {
                         entry.put("editor_code", stripPrefix(text, "EDITOR_CODE|"));
-                    } else if (lineNum == 60) {
-                        entry.put("chat_history", stripPrefix(text, "CHAT_HISTORY|"));
                     } else if (lineNum == 90) {
                         entry.put("token_breakdown", stripPrefix(text, "TOKEN_BREAKDOWN|"));
                     } else if (lineNum == 100) {
@@ -418,9 +413,7 @@ public class LlmDebugDBLog {
                 + ",editor_code:" + context.editorCodeOrEmpty().length()
                 + "/" + (context.editorCodeOrEmpty().length() / 4)
                 + ",additional_rules:" + context.additionalRulesOrEmpty().length()
-                + "/" + (context.additionalRulesOrEmpty().length() / 4)
-                + ",chat_history:" + context.chatHistoryOrEmpty().length()
-                + "/" + (context.chatHistoryOrEmpty().length() / 4);
+                + "/" + (context.additionalRulesOrEmpty().length() / 4);
     }
 
     private static int totalChars(PromptContext context) {
@@ -429,8 +422,7 @@ public class LlmDebugDBLog {
                 + context.formulaTypeOrEmpty().length()
                 + context.referenceFormulaOrEmpty().length()
                 + context.editorCodeOrEmpty().length()
-                + context.additionalRulesOrEmpty().length()
-                + context.chatHistoryOrEmpty().length();
+                + context.additionalRulesOrEmpty().length();
     }
 
     private static final int TRUNCATE_LIMIT = 3900;

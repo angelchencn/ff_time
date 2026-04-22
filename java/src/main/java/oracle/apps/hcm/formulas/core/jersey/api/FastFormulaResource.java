@@ -48,10 +48,27 @@ public class FastFormulaResource {
     public Response chat(Map<String, Object> request) {
         String message = (String) request.get("message");
         String editorCode = (String) request.getOrDefault("editor_code", "");
-        String formulaType = (String) request.getOrDefault("formula_type", "TIME_LABOR");
         String sessionId = (String) request.get("session_id");
         String llm = (String) request.get("llm");
-        if (llm == null) llm = (String) request.get("prompt_code");
+
+        // Template lookup — derives formulaType from the template's FK.
+        String templateCodeKey = (String) request.get("template_code");
+        String templateBody = null;
+        String templateRule = null;
+        String formulaType = CUSTOM_TYPE;
+        if (templateCodeKey != null && !templateCodeKey.isBlank()) {
+            try {
+                Map<String, Object> template = templateService.findByTemplateCode(templateCodeKey);
+                if (template != null) {
+                    templateBody = (String) template.get("code");
+                    templateRule = (String) template.get("rule");
+                    String ftName = (String) template.get("formula_type_name");
+                    formulaType = (ftName != null && !ftName.isBlank()) ? ftName : CUSTOM_TYPE;
+                }
+            } catch (SQLException e) {
+                AppsLogger.write(this, e, AppsLogger.SEVERE);
+            }
+        }
 
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
             AppsLogger.write(this,
@@ -59,22 +76,6 @@ public class FastFormulaResource {
                             + " session=" + sessionId
                             + " llm=" + llm,
                     AppsLogger.INFO);
-        }
-
-        // Template lookup
-        String templateCodeKey = (String) request.get("template_code");
-        String templateBody = null;
-        String templateRule = null;
-        if (templateCodeKey != null && !templateCodeKey.isBlank()) {
-            try {
-                Map<String, Object> template = templateService.findByTemplateCode(templateCodeKey);
-                if (template != null) {
-                    templateBody = (String) template.get("code");
-                    templateRule = (String) template.get("rule");
-                }
-            } catch (SQLException e) {
-                AppsLogger.write(this, e, AppsLogger.SEVERE);
-            }
         }
 
         String customSampleCode = templateBody;
@@ -186,10 +187,27 @@ public class FastFormulaResource {
     public Response chatStream(Map<String, Object> request) {
         String message = (String) request.get("message");
         String editorCode = (String) request.getOrDefault("editor_code", "");
-        String formulaType = (String) request.getOrDefault("formula_type", "TIME_LABOR");
         String sessionId = (String) request.get("session_id");
         String llm = (String) request.get("llm");
-        if (llm == null) llm = (String) request.get("prompt_code");
+
+        // Template lookup — derives formulaType from the template's FK.
+        String templateCodeKey = (String) request.get("template_code");
+        String templateBody = null;
+        String templateRule = null;
+        String formulaType = CUSTOM_TYPE;
+        if (templateCodeKey != null && !templateCodeKey.isBlank()) {
+            try {
+                Map<String, Object> template = templateService.findByTemplateCode(templateCodeKey);
+                if (template != null) {
+                    templateBody = (String) template.get("code");
+                    templateRule = (String) template.get("rule");
+                    String ftName = (String) template.get("formula_type_name");
+                    formulaType = (ftName != null && !ftName.isBlank()) ? ftName : CUSTOM_TYPE;
+                }
+            } catch (SQLException e) {
+                AppsLogger.write(this, e, AppsLogger.SEVERE);
+            }
+        }
 
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
             AppsLogger.write(this,
@@ -199,22 +217,6 @@ public class FastFormulaResource {
                             + " editorCodeLen=" + (editorCode == null ? 0 : editorCode.length())
                             + " messageLen=" + (message == null ? 0 : message.length()),
                     AppsLogger.INFO);
-        }
-
-        // Template lookup — same logic as /chat and /chat/sync.
-        String templateCodeKey = (String) request.get("template_code");
-        String templateBody = null;
-        String templateRule = null;
-        if (templateCodeKey != null && !templateCodeKey.isBlank()) {
-            try {
-                Map<String, Object> template = templateService.findByTemplateCode(templateCodeKey);
-                if (template != null) {
-                    templateBody = (String) template.get("code");
-                    templateRule = (String) template.get("rule");
-                }
-            } catch (SQLException e) {
-                AppsLogger.write(this, e, AppsLogger.SEVERE);
-            }
         }
 
         String customSampleCode = templateBody;
@@ -230,6 +232,7 @@ public class FastFormulaResource {
         final String csc = customSampleCode;
         final String cr = resolveEffectiveRule(sessionId, templateRule);
         final String pc = llm;
+        final String ft = formulaType;
 
         StreamingOutput stream = new StreamingOutput() {
             public void write(OutputStream out) throws IOException {
@@ -244,7 +247,7 @@ public class FastFormulaResource {
                 StringBuilder fullResponse = new StringBuilder();
 
                 // Uses streamChatWithContext → Agent Studio invokeStream (true SSE)
-                aiService.streamChat(message, editorCode, formulaType, history, csc, cr, pc, new java.util.function.Consumer<String>() {
+                aiService.streamChat(message, editorCode, ft, history, csc, cr, pc, new java.util.function.Consumer<String>() {
                     public void accept(String token) {
                         fullResponse.append(token);
                         try {
@@ -304,35 +307,32 @@ public class FastFormulaResource {
     public Response chatSync(Map<String, Object> request) {
         String message = (String) request.get("message");
         String editorCode = (String) request.getOrDefault("editor_code", "");
-        String formulaType = (String) request.getOrDefault("formula_type", "TIME_LABOR");
         String sessionId = (String) request.get("session_id");
-
         String llm = (String) request.get("llm");
-        if (llm == null) llm = (String) request.get("prompt_code");
 
-        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
-            AppsLogger.write(this,
-                    "POST /chat/sync: formulaType=" + formulaType
-                            + " session=" + sessionId
-                            + " llm=" + llm
-                            + " editorCodeLen=" + (editorCode == null ? 0 : editorCode.length())
-                            + " messageLen=" + (message == null ? 0 : message.length()),
-                    AppsLogger.INFO);
-        }
-
-        // Template lookup — same logic as streaming /chat.
+        // Template lookup — derives formulaType from the template's FK.
         String templateCodeKey = (String) request.get("template_code");
         String templateBody = null;
         String templateRule = null;
+        String formulaType = CUSTOM_TYPE;
+        boolean useSystemPrompt = true;
         if (templateCodeKey != null && !templateCodeKey.isBlank()) {
             try {
                 Map<String, Object> template = templateService.findByTemplateCode(templateCodeKey);
                 if (template != null) {
                     templateBody = (String) template.get("code");
                     templateRule = (String) template.get("rule");
+                    // Derive formulaType from template's formula_type_name
+                    // (joined from FF_FORMULA_TYPES). NULL FK → "Custom".
+                    String ftName = (String) template.get("formula_type_name");
+                    formulaType = (ftName != null && !ftName.isBlank()) ? ftName : CUSTOM_TYPE;
+                    String useSpFlag = (String) template.get("use_system_prompt_flag");
+                    useSystemPrompt = !"N".equalsIgnoreCase(useSpFlag);
                     if (AppsLogger.isEnabled(AppsLogger.FINER)) {
                         AppsLogger.write(this,
-                                "chatSync: resolved template_code=" + templateCodeKey,
+                                "chatSync: resolved template_code=" + templateCodeKey
+                                        + " formulaType=" + formulaType
+                                        + " useSystemPrompt=" + useSystemPrompt,
                                 AppsLogger.FINER);
                     }
                 } else if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
@@ -345,7 +345,18 @@ public class FastFormulaResource {
             }
         }
 
-        // Same customSampleCode semantics as /chat: "" for Custom-no-reference
+        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
+            AppsLogger.write(this,
+                    "POST /chat/sync: formulaType=" + formulaType
+                            + " session=" + sessionId
+                            + " llm=" + llm
+                            + " useSystemPrompt=" + useSystemPrompt
+                            + " editorCodeLen=" + (editorCode == null ? 0 : editorCode.length())
+                            + " messageLen=" + (message == null ? 0 : message.length()),
+                    AppsLogger.INFO);
+        }
+
+        // Same customSampleCode semantics: "" for Custom-no-reference
         // (suppress RAG), null for other types (enable RAG).
         String customSampleCode = templateBody;
         if (CUSTOM_TYPE.equalsIgnoreCase(formulaType)
@@ -379,7 +390,8 @@ public class FastFormulaResource {
 
         String rawResponse = aiService.chatOnce(
                 message, editorCode, formulaType, history, customSampleCode,
-                isAgentStudio ? templateRule : resolveEffectiveRule(sessionId, templateRule), llm);
+                isAgentStudio ? templateRule : resolveEffectiveRule(sessionId, templateRule),
+                llm, useSystemPrompt);
 
         // Check if the provider returned an error
         if (rawResponse != null && rawResponse.startsWith("Error:")) {

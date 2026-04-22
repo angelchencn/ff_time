@@ -121,7 +121,6 @@ export function EditorWithChat() {
 
     const body: Record<string, unknown> = {
       message: text,
-      formula_type: formulaType,
     };
     // Only send llm for Fusion environments (has auth).
     // Local dev uses OpenAI GPT 5.4 — llm is ignored server-side.

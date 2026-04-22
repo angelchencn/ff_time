@@ -27,7 +27,6 @@ interface LogDetail {
   reference_formula: string;
   additional_rules: string;
   editor_code: string;
-  chat_history: string;
   token_breakdown: string;
   response?: string;
   session_id?: string;
@@ -246,7 +245,6 @@ const DETAIL_FIELDS: Array<{ key: keyof LogDetail; breakdownKey: string; label: 
   { key: 'reference_formula', breakdownKey: 'reference_formula', label: 'Reference Formula' },
   { key: 'additional_rules',  breakdownKey: 'additional_rules',  label: 'Additional Rules' },
   { key: 'editor_code',       breakdownKey: 'editor_code',       label: 'Editor Code' },
-  { key: 'chat_history',      breakdownKey: 'chat_history',      label: 'Chat History' },
   { key: 'response',          breakdownKey: '',                   label: 'Response' },
 ];
 
