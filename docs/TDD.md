@@ -347,6 +347,43 @@ Workflow `HCM_FF_GENERATOR` configured in Fusion AI Agent Studio with:
 - Two LLM nodes: GPT-5 Mini (Oracle Premium), GPT-4.1 Mini (Oracle Premium)
 - Prompt template using `{{$context.$variables.*}}` and `{{$context.$system.*}}`
 
+Seed file: `seeddata/WorkflowSD.xml` (loaded via `FaiAgentSDAM`).
+
+### 5.3 Agent Studio Supported Business Object Seed
+
+**Seed file:** `seeddata/SupportedObjectSD.xml`
+
+Registers the Fast Formula Generator as a reusable **Supported Business Object** in AI Agent Studio. Once shipped, any workflow author can drop the tools into a workflow without manual REST wiring -- native authentication is handled by the Agent Studio runtime.
+
+| Attribute | Value |
+|---|---|
+| AM | `oracle.apps.hcm.fai.publicModel.seedDataLoader.applicationModule.FaiAgentSDAM` |
+| VO | `SupportedObject` |
+| BO Name (InternalName) | `Fast Formula Generator Business Object` |
+| Object Code | `ORA_HCM_FF_FASTFORMULAGENERATORBUSINESSOBJECT` |
+| Display Name | `Fast Formulas Generator` |
+| Object Source | `HCM_SEARCH` |
+| Family / Product | `HCM` / `GLOBAL_PAYROLL` |
+| REST Base Path | `/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants` |
+| Seeded Flag | `N` (customer-visible, not system-locked) |
+| Mandatory Flag | `N` |
+
+**Tools registered in `ObjectProperties.tools[]`:**
+
+| Tool | Operation | Resource Path |
+|---|---|---|
+| `generateFormulaSync` | POST | `/chat/sync` |
+| `generateFormulaAsync` | POST | `/chat` |
+| `pollJobStatus` | GET | `/chat/status/{pJob_Id}` |
+| `listTemplates` | GET | `/templates` |
+| `listFormulaTypes` | GET | `/formula-types` |
+| `validateFormula` | POST | `/validate` |
+| `healthCheck` | GET | `/health` |
+
+All tools set `useNativeAuthentication: true` -- Agent Studio resolves OAuth via TopologyManager; workflow authors do not configure credentials.
+
+**Conflict detection:** PK `[OBJECT_SOURCE, FAMILY, PRODUCT, OBJECT_CODE, SEEDED_FLAG]` on `FAI_SUPPT_OBJECTS_B`. Seed MERGE skips any row last updated by a user other than `SEED_DATA_FROM_APPLICATION` / `0`, so customer edits are preserved.
+
 ---
 
 ## 6. Testing
@@ -415,9 +452,11 @@ cd frontend && npm run dev -- --host 0.0.0.0  # Frontend at port 5173
 
 ### 9.1 AI Agent Studio
 
-Time & Labor team uptakes via AI Agent Studio, calling `/chat/sync` as a tool.
+Time & Labor team (and any other HCM consumer) uptakes via AI Agent Studio. The **Fast Formula Generator Business Object** is pre-registered through `seeddata/SupportedObjectSD.xml` -- workflow authors select it from the Business Object picker and use any of its 7 tools (`generateFormulaSync`, `generateFormulaAsync`, `pollJobStatus`, `listTemplates`, `listFormulaTypes`, `validateFormula`, `healthCheck`) without manual REST or OAuth wiring.
 
-See: [ff-ai-generator-uptake.md](ff-ai-generator-uptake.md)
+The typical integration path is a Tool node calling `generateFormulaSync` with `pMessage` + `pTemplate_code`, optionally `pLlm` / `pEditor_code` / `pSession_id` for multi-turn refinement.
+
+See: [ff-ai-generator-uptake.md](ff-ai-generator-uptake.md) (Quick Start for Agent Studio Workflow Authors)
 
 ### 9.2 Supported Formula Types (T&L)
 

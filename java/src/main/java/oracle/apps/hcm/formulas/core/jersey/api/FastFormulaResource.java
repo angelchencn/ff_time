@@ -23,8 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-@Path("/11.13.18.05/calculationEntries")
-//@Path("/11.13.18.05/fastFormulaAssistants")
+//@Path("/11.13.18.05/calculationEntries")
+@Path("/11.13.18.05/fastFormulaAssistants")
 public class FastFormulaResource {
 
     /** Sentinel value for the built-in "Custom Formula" type in requests + dropdowns. */

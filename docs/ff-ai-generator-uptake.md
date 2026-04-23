@@ -8,6 +8,65 @@ The default Agent Studio workflow code is `HCM_FF_GENERATOR`.
 
 ---
 
+## Quick Start for Agent Studio Workflow Authors
+
+The Fast Formulas Generator is pre-registered as a **Supported Business Object** in AI Agent Studio -- no manual tool wiring required. Workflow authors can drop it into a workflow directly.
+
+### Registered Business Object
+
+| Attribute | Value |
+|---|---|
+| BO Name | **Fast Formula Generator Business Object** |
+| Display Name | Fast Formulas Generator |
+| Object Code | `ORA_HCM_FF_FASTFORMULAGENERATORBUSINESSOBJECT` |
+| Object Source | `HCM_SEARCH` |
+| Family / Product | `HCM` / `GLOBAL_PAYROLL` |
+| REST Base Path | `/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants` |
+| Seed Source | `seeddata/SupportedObjectSD.xml` (shipped via `FaiAgentSDAM`) |
+| Authentication | Native Fusion (OAuth via TopologyManager) |
+
+### Available Tools (auto-registered)
+
+| Tool | Operation | Resource Path | Purpose |
+|---|---|---|---|
+| `generateFormulaSync` | POST | `/chat/sync` | **Recommended** -- blocking, returns full formula |
+| `generateFormulaAsync` | POST | `/chat` | Async submit, returns `jobId` |
+| `pollJobStatus` | GET | `/chat/status/{pJob_Id}` | Poll async job status |
+| `listTemplates` | GET | `/templates` | List formula templates |
+| `listFormulaTypes` | GET | `/formula-types` | List all formula types |
+| `validateFormula` | POST | `/validate` | 3-layer syntax/semantic/rules validation |
+| `healthCheck` | GET | `/health` | Health probe |
+
+### Tool Parameters (sync/async generate)
+
+| Parameter | Required | Description |
+|---|---|---|
+| `pMessage` | Yes | Natural language requirement |
+| `pTemplate_code` | Yes | Business key from `FF_FORMULA_TEMPLATES.TEMPLATE_CODE` (e.g. `ORA_HCM_FF_TER_MIN_HOURS_001`) |
+| `pLlm` | No | `GPT5MINI` (default) or `GPT41MINI` |
+| `pEditor_code` | No | Current editor code for refinement |
+| `pSession_id` | No | Agent Studio `conversationId` for multi-turn |
+
+### How to Use from a Workflow
+
+1. In Agent Studio **Workflow Designer**, add a Tool node.
+2. Select **Business Object** -> search "Fast Formula Generator Business Object".
+3. Pick the tool (e.g. `generateFormulaSync`).
+4. Map workflow variables to tool parameters (`pMessage`, `pTemplate_code`, `pLlm`, `pEditor_code`, `pSession_id`).
+5. The tool invokes the REST endpoint with native authentication -- no OAuth setup required.
+
+Sample query embedded in the seed data:
+
+```json
+{
+  "message": "Generate a time entry rule formula that validates minimum hours",
+  "template_code": "ORA_HCM_FF_TER_MIN_HOURS_001",
+  "llm": "GPT5MINI"
+}
+```
+
+---
+
 ## Endpoints
 
 | Endpoint | Method | Response | Behavior |

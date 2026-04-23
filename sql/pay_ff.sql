@@ -543,8 +543,8 @@ Insert into HR_GEN_AI_PROMPTS_SEED_TL (PROMPT_TMPL_AI_ID,LANGUAGE,SOURCE_LANG,SE
   
   select * from fai_workflows_vl where workflow_code like 'ORA_HCM_FF_GENERATOR%';
   select * from fai_workflows_b;
-  update fai_workflows_tl set description = 'Generates syntactically valid Oracle HCM Fast Formula source code from natural language requirements. Supports all formula types including Payroll, Time and Labor, Absence Management, and WFM rules. Features multi-turn conversation for iterative refinement, template-based generation with reference formulas, and configurable LLM backend.' where workflow_id = 100106861375610;
-  update fai_workflows_b set internal_name = 'Fast Formula Generator' where workflow_id = 100106861375610;
+  update fai_workflows_tl set name = 'Fast Formula Generator' where workflow_id = 100106861377610;
+  update fai_workflows_b set internal_name = 'Fast Formula Generator' where workflow_id = 100106861377610;
 
   
   select * from FAI_WORKFLOW_TAGS where workflow_id =100106861375610;

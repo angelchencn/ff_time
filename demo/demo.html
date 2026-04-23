@@ -1880,7 +1880,7 @@ Behavior:
   <div class="connector"><div class="line line-copper" style="height:40px;"></div></div>
 
   <div class="card accent-copper" style="border-left-color: var(--copper-dark);">
-    <h4 style="color:var(--copper-dark); font-size:18px;">Base Table Columns (20)</h4>
+    <h4 style="color:var(--copper-dark); font-size:18px;">Base Table Columns (21)</h4>
     <div class="desc" style="margin-bottom:14px;">
       Grouped by concern. Seeded rows come from the Fusion Seed Data Framework; user-saved rows come from the REST API.
     </div>
@@ -1903,6 +1903,7 @@ Behavior:
         <tr><td><code>SOURCE_TYPE</code></td><td>VARCHAR2(30)</td><td>NOT NULL</td><td><code>SEEDED</code> / <code>USER_CREATED</code></td></tr>
         <tr><td><code>ACTIVE_FLAG</code></td><td>VARCHAR2(1)</td><td>NOT NULL</td><td><code>Y</code>/<code>N</code> — visible in UI</td></tr>
         <tr><td><code>SEMANTIC_FLAG</code></td><td>VARCHAR2(1)</td><td>NOT NULL</td><td><code>Y</code> = participates in RAG vector search; <code>N</code> = excluded</td></tr>
+        <tr><td><code>USE_SYSTEM_PROMPT_FLAG</code></td><td>VARCHAR2(1)</td><td>NOT NULL</td><td><code>Y</code> (default) = include system prompt (~730 lines FF language spec) when generating; <code>N</code> = skip system prompt, rely only on reference formula and additional rules</td></tr>
         <tr><td><code>SORT_ORDER</code></td><td>NUMBER(9,0)</td><td>NULL</td><td>Display order within a formula type</td></tr>
 
         <tr><td colspan="4" style="background:var(--copper-bg); color:var(--copper-dark); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:1px;">WHO Columns (6)</td></tr>
