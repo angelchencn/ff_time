@@ -260,6 +260,7 @@ public class AiService {
                            String customSampleCode,
                            String customRule,
                            String promptCode,
+                           String workflowCode,
                            Consumer<String> tokenCallback) {
         if (AppsLogger.isEnabled(AppsLogger.FINER)) {
             AppsLogger.write(this,
@@ -268,7 +269,8 @@ public class AiService {
                             + " historyTurns=" + history.size()
                             + " hasSample=" + (customSampleCode != null)
                             + " hasRule=" + (customRule != null && !customRule.isBlank())
-                            + " promptCode=" + promptCode,
+                            + " promptCode=" + promptCode
+                            + " workflowCode=" + workflowCode,
                     AppsLogger.FINER);
         }
         if (!provider.isAvailable()) {
@@ -282,14 +284,26 @@ public class AiService {
         }
         PromptContext context = buildPromptContext(
                 message, editorCode, formulaType, history, customSampleCode, customRule,
-                promptCode, true);
+                promptCode, workflowCode, true);
         provider.streamChatWithContext(context, MAX_TOKENS_CHAT, tokenCallback);
+    }
+
+    /** Back-compat overload without workflowCode (defaults to provider default). */
+    public void streamChat(String message, String editorCode, String formulaType,
+                           List<Map<String, String>> history,
+                           String customSampleCode,
+                           String customRule,
+                           String promptCode,
+                           Consumer<String> tokenCallback) {
+        streamChat(message, editorCode, formulaType, history, customSampleCode, customRule,
+                promptCode, null, tokenCallback);
     }
 
     /** Convenience overload without history/custom sample/rule/promptCode */
     public void streamChat(String message, String editorCode, String formulaType,
                            Consumer<String> tokenCallback) {
-        streamChat(message, editorCode, formulaType, List.of(), null, null, null, tokenCallback);
+        streamChat(message, editorCode, formulaType, List.of(), null, null, null, null,
+                tokenCallback);
     }
 
     /**
@@ -305,6 +319,7 @@ public class AiService {
                            String customSampleCode,
                            String customRule,
                            String promptCode,
+                           String workflowCode,
                            boolean useSystemPrompt) {
         if (AppsLogger.isEnabled(AppsLogger.FINER)) {
             AppsLogger.write(this,
@@ -312,6 +327,7 @@ public class AiService {
                             + " formulaType=" + formulaType
                             + " historyTurns=" + history.size()
                             + " promptCode=" + promptCode
+                            + " workflowCode=" + workflowCode
                             + " useSystemPrompt=" + useSystemPrompt,
                     AppsLogger.FINER);
         }
@@ -325,7 +341,7 @@ public class AiService {
         }
         PromptContext context = buildPromptContext(
                 message, editorCode, formulaType, history, customSampleCode, customRule,
-                promptCode, useSystemPrompt);
+                promptCode, workflowCode, useSystemPrompt);
         String response = provider.completeWithContext(context, MAX_TOKENS_CHAT);
         if (AppsLogger.isEnabled(AppsLogger.FINER)) {
             AppsLogger.write(this,
@@ -339,6 +355,17 @@ public class AiService {
                 provider.name(), MAX_TOKENS_CHAT, "chatOnce", context, result);
 
         return result;
+    }
+
+    /** Back-compat overload without workflowCode (defaults to provider default). */
+    public String chatOnce(String message, String editorCode, String formulaType,
+                           List<Map<String, String>> history,
+                           String customSampleCode,
+                           String customRule,
+                           String promptCode,
+                           boolean useSystemPrompt) {
+        return chatOnce(message, editorCode, formulaType, history, customSampleCode, customRule,
+                promptCode, null, useSystemPrompt);
     }
 
     // ── Structured prompt context ───────────────────────────────────────────
@@ -363,6 +390,7 @@ public class AiService {
             String message, String editorCode, String formulaType,
             List<Map<String, String>> history,
             String customSampleCode, String customRule, String promptCode,
+            String workflowCode,
             boolean useSystemPrompt) {
 
         String systemPrompt = useSystemPrompt ? getSystemPrompt() : "";
@@ -371,6 +399,7 @@ public class AiService {
         String normalizedEditor = (editorCode == null || editorCode.isBlank()) ? "" : editorCode;
         String additionalRules = (customRule == null || customRule.isBlank()) ? "" : customRule;
         String chatHistoryText = formatChatHistory(history);
+        String wfCode = (workflowCode == null || workflowCode.isBlank()) ? null : workflowCode;
 
         return new PromptContext(
                 systemPrompt,
@@ -380,8 +409,19 @@ public class AiService {
                 normalizedEditor,
                 additionalRules,
                 chatHistoryText,
-                promptCode
+                promptCode,
+                wfCode
         );
+    }
+
+    /** Back-compat overload without workflowCode. */
+    PromptContext buildPromptContext(
+            String message, String editorCode, String formulaType,
+            List<Map<String, String>> history,
+            String customSampleCode, String customRule, String promptCode,
+            boolean useSystemPrompt) {
+        return buildPromptContext(message, editorCode, formulaType, history,
+                customSampleCode, customRule, promptCode, null, useSystemPrompt);
     }
 
     /**
@@ -468,11 +508,20 @@ public class AiService {
      */
     public String submitAsync(String message, String editorCode, String formulaType,
                               List<Map<String, String>> history,
-                              String customSampleCode, String customRule, String promptCode) {
+                              String customSampleCode, String customRule, String promptCode,
+                              String workflowCode) {
         PromptContext context = buildPromptContext(
                 message, editorCode, formulaType, history, customSampleCode, customRule,
-                promptCode, true);
+                promptCode, workflowCode, true);
         return provider.submitAsync(context);
+    }
+
+    /** Back-compat overload without workflowCode. */
+    public String submitAsync(String message, String editorCode, String formulaType,
+                              List<Map<String, String>> history,
+                              String customSampleCode, String customRule, String promptCode) {
+        return submitAsync(message, editorCode, formulaType, history, customSampleCode, customRule,
+                promptCode, null);
     }
 
     /**

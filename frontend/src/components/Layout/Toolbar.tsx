@@ -105,6 +105,7 @@ export function Toolbar({ onManageTemplates }: Props) {
           label="Templates"
           onClick={onManageTemplates}
           accent
+          testId="toolbar-templates-button"
         />
         <Divider />
         <Tooltip title="LLM debug logs" mouseEnterDelay={0.3}>
@@ -139,17 +140,20 @@ function ToolbarButton({
   label,
   onClick,
   accent,
+  testId,
 }: {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
   accent?: boolean;
+  testId?: string;
 }) {
   const [hover, setHover] = useState(false);
   const showAccent = accent || hover;
   return (
     <button
       type="button"
+      data-testid={testId}
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}

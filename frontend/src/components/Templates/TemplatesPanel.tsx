@@ -749,6 +749,7 @@ RETURN l_result
         }}
       >
         <button
+          data-testid="templates-back-button"
           onClick={onBack}
           style={{
             display: 'flex',
@@ -811,6 +812,7 @@ RETURN l_result
         <div style={{ flex: 1 }} />
 
         <Button
+          data-testid="templates-new-button"
           type="primary"
           icon={<PlusOutlined />}
           onClick={handleNew}
@@ -897,7 +899,7 @@ RETURN l_result
                 </div>
               </div>
             ) : (
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              <ul data-testid="templates-list" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                 {templates.map((item, index) => {
                   const isSelected = index === selectedIndex;
                   const isHovered = hoverIndex === index && !isSelected;
@@ -1103,6 +1105,7 @@ RETURN l_result
                       : 'Unsaved draft'}
                   </div>
                   <input
+                    data-testid="template-name-input"
                     value={editName}
                     onChange={(e) => {
                       setEditName(e.target.value);
@@ -1164,6 +1167,7 @@ RETURN l_result
                   />
 
                   <Button
+                    data-testid="template-save-button"
                     type={isDirty ? 'primary' : 'default'}
                     icon={<SaveOutlined />}
                     onClick={handleSave}
@@ -1214,6 +1218,7 @@ RETURN l_result
                     <SectionLabel>Identity</SectionLabel>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <Input
+                        data-testid="template-description-input"
                         value={editDesc}
                         onChange={(e) => {
                           setEditDesc(e.target.value);

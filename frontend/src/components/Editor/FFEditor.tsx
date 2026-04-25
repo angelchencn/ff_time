@@ -7,6 +7,12 @@ import { registerFastFormulaLanguage, FF_LANGUAGE_ID } from '../../languages/fas
 import { registerFFCompletionProvider } from '../../languages/ff-completion';
 import type { Diagnostic } from '../../services/api';
 
+declare global {
+  interface Window {
+    __ffTimeQaSetEditorValue?: (value: string) => void;
+  }
+}
+
 interface FFEditorProps {
   dbiNames?: string[];
   height?: string;
@@ -38,6 +44,12 @@ export function FFEditor({ dbiNames = [], height = '100%' }: FFEditorProps) {
 
     registerFastFormulaLanguage(monaco);
     completionDisposable.current = registerFFCompletionProvider(monaco, dbiNames);
+
+    if (import.meta.env.DEV) {
+      window.__ffTimeQaSetEditorValue = (value: string) => {
+        editor.setValue(value);
+      };
+    }
   };
 
   // Update Monaco markers when diagnostics change
@@ -65,26 +77,31 @@ export function FFEditor({ dbiNames = [], height = '100%' }: FFEditorProps) {
   useEffect(() => {
     return () => {
       completionDisposable.current?.dispose();
+      if (window.__ffTimeQaSetEditorValue) {
+        delete window.__ffTimeQaSetEditorValue;
+      }
     };
   }, []);
 
   return (
-    <MonacoEditor
-      height={height}
-      language={FF_LANGUAGE_ID}
-      value={code}
-      onChange={(value) => setCode(value ?? '')}
-      onMount={handleMount}
-      options={{
-        minimap: { enabled: false },
-        fontSize: 14,
-        lineNumbers: 'on',
-        wordWrap: 'on',
-        automaticLayout: true,
-        scrollBeyondLastLine: false,
-        tabSize: 2,
-      }}
-      theme="light"
-    />
+    <div data-testid="ff-editor" style={{ height }}>
+      <MonacoEditor
+        height={height}
+        language={FF_LANGUAGE_ID}
+        value={code}
+        onChange={(value) => setCode(value ?? '')}
+        onMount={handleMount}
+        options={{
+          minimap: { enabled: false },
+          fontSize: 14,
+          lineNumbers: 'on',
+          wordWrap: 'on',
+          automaticLayout: true,
+          scrollBeyondLastLine: false,
+          tabSize: 2,
+        }}
+        theme="light"
+      />
+    </div>
   );
 }

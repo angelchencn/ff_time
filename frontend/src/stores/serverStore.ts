@@ -15,15 +15,9 @@ const DEFAULT_SERVERS: ServerConfig[] = [
     auth: { username: 'tm-mfitzimmons', password: 'Welcome1' },
   },
   {
-    name: 'Payroll VP DEV',
-    baseUrl: '/fusion-proxy',
-    apiPrefix: '/hcmRestApi/redwood/11.13.18.05/calculationEntries',
-    auth: { username: 'hcm.user@oracle.com', password: 'Welcome1' },
-  },
-  {
-    name: 'Local Dev (Grizzly)',
-    baseUrl: 'http://100.95.220.150:8000',
-    apiPrefix: '/api/11.13.18.05/calculationEntries',
+    name: 'cookie cutter',
+    baseUrl: '/cookie-cutter-proxy',
+    apiPrefix: '/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants',
   },
 ];
 

@@ -13,6 +13,12 @@ export default defineConfig({
         secure: false,
         rewrite: (path) => path.replace(/^\/fusion-proxy/, ''),
       },
+      '/cookie-cutter-proxy': {
+        target: 'https://cptcmqzqy.fusionapps.ocs.oc-test.com',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/cookie-cutter-proxy/, ''),
+      },
     },
   },
 })

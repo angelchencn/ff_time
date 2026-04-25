@@ -24,7 +24,8 @@ public record PromptContext(
         String editorCode,
         String additionalRules,
         String chatHistory,
-        String promptCode
+        String promptCode,
+        String workflowCode
 ) {
     // Property key names — must match {placeholder} names in the Spectra
     // prompt template (hr_gen_ai_prompts_seed_b.prompt_tmpl).
@@ -43,7 +44,7 @@ public record PromptContext(
      * with a formula type. Other fields default to empty.
      */
     public static PromptContext of(String systemPrompt, String message, String formulaType) {
-        return new PromptContext(systemPrompt, message, formulaType, "", "", "", "", null);
+        return new PromptContext(systemPrompt, message, formulaType, "", "", "", "", null, null);
     }
 
     /** Null-safe accessor: returns "" instead of null. */
@@ -55,4 +56,5 @@ public record PromptContext(
     public String additionalRulesOrEmpty()  { return additionalRules == null  ? "" : additionalRules; }
     public String chatHistoryOrEmpty()      { return chatHistory == null      ? "" : chatHistory; }
     public String promptCodeOrNull()        { return promptCode; }
+    public String workflowCodeOrNull()      { return workflowCode; }
 }

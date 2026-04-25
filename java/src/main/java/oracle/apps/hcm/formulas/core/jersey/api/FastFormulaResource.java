@@ -50,6 +50,7 @@ public class FastFormulaResource {
         String editorCode = (String) request.getOrDefault("editor_code", "");
         String sessionId = (String) request.get("session_id");
         String llm = (String) request.get("llm");
+        String workflowCode = (String) request.get("workflow_code");
 
         // Template lookup — derives formulaType from the template's FK.
         String templateCodeKey = (String) request.get("template_code");
@@ -74,7 +75,8 @@ public class FastFormulaResource {
             AppsLogger.write(this,
                     "POST /chat (async): formulaType=" + formulaType
                             + " session=" + sessionId
-                            + " llm=" + llm,
+                            + " llm=" + llm
+                            + " workflowCode=" + workflowCode,
                     AppsLogger.INFO);
         }
 
@@ -90,7 +92,7 @@ public class FastFormulaResource {
         try {
             String asyncResponse = aiService.submitAsync(
                     message, editorCode, formulaType, history, customSampleCode,
-                    resolveEffectiveRule(sessionId, templateRule), llm);
+                    resolveEffectiveRule(sessionId, templateRule), llm, workflowCode);
 
             // Parse jobId from the provider response
             String jobId = "";
@@ -189,6 +191,7 @@ public class FastFormulaResource {
         String editorCode = (String) request.getOrDefault("editor_code", "");
         String sessionId = (String) request.get("session_id");
         String llm = (String) request.get("llm");
+        String workflowCode = (String) request.get("workflow_code");
 
         // Template lookup — derives formulaType from the template's FK.
         String templateCodeKey = (String) request.get("template_code");
@@ -214,6 +217,7 @@ public class FastFormulaResource {
                     "POST /chat/stream: formulaType=" + formulaType
                             + " session=" + sessionId
                             + " llm=" + llm
+                            + " workflowCode=" + workflowCode
                             + " editorCodeLen=" + (editorCode == null ? 0 : editorCode.length())
                             + " messageLen=" + (message == null ? 0 : message.length()),
                     AppsLogger.INFO);
@@ -233,6 +237,7 @@ public class FastFormulaResource {
         final String cr = resolveEffectiveRule(sessionId, templateRule);
         final String pc = llm;
         final String ft = formulaType;
+        final String wf = workflowCode;
 
         StreamingOutput stream = new StreamingOutput() {
             public void write(OutputStream out) throws IOException {
@@ -247,7 +252,7 @@ public class FastFormulaResource {
                 StringBuilder fullResponse = new StringBuilder();
 
                 // Uses streamChatWithContext → Agent Studio invokeStream (true SSE)
-                aiService.streamChat(message, editorCode, ft, history, csc, cr, pc, new java.util.function.Consumer<String>() {
+                aiService.streamChat(message, editorCode, ft, history, csc, cr, pc, wf, new java.util.function.Consumer<String>() {
                     public void accept(String token) {
                         fullResponse.append(token);
                         try {
@@ -309,6 +314,7 @@ public class FastFormulaResource {
         String editorCode = (String) request.getOrDefault("editor_code", "");
         String sessionId = (String) request.get("session_id");
         String llm = (String) request.get("llm");
+        String workflowCode = (String) request.get("workflow_code");
 
         // Template lookup — derives formulaType from the template's FK.
         String templateCodeKey = (String) request.get("template_code");
@@ -350,6 +356,7 @@ public class FastFormulaResource {
                     "POST /chat/sync: formulaType=" + formulaType
                             + " session=" + sessionId
                             + " llm=" + llm
+                            + " workflowCode=" + workflowCode
                             + " useSystemPrompt=" + useSystemPrompt
                             + " editorCodeLen=" + (editorCode == null ? 0 : editorCode.length())
                             + " messageLen=" + (message == null ? 0 : message.length()),
@@ -391,7 +398,7 @@ public class FastFormulaResource {
         String rawResponse = aiService.chatOnce(
                 message, editorCode, formulaType, history, customSampleCode,
                 isAgentStudio ? templateRule : resolveEffectiveRule(sessionId, templateRule),
-                llm, useSystemPrompt);
+                llm, workflowCode, useSystemPrompt);
 
         // Check if the provider returned an error
         if (rawResponse != null && rawResponse.startsWith("Error:")) {

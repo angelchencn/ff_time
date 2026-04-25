@@ -38,12 +38,12 @@ export function StatusBar() {
     >
       <Space size={12}>
         {isValid ? (
-          <Space size={4}>
+          <Space size={4} data-testid="status-validation-state">
             <CheckCircleOutlined style={{ color: 'var(--accent-green)', fontSize: 11 }} />
             <Text style={{ color: 'var(--accent-green)', fontSize: 11, fontFamily: 'var(--font-mono)' }}>OK</Text>
           </Space>
         ) : (
-          <Space size={4}>
+          <Space size={4} data-testid="status-validation-state">
             <CloseCircleOutlined style={{ color: 'var(--accent-red)', fontSize: 11 }} />
             <Text style={{ color: 'var(--accent-red)', fontSize: 11, fontFamily: 'var(--font-mono)' }}>ERROR</Text>
           </Space>

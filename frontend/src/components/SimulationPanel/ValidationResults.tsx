@@ -43,7 +43,7 @@ export function ValidationResults() {
   const warnings = diagnostics.filter((d) => d.severity === 'warning');
 
   return (
-    <div style={{ padding: 16 }}>
+    <div data-testid="validation-results" style={{ padding: 16 }}>
       <Space style={{ marginBottom: 12 }}>
         <Tag color={isValid ? 'green' : 'red'}>{isValid ? 'VALID' : 'INVALID'}</Tag>
         {errors.length > 0 && <Tag color="red">{errors.length} error{errors.length !== 1 ? 's' : ''}</Tag>}

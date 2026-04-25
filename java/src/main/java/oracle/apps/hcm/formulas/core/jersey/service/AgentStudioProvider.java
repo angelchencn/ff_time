@@ -70,6 +70,38 @@ public class AgentStudioProvider implements LlmProvider {
      */
     private static final ThreadLocal<String> lastConversationId = new ThreadLocal<>();
 
+    /**
+     * Maps async jobId → workflowCode used at submit time, so subsequent
+     * {@link #getJobStatus(String)} calls can poll the correct workflow
+     * when the caller did not provide one (e.g. a client that only has
+     * the jobId from a previous submit). Entries are best-effort and
+     * may be lost across restarts — callers that need durability should
+     * pass the workflow code back on the poll path.
+     */
+    private static final ConcurrentHashMap<String, String> jobIdToWorkflow =
+            new ConcurrentHashMap<>();
+
+    /**
+     * Resolve the workflow code for a given request. Falls back to the
+     * default {@link #DEFAULT_WORKFLOW_CODE} when the context does not
+     * specify one.
+     */
+    private static String resolveWorkflowCode(PromptContext context) {
+        if (context == null) return DEFAULT_WORKFLOW_CODE;
+        String wf = context.workflowCodeOrNull();
+        return (wf == null || wf.isBlank()) ? DEFAULT_WORKFLOW_CODE : wf;
+    }
+
+    /**
+     * Resolve the workflow code for a plain jobId poll. Uses the stored
+     * mapping from submit time; falls back to the default when unknown.
+     */
+    private static String resolveWorkflowCodeForJob(String jobId) {
+        if (jobId == null || jobId.isBlank()) return DEFAULT_WORKFLOW_CODE;
+        String wf = jobIdToWorkflow.get(jobId);
+        return (wf == null || wf.isBlank()) ? DEFAULT_WORKFLOW_CODE : wf;
+    }
+
     @Override
     public String getLastConversationId() {
         return lastConversationId.get();
@@ -102,7 +134,7 @@ public class AgentStudioProvider implements LlmProvider {
 
     @Override
     public String submitAsync(PromptContext context) {
-        String workflowCode = DEFAULT_WORKFLOW_CODE;
+        String workflowCode = resolveWorkflowCode(context);
         String chatHistory = context.chatHistoryOrEmpty();
         boolean isFirstTurn = chatHistory.isBlank();
         String sessionKey = deriveSessionKey(context);
@@ -119,6 +151,17 @@ public class AgentStudioProvider implements LlmProvider {
         try {
             Object agentRequest = buildAgentRequest(context, isFirstTurn, conversationId);
             String response = invokeAsync(workflowCode, agentRequest);
+            // Remember which workflow ran this job so poll(jobId) can route
+            // correctly even when the caller only has the jobId.
+            try {
+                JsonNode node = MAPPER.readTree(response);
+                String jobId = extractJobId(node);
+                if (jobId != null && !jobId.isBlank()) {
+                    jobIdToWorkflow.put(jobId, workflowCode);
+                }
+            } catch (Exception ignore) {
+                // response may not be JSON — skip mapping
+            }
             return response;
         } catch (Throwable t) {
             Throwable cause = unwrap(t);
@@ -129,19 +172,23 @@ public class AgentStudioProvider implements LlmProvider {
 
     @Override
     public String getJobStatus(String jobId) {
-        String workflowCode = DEFAULT_WORKFLOW_CODE;
+        String workflowCode = resolveWorkflowCodeForJob(jobId);
         try {
             ensureClientReflection();
             Object client = cachedClientConstructor.newInstance();
             String response = (String) cachedGetStatus.invoke(client, workflowCode, jobId);
 
-            // Store conversationId if job is complete
+            // Store conversationId if job is complete; drop the jobId→workflow
+            // mapping once the job reaches a terminal state so the map does
+            // not grow without bound.
             if (response != null) {
                 JsonNode node = MAPPER.readTree(response);
                 String status = node.path("status").asText("");
                 if ("COMPLETE".equalsIgnoreCase(status)) {
-                    // Use a generic session key since we don't have context here
                     storeConversationId(workflowCode + "|" + jobId, node);
+                    jobIdToWorkflow.remove(jobId);
+                } else if ("ERROR".equalsIgnoreCase(status)) {
+                    jobIdToWorkflow.remove(jobId);
                 }
             }
 
@@ -157,7 +204,7 @@ public class AgentStudioProvider implements LlmProvider {
 
     @Override
     public String completeWithContext(PromptContext context, int maxTokens) {
-        String workflowCode = DEFAULT_WORKFLOW_CODE;
+        String workflowCode = resolveWorkflowCode(context);
 
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
             AppsLogger.write(this,
@@ -250,7 +297,7 @@ public class AgentStudioProvider implements LlmProvider {
     @Override
     public void streamChatWithContext(PromptContext context, int maxTokens,
                                       Consumer<String> tokenCallback) {
-        String workflowCode = DEFAULT_WORKFLOW_CODE;
+        String workflowCode = resolveWorkflowCode(context);
         String chatHistory = context.chatHistoryOrEmpty();
         boolean isFirstTurn = chatHistory.isBlank();
         String sessionKey = deriveSessionKey(context);
