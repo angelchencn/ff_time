@@ -1,3 +1,6 @@
+ALTER SESSION SET CURRENT_SCHEMA = FUSION;
+
+
 SET DEFINE OFF 
    
   DELETE FROM FAI_WORKFLOW_SEED_ROLES WHERE WORKFLOW_ID IN (SELECT workflow_id FROM fai_workflows_b WHERE workflow_code = 'ORA_HCM_FF_GENERATOR'); 
@@ -24,7 +27,8 @@ Here is the JSON Schema format the output should adhere to:
 
 select * from fnd_tables where table_name like 'FAI%';
 
-select * from fai_workflows_vl where workflow_code = 'ORA_HCM_FF_GENERATOR';
+select * from fai_workflows_vl where workflow_code like '%ORA_HCM_FF_GENERATOR%';
+
 select * from fusion.FAI_SUPPT_OBJECTS_VL where object_code like 'ORA_HCM_FF_FASTFORMULAGENERATORBUSINESSOBJECT' order by creation_date desc;
 select * from FAI_SUPPT_OBJECTS_B where internal_name like '%Fast Formula%';
 
@@ -51,3 +55,6 @@ Insert into FAI_SUPPT_OBJECTS_B (SUPPT_OBJECT_ID,OBJECT_CODE,INTERNAL_NAME,INTER
 || TO_CLOB(q'[.05/fastFormulaAssistants/health","resourceType":"HCM_SEARCH","sampleQueries":[],"type":"BUS_OBJECT","useNativeAuthentication":true}]}]'), EMPTY_CLOB(),'TM-MFITZIMMONS',to_timestamp('22-APR-26 06.18.00.840766000 PM','DD-MON-RR HH.MI.SSXFF AM'),'TM-MFITZIMMONS',to_timestamp('22-APR-26 06.48.56.190096000 PM','DD-MON-RR HH.MI.SSXFF AM'),null,4,'SDFFILE','Y','Y','61ECAF4AAAC2E990E040449821C61C97');
 
 Insert into FAI_SUPPT_OBJECTS_TL (SUPPT_OBJECT_ID,OBJECT_DISPLAY_NAME,DESCRIPTION,CREATED_BY,CREATION_DATE,LAST_UPDATED_BY,LAST_UPDATE_DATE,LAST_UPDATE_LOGIN,OBJECT_VERSION_NUMBER,SEED_DATA_SOURCE,ORA_SEED_SET1,ORA_SEED_SET2,SOURCE_LANG,LANGUAGE) values (300100652824190,'Fast Formulas Generator',null,'SEED_DATA_FROM_APPLICATION',to_timestamp('01-APR-26 05.51.28.000000000 PM','DD-MON-RR HH.MI.SSXFF AM'),'SEED_DATA_FROM_APPLICATION',to_timestamp('01-APR-26 05.51.28.000000000 PM','DD-MON-RR HH.MI.SSXFF AM'),'-1',1,'SDFFILE','N','Y','US','US');
+
+select * from fusion.FAI_SUPPT_OBJECTS_B where object_code like 'ORA_HCM_FF%';
+select * from fusion.fai_workflows_vl where workflow_code = 'ORA_HCM_FF_GENERATOR';

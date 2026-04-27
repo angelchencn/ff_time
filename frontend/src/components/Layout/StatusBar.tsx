@@ -129,6 +129,9 @@ function ServerConfigModal({ open, onClose }: { open: boolean; onClose: () => vo
     if (form.auth?.username) {
       cleaned.auth = { username: form.auth.username, password: form.auth.password || '' };
     }
+    if (form.workflowCode?.trim()) {
+      cleaned.workflowCode = form.workflowCode.trim();
+    }
     if (editIndex === -1) {
       addServer(cleaned);
     } else if (editIndex !== null) {
@@ -261,6 +264,12 @@ function ServerConfigModal({ open, onClose }: { open: boolean; onClose: () => vo
                 }
               />
             )}
+            <Input
+              size="small"
+              placeholder="Workflow Code (optional, e.g. HCM_FAST_FORMULA_GENERATOR1)"
+              value={form.workflowCode || ''}
+              onChange={(e) => setForm({ ...form, workflowCode: e.target.value || undefined })}
+            />
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Button size="small" onClick={() => setEditIndex(null)}>Cancel</Button>
               <Button

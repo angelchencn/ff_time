@@ -70,6 +70,11 @@ public class FastFormulaResource {
                 AppsLogger.write(this, e, AppsLogger.SEVERE);
             }
         }
+        // Follow-up turns don't send template_code; use formula_type passed directly by client.
+        if (CUSTOM_TYPE.equals(formulaType)) {
+            String bodyFormulaType = (String) request.get("formula_type");
+            if (bodyFormulaType != null && !bodyFormulaType.isBlank()) formulaType = bodyFormulaType;
+        }
 
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
             AppsLogger.write(this,
@@ -211,6 +216,11 @@ public class FastFormulaResource {
                 AppsLogger.write(this, e, AppsLogger.SEVERE);
             }
         }
+        // Follow-up turns don't send template_code; use formula_type passed directly by client.
+        if (CUSTOM_TYPE.equals(formulaType)) {
+            String bodyFormulaType = (String) request.get("formula_type");
+            if (bodyFormulaType != null && !bodyFormulaType.isBlank()) formulaType = bodyFormulaType;
+        }
 
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
             AppsLogger.write(this,
@@ -349,6 +359,11 @@ public class FastFormulaResource {
             } catch (SQLException e) {
                 AppsLogger.write(this, e, AppsLogger.SEVERE);
             }
+        }
+        // Follow-up turns don't send template_code; use formula_type passed directly by client.
+        if (CUSTOM_TYPE.equals(formulaType)) {
+            String bodyFormulaType = (String) request.get("formula_type");
+            if (bodyFormulaType != null && !bodyFormulaType.isBlank()) formulaType = bodyFormulaType;
         }
 
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {

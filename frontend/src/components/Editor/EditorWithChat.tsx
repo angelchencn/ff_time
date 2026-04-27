@@ -52,7 +52,7 @@ export function EditorWithChat() {
   // template_id so picking is unambiguous even if two templates share a name.
   const sampleOptions = useMemo(() => {
     return dbTemplates
-      .filter((t) => t.template_id != null)
+      .filter((t) => t.template_id != null && t.systemprompt_flag !== 'Y')
       .map((t) => ({
         value: t.template_id as number,
         label: t.name || t.description || `#${t.template_id}`,
@@ -121,11 +121,13 @@ export function EditorWithChat() {
 
     const body: Record<string, unknown> = {
       message: text,
+      formula_type: formulaType,
     };
-    // Only send llm for Fusion environments (has auth).
-    // Local dev uses OpenAI GPT 5.4 — llm is ignored server-side.
+    // Only send llm/workflow_code for Fusion environments (has auth).
+    // Local dev uses OpenAI GPT 5.4 — these are ignored server-side.
     if (current.auth) {
       body.llm = selectedLlm;
+      if (current.workflowCode) body.workflow_code = current.workflowCode;
     }
     if (shouldShipEditorCode) {
       body.editor_code = code;

@@ -91,6 +91,17 @@ public class ValidatorRegressionTest {
 
     private List<FormulaRecord> fetchFormulas() throws Exception {
         var list = new ArrayList<FormulaRecord>();
+
+        // Print total DB count for status reporting
+        try (Connection conn = DbConfig.getConnection();
+             PreparedStatement countPs = conn.prepareStatement(
+                 "SELECT COUNT(*) FROM FF_FORMULAS_B_F WHERE FORMULA_TEXT IS NOT NULL");
+             ResultSet countRs = countPs.executeQuery()) {
+            if (countRs.next()) {
+                System.out.printf("%nDB total formulas (FORMULA_TEXT IS NOT NULL): %,d%n", countRs.getLong(1));
+            }
+        }
+
         String sql = "SELECT FORMULA_ID, BASE_FORMULA_NAME, FORMULA_TEXT"
                    + "  FROM FF_FORMULAS_B_F"
                    + " WHERE FORMULA_TEXT IS NOT NULL"

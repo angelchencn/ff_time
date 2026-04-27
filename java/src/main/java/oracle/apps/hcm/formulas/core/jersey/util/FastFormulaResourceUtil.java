@@ -1,7 +1,6 @@
 package oracle.apps.hcm.formulas.core.jersey.util;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import oracle.adf.model.binding.PermissionHelper;
@@ -17,12 +16,9 @@ public class FastFormulaResourceUtil {
     public static final String FASTFORMULA_ENTRIES = "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants";
     
     public final static List<String> validResources = new ArrayList<String>();
-    public static final List<String> VALID_RESOURCES;
 
     static {
-        List<String> resources = new ArrayList<>();
-        resources.add(FASTFORMULA_ENTRIES);
-        VALID_RESOURCES = Collections.unmodifiableList(resources);
+        validResources.add(FASTFORMULA_ENTRIES);
     }
         
     public static boolean isValidResource(String pResourcePath) {

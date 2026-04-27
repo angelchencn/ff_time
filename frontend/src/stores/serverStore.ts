@@ -5,6 +5,7 @@ export interface ServerConfig {
   baseUrl: string;
   apiPrefix: string;
   auth?: { username: string; password: string };
+  workflowCode?: string;
 }
 
 const DEFAULT_SERVERS: ServerConfig[] = [
@@ -18,6 +19,7 @@ const DEFAULT_SERVERS: ServerConfig[] = [
     name: 'cookie cutter',
     baseUrl: '/cookie-cutter-proxy',
     apiPrefix: '/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants',
+    auth: { username: 'tm-mfitzimmons', password: 'Welcome1' },
   },
 ];
 
