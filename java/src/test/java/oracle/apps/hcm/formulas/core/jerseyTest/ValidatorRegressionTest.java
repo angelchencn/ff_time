@@ -23,10 +23,14 @@ import static org.junit.Assert.assertTrue;
  * Skipped automatically when FF_DB_URL is not set (CI / local without Oracle).
  * Run manually:
  *   FF_DB_URL=jdbc:oracle:thin:@host:port/SID FF_DB_USER=... FF_DB_PASSWORD=... mvn test -Dtest=ValidatorRegressionTest
+ *   mvn test -Dtest=ValidatorRegressionTest -Dff.regression.offset=5000 -Dff.regression.limit=5000
  */
 public class ValidatorRegressionTest {
 
-    private static final int SAMPLE_SIZE = 5000;
+    private static final int SAMPLE_SIZE =
+            Integer.getInteger("ff.regression.limit", 5000);
+    private static final int OFFSET =
+            Integer.getInteger("ff.regression.offset", 0);
     private static final int MAX_SHOWN_PER_CATEGORY = 50;
 
     private final ValidatorService validator = new ValidatorService();
@@ -37,7 +41,9 @@ public class ValidatorRegressionTest {
         Assume.assumeNotNull("FF_DB_URL not set — skipping validator regression test", dbUrl);
 
         List<FormulaRecord> formulas = fetchFormulas();
-        System.out.printf("%n=== Validator Regression: %d formulas ===%n%n", formulas.size());
+        System.out.printf(
+                "%n=== Validator Regression: %d formulas (offset=%d limit=%d) ===%n%n",
+                formulas.size(), OFFSET, SAMPLE_SIZE);
 
         List<FailureReport> syntaxFailures   = new ArrayList<>();
         List<FailureReport> semanticFailures = new ArrayList<>();
@@ -106,11 +112,12 @@ public class ValidatorRegressionTest {
                    + "  FROM FF_FORMULAS_B_F"
                    + " WHERE FORMULA_TEXT IS NOT NULL"
                    + " ORDER BY FORMULA_ID"
-                   + " FETCH FIRST ? ROWS ONLY";
+                   + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
 
         try (Connection conn = DbConfig.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, SAMPLE_SIZE);
+            ps.setInt(1, OFFSET);
+            ps.setInt(2, SAMPLE_SIZE);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     long id     = rs.getLong("FORMULA_ID");

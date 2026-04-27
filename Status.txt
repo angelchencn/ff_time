@@ -34,3 +34,60 @@ Pending tasks:
     1. jazn change for jesery rest
     2. we need to register a usercase in prompt lab (hcm.hrg.goal_creation/hcm.ff.formula_generate)
     3. Seeddata for template
+
+
+Current Project Snapshot - 2026-04-27
+=====================================
+
+Repository state:
+    Branch: main...origin/main
+    Working tree has local changes:
+        - docs/ff-ai-generator-uptake.md
+            Added "Formula Template Seed Data" section based on FormulaTemplatesSD.xml.
+        - AGENTS.md
+            New contributor guide, "Repository Guidelines".
+        - java/src/test/java/oracle/apps/hcm/formulas/core/jerseyTest/ValidatorRegressionTest.java
+            Added -Dff.regression.offset and -Dff.regression.limit support for chunked real-formula validation.
+        - java/src/main/java/oracle/apps/hcm/formulas/core/jersey/api/FastFormulaResource.java
+            Existing concurrent change: removed one commented @Path line. Not made by Codex.
+
+Architecture memory:
+    - Java/Jersey backend is the primary implementation.
+    - Python/FastAPI backend is legacy but still has passing tests.
+    - React/Vite frontend talks to Fusion/Jersey-style REST endpoints through serverStore configuration.
+    - Formula template rows are source controlled through Fusion seed data, not by manual target-pod SQL.
+    - FF_FORMULA_TEMPLATES.TEMPLATE_CODE is the stable business key used by /chat and Agent Studio.
+    - System prompt rows live in FF_FORMULA_TEMPLATES with SYSTEMPROMPT_FLAG='Y' and ACTIVE_FLAG='Y'.
+
+Validation memory:
+    - Oracle real-formula parser regression covered all 38,971 formulas from FF_FORMULAS_B_F where FORMULA_TEXT is not null.
+    - First 5,000 were run previously by Claude Code:
+        total=5,000 passed=2,810 syntax_errors=0 semantic_errors=5,424 rule_errors=298
+    - Remaining 33,971 were run in chunks from offset 5,000 through 35,000:
+        total=33,971 passed=14,739 syntax_errors=0 semantic_errors=44,637 rule_errors=2,758
+    - Full combined result:
+        total=38,971 passed=17,549 syntax_errors=0 semantic_errors=50,061 rule_errors=3,056
+    - Semantic/rule counts are diagnostic counts, not formula counts.
+    - Logs for remaining chunks are under java/target/validator-regression/.
+
+Latest unit test results:
+    - java: mvn test
+        114 tests, 0 failures, 0 errors, 1 skipped, BUILD SUCCESS.
+        ValidatorRegressionTest is skipped unless FF_DB_URL is set.
+    - backend: ./venv/bin/python -m pytest tests --ignore=tests/test_rag_engine.py -q
+        99 passed.
+
+Known issues / risks:
+    - Frontend build currently fails with TypeScript errors:
+        1. LlmDebugModal.tsx: key 'full' is not assignable to keyof LogDetail.
+        2. EditorWithChat.tsx: DbTemplate type lacks systemprompt_flag.
+    - Java clean test passes, but runtime resource packaging is incomplete:
+        formula_types_registry.json and rag_formulas.json are not available from java/src/main/resources after clean.
+    - Java local tests log ADF BC classpath warnings when LLM_PROVIDER is not set to openai.
+    - Command.txt contains local DB connection details and must remain ignored / not shared.
+
+Recommended next steps:
+    1. Fix frontend TypeScript build.
+    2. Decide whether Java resource data should be copied into java/src/main/resources or loaded explicitly from backend/data.
+    3. Commit AGENTS.md and docs/ff-ai-generator-uptake.md if the new docs are accepted.
+    4. Keep ValidatorRegressionTest offset/limit support; it is useful for long DB regression runs.

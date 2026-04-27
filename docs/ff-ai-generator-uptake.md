@@ -275,6 +275,149 @@ Full list: 123 formula types available via `GET /formula-types`.
 
 ---
 
+## Formula Template Seed Data
+
+`FF_FORMULA_TEMPLATES` rows are source controlled through Fusion seed data, not by
+ad hoc SQL in target pods. The seed file owns the template body, per-template AI
+instructions, display metadata, and system-prompt rows used by the generator.
+
+### Seed File
+
+Use the standard FND seed data loader XML format for the `FormulaTemplates` VO.
+The sample file is:
+
+```
+FormulaTemplatesSD.xml
+```
+
+The file should be checked in under the owning Fusion seed-data module path
+for HCM Fast Formula templates. The sample header uses:
+
+```
+fusionapps/hcm/hrc/db/data/HRC/HcmCommonTop/HcmCommonFf/FormulaTemplatesSD.xml
+```
+
+### Loader Metadata
+
+The seed file must point to the Fast Formula service AM and `FormulaTemplates`
+VO:
+
+```xml
+<SEEDDATA
+  am="oracle.apps.hcm.formulas.core.fastFormulaService.applicationModule.FastFormulaServiceAM"
+  vo="FormulaTemplates"
+  translatable="true"
+  effective_dated="false"
+  xmlns="http://www.oracle.com/apps/fnd/applseed">
+```
+
+The adxml apply action should invoke the FND seed loader with the same AM:
+
+```xml
+<!-- adxml:
+<args>-am oracle.apps.hcm.formulas.core.fastFormulaService.applicationModule.FastFormulaServiceAM
+      -dburl jdbc:oracle:#jdbc_protocol_fusion#:@#jdbc_db_addr#
+      -dbuser #un:fusion#
+      -file #fullpath:~PROD:~PATH:~FILE#
+      -cfver #last_applied_version#</args>
+-->
+```
+
+### Row Identity and Conflict Detection
+
+`TEMPLATE_CODE` is the stable business key for source control. Use it as the
+seed row key and never change it after a template is referenced by Agent Studio
+or a client request.
+
+```xml
+<FormulaTemplates rowkey="ORA_HCM_FF_LANGUAGE_REFERENCE" rowver="0">
+  <TemplateCode>ORA_HCM_FF_LANGUAGE_REFERENCE</TemplateCode>
+  ...
+</FormulaTemplates>
+```
+
+Conflict detection should protect both the base row and the translated row from
+overwriting customer-modified content. The sample checks:
+
+| Check | Table | Key | Purpose |
+|---|---|---|---|
+| `base_customization` | `FF_FORMULA_TEMPLATES` | `TEMPLATE_CODE` | Do not overwrite a base row if `LAST_UPDATED_BY` is not seed-owned |
+| `translation_customization` | `FF_FORMULA_TEMPLATES_TL` | `TEMPLATE_CODE` + current language | Do not overwrite translated `NAME` or `DESCRIPTION` if customer-modified |
+| `FormulaTemplatesAltKey` | `FF_FORMULA_TEMPLATES` | `TEMPLATE_CODE` | Detect duplicate business-key rows |
+
+Seed-owned rows should use `LAST_UPDATED_BY` / `CREATED_BY` values of
+`SEED_DATA_FROM_APPLICATION` or `0`, matching the conflict checks.
+
+### Important Attributes
+
+| XML Attribute | Database / Runtime Meaning |
+|---|---|
+| `TemplateCode` | Business key. This is the value clients pass as `template_code` to `/chat/sync`, `/chat`, and `/chat/stream`. |
+| `FormulaText` | Template formula body, or the system prompt text when `SystempromptFlag='Y'`. |
+| `AdditionalPromptText` | Optional template-specific guidance appended to the prompt. Use `isNull="true"` when absent. |
+| `SourceType` | `SEEDED` for Oracle-delivered rows. |
+| `SystempromptFlag` | `Y` means this row contributes to the global system prompt loaded by `AiService.getSystemPrompt()`. Normal starter templates should use `N`. |
+| `UseSystempromptFlag` | `Y` means generation with this template includes system prompt rows. `N` allows a lightweight template-specific prompt. |
+| `ActiveFlag` | `Y` makes the row visible to template APIs and the editor; `N` hides it without deleting the seed row. |
+| `SemanticFlag` | `Y` means the row can participate in semantic/RAG usage; `N` excludes it from semantic retrieval. |
+| `SortOrder` | Display and prompt ordering. System prompt rows are concatenated by `SORT_ORDER`, then `TEMPLATE_ID`. |
+| `ModuleId` | Required seed ownership partition. Use the owning module's taxonomy module id. |
+| `Name` / `Description` | Translatable display strings stored through `FF_FORMULA_TEMPLATES_TL`. |
+| `BaseFormulaTypeName` | Formula type lookup/display helper. Use `isNull="true"` for system-prompt rows and Custom templates. |
+
+### Minimal Seed Row Example
+
+```xml
+<FormulaTemplates rowkey="ORA_HCM_FF_TER_MIN_HOURS_001" rowver="0">
+  <TemplateCode>ORA_HCM_FF_TER_MIN_HOURS_001</TemplateCode>
+  <FormulaText>/* Fast Formula starter body goes here */</FormulaText>
+  <AdditionalPromptText>Generate a time entry rule that validates minimum reported hours.</AdditionalPromptText>
+  <SourceType>SEEDED</SourceType>
+  <SystempromptFlag>N</SystempromptFlag>
+  <ActiveFlag>Y</ActiveFlag>
+  <SemanticFlag>Y</SemanticFlag>
+  <UseSystempromptFlag>Y</UseSystempromptFlag>
+  <SortOrder>100</SortOrder>
+  <ModuleId>61ECAF4AAAC2E990E040449821C61C97</ModuleId>
+  <Name>Minimum Hours Time Entry Rule</Name>
+  <Description>Starter template for a WFM Time Entry Rule that validates minimum hours.</Description>
+  <CreatedBy>SEED_DATA_FROM_APPLICATION</CreatedBy>
+  <CreationDate>2026-04-25 00:00:00</CreationDate>
+  <LastUpdateDate>2026-04-25 00:00:00</LastUpdateDate>
+  <LastUpdatedBy>SEED_DATA_FROM_APPLICATION</LastUpdatedBy>
+  <LastUpdateLogin>-1</LastUpdateLogin>
+  <EnterpriseId>0</EnterpriseId>
+  <BaseFormulaTypeName>WFM Time Entry Rules</BaseFormulaTypeName>
+</FormulaTemplates>
+```
+
+For system prompt rows, set `SystempromptFlag` to `Y`, set `SemanticFlag` to
+`N`, keep `ActiveFlag` as `Y`, and put the prompt section in `FormulaText`.
+Multiple active system prompt rows are allowed; the service concatenates them in
+seeded sort order.
+
+### Apply and Verify
+
+After the seed file is applied by the Fusion seed-data loader, verify the row is
+available through the REST API:
+
+```bash
+curl -u <user>:<password> \
+  "https://<pod>/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/templates?formula_type=WFM%20Time%20Entry%20Rules"
+```
+
+Then invoke generation using the seeded `TemplateCode`:
+
+```json
+{
+  "message": "Generate a time entry rule that errors when reported hours are less than 4",
+  "template_code": "ORA_HCM_FF_TER_MIN_HOURS_001",
+  "llm": "GPT5MINI"
+}
+```
+
+---
+
 ## Agent Studio Workflow
 
 ### Workflow Code
@@ -426,6 +569,7 @@ Response: generated Fast Formula source code
 | Agent Studio Workflow | `HCM_FF_GENERATOR` workflow published in Agent Studio |
 | System Prompt | At least one active row in `FF_FORMULA_TEMPLATES` with `SYSTEMPROMPT_FLAG='Y'` and `ACTIVE_FLAG='Y'` |
 | Template Config | Each template needs `USE_SYSTEM_PROMPT_FLAG` ('Y' = include system prompt, 'N' = skip). Column added to `FF_FORMULA_TEMPLATES` with default 'Y' |
+| Formula Template Seed Data | `FormulaTemplatesSD.xml` applied through the FND seed data loader for `FastFormulaServiceAM` / `FormulaTemplates` |
 | Agent Studio Security | Calling user must have permission to execute the workflow |
 
 ---
