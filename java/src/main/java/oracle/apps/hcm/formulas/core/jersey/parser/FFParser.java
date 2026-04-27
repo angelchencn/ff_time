@@ -254,6 +254,7 @@ public class FFParser {
         expect(TokenType.INPUT);
         expect(TokenType.IS);
         String name = expectName();
+        consumeOptionalDataType();
         return new InputDecl(List.of(name));
     }
 
@@ -272,6 +273,7 @@ public class FFParser {
         expect(TokenType.OUTPUT);
         expect(TokenType.IS);
         String name = expectName();
+        consumeOptionalDataType();
         return new OutputDecl(List.of(name));
     }
 
@@ -307,20 +309,24 @@ public class FFParser {
         return names;
     }
 
-    // ── Data type: '(' (NUMBER | TEXT | DATE) ')' ──────────────────────────
+    // ── Data type: '(' (NUMBER | TEXT | DATE | compound_name) ')' ────────────
 
     private void consumeOptionalDataType() {
         if (check(TokenType.LPAREN) && isDataTypeAhead()) {
             advance(); // (
-            advance(); // NUMBER_TYPE | TEXT_TYPE | DATE_TYPE
+            advance(); // NUMBER_TYPE | TEXT_TYPE | DATE_TYPE | compound NAME like number_number
             expect(TokenType.RPAREN);
         }
     }
 
     private boolean isDataTypeAhead() {
-        if (pos + 1 >= tokens.size()) return false;
+        if (pos + 2 >= tokens.size()) return false;
         TokenType next = tokens.get(pos + 1).type();
-        return next == TokenType.NUMBER_TYPE || next == TokenType.TEXT_TYPE || next == TokenType.DATE_TYPE;
+        TokenType afterNext = tokens.get(pos + 2).type();
+        if (afterNext != TokenType.RPAREN) return false;
+        // Standard scalar types and Oracle compound array types (number_number, text_number, etc.)
+        return next == TokenType.NUMBER_TYPE || next == TokenType.TEXT_TYPE
+                || next == TokenType.DATE_TYPE || next == TokenType.NAME;
     }
 
     // ── IF / THEN / ELSIF / ELSE / END IF ──────────────────────────────────
@@ -360,8 +366,15 @@ public class FFParser {
         expect(TokenType.WHILE);
         AstNodes condition = parseExpr();
         expect(TokenType.LOOP);
+        boolean paren = check(TokenType.LPAREN);
         List<AstNodes> body = parseBody(false);
-        expect(TokenType.ENDLOOP);
+        // Oracle FF: WHILE cond LOOP (stmts) — parenthesized body, no END LOOP written.
+        // WHILE cond LOOP stmts END LOOP — non-paren body, END LOOP required.
+        if (!paren) {
+            expect(TokenType.ENDLOOP);
+        } else if (check(TokenType.ENDLOOP)) {
+            advance(); // optional END LOOP when body was parenthesized
+        }
         return new WhileLoop(condition, body);
     }
 
@@ -379,8 +392,13 @@ public class FFParser {
             // FOR cursor
             String cursorName = expectName();
             expect(TokenType.LOOP);
+            boolean paren = check(TokenType.LPAREN);
             List<AstNodes> body = parseBody(false);
-            expect(TokenType.ENDLOOP);
+            if (!paren) {
+                expect(TokenType.ENDLOOP);
+            } else if (check(TokenType.ENDLOOP)) {
+                advance();
+            }
             return new ForCursorLoop(variable, cursorName, body);
         }
 
@@ -389,8 +407,13 @@ public class FFParser {
         expect(TokenType.DOTDOT);
         AstNodes end = parseExpr();
         expect(TokenType.LOOP);
+        boolean paren = check(TokenType.LPAREN);
         List<AstNodes> body = parseBody(false);
-        expect(TokenType.ENDLOOP);
+        if (!paren) {
+            expect(TokenType.ENDLOOP);
+        } else if (check(TokenType.ENDLOOP)) {
+            advance();
+        }
         return new ForLoop(variable, start, end, body);
     }
 
@@ -507,15 +530,21 @@ public class FFParser {
             AstNodes expr = parseConcat();
 
             if (check(TokenType.GT)) {
-                // in param: expr > 'param_name'
+                // in param: expr > param_expr  (param_expr may be 'literal', NAME, or TO_CHAR(x))
                 advance();
-                String paramName = expectSingleString();
+                AstNodes paramExpr = parseConcat();
+                String paramName = paramExpr instanceof StringLiteral ? ((StringLiteral) paramExpr).value()
+                        : paramExpr instanceof Identifier ? ((Identifier) paramExpr).name()
+                        : paramExpr.toString();
                 String varName = expr instanceof Identifier ? ((Identifier) expr).name() : expr.toString();
                 inParams.add(new InParam(varName, paramName));
             } else if (check(TokenType.LT)) {
-                // out param: expr < 'param_name' (DEFAULT expr)?
+                // out param: expr < param_expr (DEFAULT expr)?
                 advance();
-                String paramName = expectSingleString();
+                AstNodes paramExpr2 = parseConcat();
+                String paramName = paramExpr2 instanceof StringLiteral ? ((StringLiteral) paramExpr2).value()
+                        : paramExpr2 instanceof Identifier ? ((Identifier) paramExpr2).name()
+                        : paramExpr2.toString();
                 Object defaultVal = null;
                 if (check(TokenType.DEFAULT)) {
                     advance();
@@ -540,13 +569,13 @@ public class FFParser {
         expect(TokenType.CHANGE_CONTEXTS);
         expect(TokenType.LPAREN);
         Map<String, AstNodes> contexts = new LinkedHashMap<>();
-        String name = expectName();
+        String name = expectContextKey();
         expect(TokenType.EQ);
         AstNodes value = parseExpr();
         contexts.put(name, value);
         while (check(TokenType.COMMA)) {
             advance();
-            name = expectName();
+            name = expectContextKey();
             expect(TokenType.EQ);
             value = parseExpr();
             contexts.put(name, value);
@@ -555,12 +584,27 @@ public class FFParser {
         return new ChangeContexts(contexts);
     }
 
+    private String expectContextKey() {
+        String name = expectName();
+        // Oracle FF allows array-indexed context keys: CHANGE_CONTEXTS(arr[idx] = val)
+        if (check(TokenType.LBRACKET)) {
+            advance();
+            parseExpr();
+            expect(TokenType.RBRACKET);
+        }
+        return name;
+    }
+
     // ── EXECUTE ────────────────────────────────────────────────────────────
 
     private AstNodes parseExecuteStmt() {
         expect(TokenType.EXECUTE);
         expect(TokenType.LPAREN);
-        String formulaName = expectSingleString();
+        // Oracle FF allows EXECUTE('literal'), EXECUTE(variable), or EXECUTE(array[idx])
+        AstNodes formulaRef = parseExpr();
+        String formulaName = formulaRef instanceof StringLiteral ? ((StringLiteral) formulaRef).value()
+                : formulaRef instanceof Identifier ? ((Identifier) formulaRef).name()
+                : formulaRef.toString();
         expect(TokenType.RPAREN);
         return new Execute(formulaName);
     }
@@ -577,11 +621,20 @@ public class FFParser {
         return new BlockGroup(statements);
     }
 
-    // ── Quoted name assignment: "NAME" = expr ──────────────────────────────
+    // ── Quoted name assignment: "NAME" = expr  or  "NAME"[idx] = expr ────────
 
     private AstNodes parseQuotedAssignment() {
         Token qt = advance(); // QUOTED_NAME
         String name = qt.text().substring(1, qt.text().length() - 1);
+        // Oracle FF allows "AREA1"[idx] = expr for indexed array assignment
+        if (check(TokenType.LBRACKET)) {
+            advance();
+            AstNodes index = parseExpr();
+            expect(TokenType.RBRACKET);
+            expect(TokenType.EQ);
+            AstNodes value = parseExpr();
+            return new ArrayAssignment(name, index, value);
+        }
         expect(TokenType.EQ);
         AstNodes value = parseExpr();
         return new Assignment(name, value);
@@ -624,6 +677,22 @@ public class FFParser {
             return new Assignment(name, value);
         }
 
+        // NAME '.' METHOD ['(' args ')'] → method call as statement (e.g. arr.DELETE(1), arr.TRIM)
+        if (lookahead(1, TokenType.DOT)) {
+            advance(); // consume NAME
+            advance(); // consume .
+            String method = expectName();
+            List<AstNodes> args = List.of();
+            if (check(TokenType.LPAREN)) {
+                advance();
+                if (!check(TokenType.RPAREN)) {
+                    args = parseExprList();
+                }
+                expect(TokenType.RPAREN);
+            }
+            return new MethodCall(name, method, args);
+        }
+
         throw error("Expected assignment, function call, or array assignment after '" + name + "'");
     }
 
@@ -646,15 +715,22 @@ public class FFParser {
             return body;
         }
 
-        // Non-parenthesized: read statements until a terminator
         List<AstNodes> body = new ArrayList<>();
-        while (!check(TokenType.EOF)) {
-            if (isIfBody && (check(TokenType.ELSIF) || check(TokenType.ELSE) || check(TokenType.ENDIF))) {
-                break;
+
+        if (!isIfBody) {
+            // Non-paren loop body: read until ENDLOOP
+            while (!check(TokenType.EOF) && !check(TokenType.ENDLOOP)) {
+                body.add(parseStatement());
             }
-            if (!isIfBody && check(TokenType.ENDLOOP)) {
-                break;
-            }
+            return body;
+        }
+
+        // Non-paren IF/ELSIF/ELSE body: Oracle FF allows "IF cond THEN stmt" without
+        // END IF. Read exactly ONE statement. Multi-statement non-paren bodies require
+        // explicit END IF and the single-statement read will leave remaining statements
+        // at the top level where ENDIF will be consumed by parseIfStmt normally.
+        if (!check(TokenType.ELSIF) && !check(TokenType.ELSE)
+                && !check(TokenType.ENDIF) && !check(TokenType.EOF)) {
             body.add(parseStatement());
         }
         return body;
@@ -888,11 +964,18 @@ public class FFParser {
             return new StringLiteral(value);
         }
 
-        // Quoted name (identifier)
+        // Quoted name (identifier) — may be followed by [idx] for array element access
         if (check(TokenType.QUOTED_NAME)) {
             advance();
             String raw = t.text();
-            return new QuotedIdentifier(raw.substring(1, raw.length() - 1));
+            String name = raw.substring(1, raw.length() - 1);
+            if (check(TokenType.LBRACKET)) {
+                advance();
+                AstNodes index = parseExpr();
+                expect(TokenType.RBRACKET);
+                return new ArrayAccess(name, index);
+            }
+            return new QuotedIdentifier(name);
         }
 
         // NAME — could be variable, function call, method call, or array access
@@ -994,15 +1077,16 @@ public class FFParser {
     // ── Helper: expect NAME token, return its text ─────────────────────────
 
     private String expectName() {
-        // Accept NAME or keywords that might be used as identifiers in certain contexts
         Token t = peek();
         if (t.type() == TokenType.NAME) {
             advance();
             return t.text();
         }
-        // Some keywords can appear as names in certain positions
-        // (e.g., DEFAULTED, FOUND are also valid identifiers in some contexts)
-        // Allow any keyword-like token as a name when expected as NAME
+        // Quoted identifiers like "EFFECTIVE_DATE" are valid in name positions
+        if (t.type() == TokenType.QUOTED_NAME) {
+            advance();
+            return t.text().substring(1, t.text().length() - 1);
+        }
         if (isKeywordUsableAsName(t.type())) {
             advance();
             return t.text();
