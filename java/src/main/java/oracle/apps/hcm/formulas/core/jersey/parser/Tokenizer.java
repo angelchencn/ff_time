@@ -219,9 +219,18 @@ public final class Tokenizer {
             return readQuotedName(startLine, startCol);
         }
 
-        // Number literal
+        // Number literal (including .digit without leading zero, e.g. .5 → 0.5)
         if (Character.isDigit(c)) {
             return readNumber(startLine, startCol);
+        }
+        if (c == '.' && pos + 1 < length && Character.isDigit(source.charAt(pos + 1))) {
+            advance(); // consume '.'
+            var sb = new StringBuilder("0.");
+            while (pos < length && Character.isDigit(source.charAt(pos))) {
+                sb.append(source.charAt(pos));
+                advance();
+            }
+            return new Token(TokenType.NUMBER, sb.toString(), startLine, startCol);
         }
 
         // Identifier or keyword (including compound keywords with underscore like CALL_FORMULA)
@@ -328,7 +337,7 @@ public final class Tokenizer {
 
     private Token readNameOrKeyword(int startLine, int startCol) {
         var sb = new StringBuilder();
-        while (pos < length && (Character.isLetterOrDigit(source.charAt(pos)) || source.charAt(pos) == '_')) {
+        while (pos < length && (Character.isLetterOrDigit(source.charAt(pos)) || source.charAt(pos) == '_' || source.charAt(pos) == '#')) {
             sb.append(source.charAt(pos));
             advance();
         }
@@ -384,6 +393,8 @@ public final class Tokenizer {
                 skipBlockComment();
             } else if (c == '-' && pos + 1 < length && source.charAt(pos + 1) == '-') {
                 skipLineComment();
+            } else if (c == '#') {
+                skipLineComment(); // # used as line comment in some Oracle payroll formulas
             } else {
                 break;
             }

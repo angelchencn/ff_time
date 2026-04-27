@@ -26,8 +26,8 @@ import static org.junit.Assert.assertTrue;
  */
 public class ValidatorRegressionTest {
 
-    private static final int SAMPLE_SIZE = 500;
-    private static final int MAX_SHOWN_PER_CATEGORY = 10;
+    private static final int SAMPLE_SIZE = 5000;
+    private static final int MAX_SHOWN_PER_CATEGORY = 50;
 
     private final ValidatorService validator = new ValidatorService();
 

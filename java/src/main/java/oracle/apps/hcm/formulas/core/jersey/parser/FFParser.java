@@ -208,6 +208,12 @@ public class FFParser {
             case LPAREN: return parseBlockStmt();
             case QUOTED_NAME: return parseQuotedAssignment();
             case NAME: return parseNameStartStatement();
+            // Keywords that are valid variable names in Oracle FF
+            case NUMBER_TYPE: case TEXT_TYPE: case DATE_TYPE:
+            case ASC: case DESC:
+            case FOUND: case DEFAULTED: case NULL_KW:
+            case ORDER: case WHERE: case FROM: case SELECT: case BY: case USING:
+                return parseNameStartStatement();
             default:
                 throw error("Unexpected token: " + peek().text());
         }
@@ -329,6 +335,18 @@ public class FFParser {
                 || next == TokenType.DATE_TYPE || next == TokenType.NAME;
     }
 
+    private boolean isTypedAssignment() {
+        // Pattern: NAME ( type ) =  — typed variable assignment
+        // pos=NAME, pos+1=(, pos+2=type, pos+3=), pos+4==
+        if (pos + 4 >= tokens.size()) return false;
+        if (tokens.get(pos + 1).type() != TokenType.LPAREN) return false;
+        TokenType typeToken = tokens.get(pos + 2).type();
+        if (tokens.get(pos + 3).type() != TokenType.RPAREN) return false;
+        if (tokens.get(pos + 4).type() != TokenType.EQ) return false;
+        return typeToken == TokenType.NUMBER_TYPE || typeToken == TokenType.TEXT_TYPE
+                || typeToken == TokenType.DATE_TYPE || typeToken == TokenType.NAME;
+    }
+
     // ── IF / THEN / ELSIF / ELSE / END IF ──────────────────────────────────
 
     private AstNodes parseIfStmt() {
@@ -435,6 +453,10 @@ public class FFParser {
 
         expect(TokenType.FROM);
         String tableName = expectName();
+        if (check(TokenType.DOT)) {
+            advance(); // consume .
+            tableName = tableName + "." + expectName();
+        }
 
         AstNodes whereClause = null;
         if (check(TokenType.WHERE)) {
@@ -646,6 +668,15 @@ public class FFParser {
         Token nameToken = peek();
         String name = nameToken.text();
 
+        // NAME '(' type ')' '=' → typed assignment: Oracle FF allows x (NUMBER) = value
+        if (isTypedAssignment()) {
+            advance(); // consume NAME
+            consumeOptionalDataType(); // consume (type)
+            advance(); // consume =
+            AstNodes value = parseExpr();
+            return new Assignment(name, value);
+        }
+
         // NAME '(' → bare function call
         if (lookahead(1, TokenType.LPAREN)) {
             advance(); // consume NAME
@@ -725,12 +756,13 @@ public class FFParser {
             return body;
         }
 
-        // Non-paren IF/ELSIF/ELSE body: Oracle FF allows "IF cond THEN stmt" without
-        // END IF. Read exactly ONE statement. Multi-statement non-paren bodies require
-        // explicit END IF and the single-statement read will leave remaining statements
-        // at the top level where ENDIF will be consumed by parseIfStmt normally.
-        if (!check(TokenType.ELSIF) && !check(TokenType.ELSE)
-                && !check(TokenType.ENDIF) && !check(TokenType.EOF)) {
+        // Non-paren IF body: read statements until ELSIF/ELSE/ENDIF/EOF/RPAREN.
+        // RPAREN terminates if this IF is nested inside a parenthesized block.
+        // Oracle FF allows both single-statement and multi-statement bodies; END IF
+        // (or ELSIF/ELSE) always terminates the body regardless of statement count.
+        while (!check(TokenType.ELSIF) && !check(TokenType.ELSE)
+                && !check(TokenType.ENDIF) && !check(TokenType.EOF)
+                && !check(TokenType.ENDLOOP) && !check(TokenType.RPAREN)) {
             body.add(parseStatement());
         }
         return body;
@@ -980,6 +1012,11 @@ public class FFParser {
 
         // NAME — could be variable, function call, method call, or array access
         if (check(TokenType.NAME)) {
+            return parseNameExpr();
+        }
+
+        // Keywords used as identifiers (FOUND, DESC, NUMBER, TEXT, DATE, etc.)
+        if (isKeywordUsableAsName(t.type())) {
             return parseNameExpr();
         }
 
