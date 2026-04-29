@@ -66,6 +66,8 @@ FROM FND_APPL_TAXONOMY fat,
 where fat.module_id = module_id.source_module_id;
 -----------------------------------------------------------------
 
+select * from ff_formulas_b_f;
+
 GRANT SELECT ON FF_FORMULA_TEMPLATES TO FUSION_RUNTIME;
 GRANT SELECT ON FF_FORMULA_TEMPLATES_TL TO FUSION_RUNTIME;
 GRANT UPDATE ON FF_FORMULA_TEMPLATES TO FUSION_RUNTIME;
