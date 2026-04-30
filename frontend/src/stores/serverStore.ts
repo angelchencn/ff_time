@@ -12,7 +12,7 @@ const DEFAULT_SERVERS: ServerConfig[] = [
   {
     name: 'VP DEV Agent',
     baseUrl: '/fusion-proxy',
-    apiPrefix: '/hcmRestApi/redwood/11.13.18.05/calculationEntries',
+    apiPrefix: '/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants',
     auth: { username: 'tm-mfitzimmons', password: 'Welcome1' },
   },
   {

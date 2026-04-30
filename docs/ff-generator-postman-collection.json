@@ -24,10 +24,10 @@
           "raw": "{\n  \"message\": \"Generate a time entry rule formula that validates minimum hours\",\n  \"template_code\": \"ORA_HCM_FF_TER_MIN_HOURS_001\",\n  \"llm\": \"GPT5MINI\"\n}"
         },
         "url": {
-          "raw": "https://cptchuhqy.fusionapps.ocs.oc-test.com/hcmRestApi/resources/11.13.18.05/calculationEntries/chat/sync",
+          "raw": "https://cptchuhqy.fusionapps.ocs.oc-test.com/hcmRestApi/resources/11.13.18.05/fastFormulaAssistants/chat/sync",
           "protocol": "https",
           "host": ["cptchuhqy", "fusionapps", "ocs", "oc-test", "com"],
-          "path": ["hcmRestApi", "resources", "11.13.18.05", "calculationEntries", "chat", "sync"]
+          "path": ["hcmRestApi", "resources", "11.13.18.05", "fastFormulaAssistants", "chat", "sync"]
         },
         "description": "Blocking endpoint. Returns full formula code."
       }
@@ -51,10 +51,10 @@
           "raw": "{\n  \"message\": \"Generate an element skip formula\",\n  \"template_code\": \"ORA_HCM_FF_ELEMENT_SKIP_001\",\n  \"llm\": \"GPT5MINI\"\n}"
         },
         "url": {
-          "raw": "https://cptchuhqy.fusionapps.ocs.oc-test.com/hcmRestApi/resources/11.13.18.05/calculationEntries/chat",
+          "raw": "https://cptchuhqy.fusionapps.ocs.oc-test.com/hcmRestApi/resources/11.13.18.05/fastFormulaAssistants/chat",
           "protocol": "https",
           "host": ["cptchuhqy", "fusionapps", "ocs", "oc-test", "com"],
-          "path": ["hcmRestApi", "resources", "11.13.18.05", "calculationEntries", "chat"]
+          "path": ["hcmRestApi", "resources", "11.13.18.05", "fastFormulaAssistants", "chat"]
         },
         "description": "Async endpoint. Returns jobId immediately."
       }
@@ -71,10 +71,10 @@
           ]
         },
         "url": {
-          "raw": "https://cptchuhqy.fusionapps.ocs.oc-test.com/hcmRestApi/resources/11.13.18.05/calculationEntries/chat/status/JOB_ID_HERE",
+          "raw": "https://cptchuhqy.fusionapps.ocs.oc-test.com/hcmRestApi/resources/11.13.18.05/fastFormulaAssistants/chat/status/JOB_ID_HERE",
           "protocol": "https",
           "host": ["cptchuhqy", "fusionapps", "ocs", "oc-test", "com"],
-          "path": ["hcmRestApi", "resources", "11.13.18.05", "calculationEntries", "chat", "status", "JOB_ID_HERE"]
+          "path": ["hcmRestApi", "resources", "11.13.18.05", "fastFormulaAssistants", "chat", "status", "JOB_ID_HERE"]
         },
         "description": "Poll async job status."
       }
@@ -91,10 +91,10 @@
           ]
         },
         "url": {
-          "raw": "https://cptchuhqy.fusionapps.ocs.oc-test.com/hcmRestApi/resources/11.13.18.05/calculationEntries/templates",
+          "raw": "https://cptchuhqy.fusionapps.ocs.oc-test.com/hcmRestApi/resources/11.13.18.05/fastFormulaAssistants/templates",
           "protocol": "https",
           "host": ["cptchuhqy", "fusionapps", "ocs", "oc-test", "com"],
-          "path": ["hcmRestApi", "resources", "11.13.18.05", "calculationEntries", "templates"]
+          "path": ["hcmRestApi", "resources", "11.13.18.05", "fastFormulaAssistants", "templates"]
         },
         "description": "List available formula templates."
       }
@@ -111,10 +111,10 @@
           ]
         },
         "url": {
-          "raw": "https://cptchuhqy.fusionapps.ocs.oc-test.com/hcmRestApi/resources/11.13.18.05/calculationEntries/formula-types",
+          "raw": "https://cptchuhqy.fusionapps.ocs.oc-test.com/hcmRestApi/resources/11.13.18.05/fastFormulaAssistants/formula-types",
           "protocol": "https",
           "host": ["cptchuhqy", "fusionapps", "ocs", "oc-test", "com"],
-          "path": ["hcmRestApi", "resources", "11.13.18.05", "calculationEntries", "formula-types"]
+          "path": ["hcmRestApi", "resources", "11.13.18.05", "fastFormulaAssistants", "formula-types"]
         },
         "description": "List all formula types."
       }
@@ -138,10 +138,10 @@
           "raw": "{\n  \"code\": \"DEFAULT FOR hours IS 0\\nINPUTS ARE hours\\nl_pay = hours * 25\\nRETURN l_pay\"\n}"
         },
         "url": {
-          "raw": "https://cptchuhqy.fusionapps.ocs.oc-test.com/hcmRestApi/resources/11.13.18.05/calculationEntries/validate",
+          "raw": "https://cptchuhqy.fusionapps.ocs.oc-test.com/hcmRestApi/resources/11.13.18.05/fastFormulaAssistants/validate",
           "protocol": "https",
           "host": ["cptchuhqy", "fusionapps", "ocs", "oc-test", "com"],
-          "path": ["hcmRestApi", "resources", "11.13.18.05", "calculationEntries", "validate"]
+          "path": ["hcmRestApi", "resources", "11.13.18.05", "fastFormulaAssistants", "validate"]
         },
         "description": "Validate Fast Formula syntax."
       }
@@ -158,10 +158,10 @@
           ]
         },
         "url": {
-          "raw": "https://cptchuhqy.fusionapps.ocs.oc-test.com/hcmRestApi/resources/11.13.18.05/calculationEntries/health",
+          "raw": "https://cptchuhqy.fusionapps.ocs.oc-test.com/hcmRestApi/resources/11.13.18.05/fastFormulaAssistants/health",
           "protocol": "https",
           "host": ["cptchuhqy", "fusionapps", "ocs", "oc-test", "com"],
-          "path": ["hcmRestApi", "resources", "11.13.18.05", "calculationEntries", "health"]
+          "path": ["hcmRestApi", "resources", "11.13.18.05", "fastFormulaAssistants", "health"]
         },
         "description": "Health check."
       }

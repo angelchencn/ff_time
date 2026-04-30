@@ -274,7 +274,7 @@ Chat request body: `{message, template_code, llm?, editor_code?, session_id?}`. 
 | GET | `/formulas/lookup` | `[{formula_id, ...}]` | Formula search |
 | GET | `/health` | `{status}` | Health check |
 
-**Base Path:** `/11.13.18.05/calculationEntries`
+**Base Path:** `/11.13.18.05/fastFormulaAssistants`
 
 ### 3.4 Session Management
 

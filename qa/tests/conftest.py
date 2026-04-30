@@ -113,7 +113,7 @@ def _mock_bootstrap_script() -> str:
         {
             "name": "Local QA",
             "baseUrl": "http://127.0.0.1:8000",
-            "apiPrefix": "/api/11.13.18.05/calculationEntries",
+            "apiPrefix": "/api/11.13.18.05/fastFormulaAssistants",
         }
     ]
 

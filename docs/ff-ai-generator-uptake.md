@@ -79,7 +79,7 @@ Sample query embedded in the seed data:
 **Base URL (Fusion):**
 
 ```
-https://<pod>/hcmRestApi/redwood/11.13.18.05/calculationEntries
+https://<pod>/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants
 ```
 
 ---

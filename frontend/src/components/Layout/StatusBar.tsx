@@ -115,7 +115,7 @@ function ServerConfigModal({ open, onClose }: { open: boolean; onClose: () => vo
     setForm({
       name: '',
       baseUrl: '',
-      apiPrefix: '/hcmRestApi/redwood/11.13.18.05/calculationEntries',
+      apiPrefix: '/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants',
     });
   }
 
@@ -234,7 +234,7 @@ function ServerConfigModal({ open, onClose }: { open: boolean; onClose: () => vo
             />
             <Input
               size="small"
-              placeholder="API Prefix (e.g. /api/11.13.18.05/calculationEntries)"
+              placeholder="API Prefix (e.g. /api/11.13.18.05/fastFormulaAssistants)"
               value={form.apiPrefix}
               onChange={(e) => setForm({ ...form, apiPrefix: e.target.value })}
             />

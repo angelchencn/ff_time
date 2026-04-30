@@ -6,6 +6,7 @@ const { Text } = Typography;
 
 interface ChatMessageProps {
   message: ChatMessageType;
+  isStreamingPlaceholder?: boolean;
 }
 
 interface ContentPart {
@@ -58,7 +59,41 @@ function CodeBlock({ content }: { content: string }) {
   );
 }
 
-export function ChatMessage({ message }: ChatMessageProps) {
+function TypingDots() {
+  return (
+    <>
+      <style>{`
+        @keyframes chatTypingDot {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+          30% { transform: translateY(-3px); opacity: 1; }
+        }
+        .typing-dot {
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          background: var(--text-secondary);
+          animation: chatTypingDot 1.1s infinite ease-in-out;
+        }
+      `}</style>
+      <div
+        aria-label="Assistant is typing"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          minWidth: 28,
+          padding: '4px 0',
+        }}
+      >
+        <span className="typing-dot" />
+        <span className="typing-dot" style={{ animationDelay: '120ms' }} />
+        <span className="typing-dot" style={{ animationDelay: '240ms' }} />
+      </div>
+    </>
+  );
+}
+
+export function ChatMessage({ message, isStreamingPlaceholder = false }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const parts = useMemo(
     () => isUser ? [{ type: 'text' as const, content: message.content }] : parseContent(message.content),
@@ -87,13 +122,17 @@ export function ChatMessage({ message }: ChatMessageProps) {
           boxShadow: 'var(--shadow-sm)',
         }}
       >
-        {parts.map((part, i) =>
+        {isStreamingPlaceholder ? (
+          <TypingDots />
+        ) : (
+          parts.map((part, i) =>
           part.type === 'code' ? (
             <CodeBlock key={i} content={part.content} />
           ) : (
             <Text key={i} style={{ color: 'inherit', fontSize: 'inherit', whiteSpace: 'pre-wrap' }}>
               {part.content}
             </Text>
+          )
           )
         )}
       </div>

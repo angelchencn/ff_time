@@ -321,7 +321,18 @@ export function EditorWithChat() {
                 </Text>
               </div>
             ) : (
-              messages.map((msg) => <ChatMessage key={msg.id} message={msg} />)
+              messages.map((msg, index) => (
+                <ChatMessage
+                  key={msg.id}
+                  message={msg}
+                  isStreamingPlaceholder={
+                    isStreaming &&
+                    index === messages.length - 1 &&
+                    msg.role === 'assistant' &&
+                    msg.content.length === 0
+                  }
+                />
+              ))
             )}
             <div ref={listEndRef} />
           </div>
