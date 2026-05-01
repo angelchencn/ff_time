@@ -9,6 +9,9 @@ import oracle.apps.hcm.formulas.core.jersey.api.*;
 
 import org.junit.Test;
 
+import javax.ws.rs.QueryParam;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -124,5 +127,22 @@ public class ApiTest {
         // FastFormulaResource.health() just returns a map
         FastFormulaResource resource = new FastFormulaResource();
         assertNotNull(resource);
+    }
+
+    @Test
+    public void chatStatusAcceptsOptionalWaitSeconds() throws Exception {
+        Method method = FastFormulaResource.class.getMethod("chatStatus", String.class, String.class);
+        Annotation[] waitParamAnnotations = method.getParameterAnnotations()[1];
+        QueryParam queryParam = null;
+        for (Annotation annotation : waitParamAnnotations) {
+            if (annotation instanceof QueryParam) {
+                queryParam = (QueryParam) annotation;
+                break;
+            }
+        }
+
+        assertNotNull(method);
+        assertNotNull(queryParam);
+        assertEquals("wait_seconds", queryParam.value());
     }
 }

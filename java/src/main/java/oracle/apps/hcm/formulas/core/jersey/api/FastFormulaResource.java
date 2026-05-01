@@ -28,6 +28,7 @@ public class FastFormulaResource {
 
     /** Sentinel value for the built-in "Custom Formula" type in requests + dropdowns. */
     private static final String CUSTOM_TYPE = "Custom";
+    private static final int MAX_STATUS_WAIT_SECONDS = 30;
 
     private final AiService aiService = new AiService();
     private final ChatSessionStore sessionStore = ChatSessionStore.getInstance();
@@ -130,13 +131,17 @@ public class FastFormulaResource {
     @GET
     @Path("/chat/status/{jobId}")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response chatStatus(@PathParam("jobId") String jobId) {
+    public Response chatStatus(@PathParam("jobId") String jobId,
+                               @QueryParam("wait_seconds") String waitSeconds) {
         if (AppsLogger.isEnabled(AppsLogger.FINER)) {
             AppsLogger.write(this,
-                    "GET /chat/status/" + jobId, AppsLogger.FINER);
+                    "GET /chat/status/" + jobId + " waitSeconds=" + waitSeconds,
+                    AppsLogger.FINER);
         }
 
         try {
+            waitBeforeStatusPoll(waitSeconds);
+
             String statusResponse = aiService.getJobStatus(jobId);
             if (statusResponse == null || statusResponse.isBlank()) {
                 return Response.ok(Map.of("status", "UNKNOWN", "jobId", jobId)).build();
@@ -167,6 +172,11 @@ public class FastFormulaResource {
             }
 
             return Response.ok(result).build();
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            return Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .entity(Map.of("error", "Interrupted while waiting before status poll"))
+                    .build();
         } catch (UnsupportedOperationException uoe) {
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity(Map.of("error", "Status polling not supported: " + uoe.getMessage()))
@@ -176,6 +186,28 @@ public class FastFormulaResource {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity(Map.of("error", "Status poll failed: " + e.getMessage()))
                     .build();
+        }
+    }
+
+    private static void waitBeforeStatusPoll(String waitSeconds) throws InterruptedException {
+        int effectiveWaitSeconds = normalizeStatusWaitSeconds(waitSeconds);
+        if (effectiveWaitSeconds > 0) {
+            Thread.sleep(effectiveWaitSeconds * 1000L);
+        }
+    }
+
+    private static int normalizeStatusWaitSeconds(String waitSeconds) {
+        if (waitSeconds == null || waitSeconds.isBlank()) {
+            return 0;
+        }
+        try {
+            int parsed = Integer.parseInt(waitSeconds.trim());
+            if (parsed <= 0) {
+                return 0;
+            }
+            return Math.min(parsed, MAX_STATUS_WAIT_SECONDS);
+        } catch (NumberFormatException nfe) {
+            return 0;
         }
     }
 

@@ -41,7 +41,7 @@ export function EditorWithChat() {
   const { formulaTypes } = useFormulaTypes();
   const { templates: dbTemplates, loading: templatesLoading } =
     useTemplatesByFormulaType(formulaType);
-  const [selectedLlm, setSelectedLlm] = useState<string>('GPT5MINI');
+  const [selectedLlm, setSelectedLlm] = useState<string>('');
   const [chatOpen, setChatOpen] = useState(false);
   const [chatHeight, setChatHeight] = useState(DEFAULT_CHAT_HEIGHT);
   const listEndRef = useRef<HTMLDivElement>(null);
@@ -126,7 +126,7 @@ export function EditorWithChat() {
     // Only send llm/workflow_code for Fusion environments (has auth).
     // Local dev uses OpenAI GPT 5.4 — these are ignored server-side.
     if (current.auth) {
-      body.llm = selectedLlm;
+      if (selectedLlm) body.llm = selectedLlm;
       if (current.workflowCode) body.workflow_code = current.workflowCode;
     }
     if (shouldShipEditorCode) {
@@ -480,9 +480,13 @@ export function EditorWithChat() {
               size="small"
               variant="borderless"
               style={{ width: 160 }}
+              placeholder="Default"
               options={[
-                { value: 'GPT5MINI', label: 'GPT-5 Mini' },
-                { value: 'GPT41MINI', label: 'GPT-4.1 Mini' },
+                { value: '', label: 'Default' },
+                { value: 'GPT54MINI', label: 'GPT54MINI' },
+                { value: 'GPT5MINI', label: 'GPT5MINI' },
+                { value: 'Llama33', label: 'Llama33' },
+                { value: 'GptOss', label: 'GptOss' },
               ]}
             />
           ) : (

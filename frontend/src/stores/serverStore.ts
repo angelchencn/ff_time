@@ -8,17 +8,22 @@ export interface ServerConfig {
   workflowCode?: string;
 }
 
+const FAST_FORMULA_ASSISTANTS_PREFIX =
+  '/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants';
+const LEGACY_VP_DEV_PREFIX =
+  '/hcmRestApi/redwood/11.13.18.05/calculationEntries';
+
 const DEFAULT_SERVERS: ServerConfig[] = [
   {
     name: 'VP DEV Agent',
     baseUrl: '/fusion-proxy',
-    apiPrefix: '/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants',
+    apiPrefix: FAST_FORMULA_ASSISTANTS_PREFIX,
     auth: { username: 'tm-mfitzimmons', password: 'Welcome1' },
   },
   {
     name: 'cookie cutter',
     baseUrl: '/cookie-cutter-proxy',
-    apiPrefix: '/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants',
+    apiPrefix: FAST_FORMULA_ASSISTANTS_PREFIX,
     auth: { username: 'tm-mfitzimmons', password: 'Welcome1' },
   },
 ];
@@ -31,7 +36,11 @@ function loadServers(): ServerConfig[] {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved) as ServerConfig[];
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const migrated = migrateSavedServers(parsed);
+        if (migrated.changed) saveServers(migrated.servers);
+        return migrated.servers;
+      }
     }
   } catch { /* ignore */ }
   return DEFAULT_SERVERS;
@@ -39,6 +48,23 @@ function loadServers(): ServerConfig[] {
 
 function saveServers(servers: ServerConfig[]) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(servers)); } catch { /* ignore */ }
+}
+
+function migrateSavedServers(servers: ServerConfig[]): { servers: ServerConfig[]; changed: boolean } {
+  let changed = false;
+  const migrated = servers.map((server) => {
+    if (
+      server.name === 'VP DEV Agent'
+      && server.baseUrl === '/fusion-proxy'
+      && server.apiPrefix === LEGACY_VP_DEV_PREFIX
+    ) {
+      changed = true;
+      return { ...server, apiPrefix: FAST_FORMULA_ASSISTANTS_PREFIX };
+    }
+    return server;
+  });
+
+  return { servers: migrated, changed };
 }
 
 function loadSavedIndex(maxLen: number): number {

@@ -8,7 +8,7 @@ export default defineConfig({
     proxy: {
       // Proxy Fusion Cloud requests to bypass CORS
       '/fusion-proxy': {
-        target: 'https://cptchuhqy.fusionapps.ocs.oc-test.com',
+        target: 'https://cptcneaqy.fusionapps.ocs.oc-test.com',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/fusion-proxy/, ''),

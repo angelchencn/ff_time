@@ -1,0 +1,1242 @@
+{
+  "Specification": {
+    "dataPipeline": {
+      "pipelineNodes": [
+        {
+          "metadata": {
+            "description": "Start of data pipeline",
+            "name": "Start"
+          },
+          "outcomes": {
+            "success": "1777573454918"
+          },
+          "code": "START",
+          "id": "start",
+          "inputs": [],
+          "type": "START"
+        },
+        {
+          "metadata": {
+            "description": "End of data pipeline",
+            "name": "End"
+          },
+          "outcomes": {},
+          "code": "END",
+          "id": "end",
+          "inputs": [],
+          "type": "END"
+        },
+        {
+          "metadata": {
+            "businessObjectCode": "ORA_HCM_FF_FASTFORMULAGENERATORBUSINESSOBJECT",
+            "functionName": "generateFormulaAsync",
+            "name": "Invoke FF_BO"
+          },
+          "outcomes": {
+            "success": "1777573231483"
+          },
+          "code": "INVOKE_FFBO",
+          "id": "1777140896542",
+          "inputs": [
+            {
+              "id": "1777495329020_1",
+              "name": "pMessage",
+              "type": "string",
+              "value": "Formula that subtracts the time not worked entry for the scheduled shift from a reported time entry's calculated duration if the entries match shift."
+            },
+            {
+              "id": "1777495329020_2",
+              "name": "pTemplate_code",
+              "type": "string",
+              "value": "ORA_HCM_FF_TEST_TIME_CALCULATION_FORMULA_765678"
+            },
+            {
+              "id": "1777495329021_3",
+              "name": "pLlm",
+              "type": "string"
+            },
+            {
+              "id": "1777495329022_4",
+              "name": "pEditor_code",
+              "type": "string"
+            },
+            {
+              "id": "1777495329023_5",
+              "name": "pSession_id",
+              "type": "string"
+            }
+          ],
+          "outputSpecification": "{}",
+          "type": "BO_FUNCTION"
+        },
+        {
+          "metadata": {
+            "name": "Switch OraMessageHint"
+          },
+          "outcomes": {
+            "InitDisplay": "1777435415005",
+            "Summary": "add_Summary_1777435333347",
+            "Query": "add_Query_1777435333347"
+          },
+          "code": "SWITCH_ORAMESSAGEHINT",
+          "convergenceTargetId": "end",
+          "id": "1777435333347",
+          "inputs": [
+            {
+              "id": "1777435333349_1",
+              "name": "caseExpression",
+              "type": "string",
+              "value": "{{$context.$app.$OraMessageHint}}"
+            }
+          ],
+          "type": "SWITCH"
+        },
+        {
+          "metadata": {
+            "description": "Add node for Summary case branch",
+            "name": "Add (Summary Case)"
+          },
+          "outcomes": {
+            "success": "end"
+          },
+          "id": "add_Summary_1777435333347",
+          "inputs": [],
+          "type": "ADD"
+        },
+        {
+          "metadata": {
+            "description": "Add node for Query case branch",
+            "name": "Add (Query Case)"
+          },
+          "outcomes": {
+            "success": "end"
+          },
+          "id": "add_Query_1777435333347",
+          "inputs": [],
+          "type": "ADD"
+        },
+        {
+          "aiAppOutputSpecification": {
+            "dataDisplay": {
+              "layouts": [],
+              "enableActions": true,
+              "enableCommunications": true,
+              "customNotes": "Display the response as a record. Show Message, Template, Session_Id, and Formula Text.\nFormula Text should preserve line breaks and use a monospace/preformatted style if available."
+            }
+          },
+          "metadata": {
+            "modelConfiguration": {
+              "modelProperties": {
+                "k": 0,
+                "max_completion_tokens": 32000,
+                "reasoning_effort": "low"
+              },
+              "code": "ORA_MODEL_CONFIG_PREMIUM_OPEN_AI_GPT_4_1_MINI",
+              "model": "OCI_GPT_5_MINI",
+              "modelName": "Gpt-5 Mini",
+              "provider": "CERT_PREMIUM"
+            },
+            "name": "Init Display LLM"
+          },
+          "outcomes": {
+            "success": "end"
+          },
+          "code": "INIT_DISPLAY_LLM",
+          "id": "1777435415005",
+          "inputs": [
+            {
+              "id": "1777435415006_1",
+              "name": "prompt",
+              "type": "string",
+              "value": "You will receive this JSON object:\n  {{$context.$nodes.INVOKE_FFBO.$output}} and   {{$context.$nodes.INVOKEASYNC.$output}}\n\n\n  Return plain text only.\n\n  Message:\n  {{$context.$nodes.INVOKE_FFBO.$input.pMessage}}\n\n  Template:\n  {{$context.$nodes.INVOKE_FFBO.$input.pTemplate_code}}\n\n  Session_Id:\n  {{$context.$nodes.INVOKE_FFBO.$output.session_id}}\n\n  Job_Id:\n  {{$context.$nodes.INVOKE_FFBO.$output.jobId}}\n\n  Job Status:\n {{$context.$nodes.LOOP_STATUS.JOBSTATUSCHECK.$output.result.status}} \n\n  Formula Text:\n {{$context.$nodes.LOOP_STATUS.JOBSTATUSCHECK.$output.result.output}} \n\n  Rules:\n  1. Do not output JSON.\n  2. Do not output Markdown code fences.\n  3. Preserve Formula Text exactly.\n  4. Convert escaped newline characters \"\\n\" into real line breaks.\n  5. Do not summarize or rewrite the formula.\n  6. Do not add explanations..."
+            }
+          ],
+          "type": "LLM"
+        },
+        {
+          "metadata": {
+            "dataPipeline": {
+              "pipelineNodes": [
+                {
+                  "metadata": {
+                    "name": "Start",
+                    "description": "Start of data pipeline"
+                  },
+                  "outcomes": {
+                    "success": "1777573500998"
+                  },
+                  "id": "start_1777573231483",
+                  "code": "START_1777573231483",
+                  "type": "START"
+                },
+                {
+                  "metadata": {
+                    "name": "End",
+                    "description": "End of data pipeline"
+                  },
+                  "id": "end_1777573231483",
+                  "code": "END_1777573231483",
+                  "type": "END"
+                },
+                {
+                  "metadata": {
+                    "businessObjectCode": "ORA_HCM_FF_FASTFORMULAGENERATORBUSINESSOBJECT",
+                    "functionName": "pollJobStatus",
+                    "processJson": true,
+                    "name": "Get Job Status"
+                  },
+                  "outcomes": {
+                    "success": "1777573599692"
+                  },
+                  "code": "GET_JOB_STATUS",
+                  "id": "1777573500998",
+                  "inputs": [
+                    {
+                      "id": "1777607091124_1",
+                      "name": "pJob_Id",
+                      "type": "string",
+                      "value": "{{$context.$nodes.INVOKE_FFBO.$output.jobId}}"
+                    },
+                    {
+                      "id": "1777607091125_2",
+                      "name": "pWait_Seconds",
+                      "type": "string",
+                      "value": "10"
+                    }
+                  ],
+                  "outputSpecification": "{}",
+                  "type": "BO_FUNCTION"
+                },
+                {
+                  "metadata": {
+                    "name": "jobStatusCheck",
+                    "returnType": "object",
+                    "sourceCode": "const poll = $context.$nodes.LOOP_STATUS.GET_JOB_STATUS.$output;\nconst status = String(poll.status || '').toUpperCase();\n\n  if (status === 'COMPLETE') {\n   $context.$variables.jobStatus  = false;\n    return {\n      execute: false,\n      status: status,\n      output: poll.text || poll.output || '',\n      timeout: false,\n      error: ''\n    };\n  }\n\n  if (status === 'ERROR') {\n   $context.$variables.jobStatus  = false;\n    return {\n      execute: false,\n      status: status,\n      output: '',\n      timeout: false,\n      error: poll.error || 'pollJobStatus returned ERROR'\n    };\n  }\n\n  return {\n    execute: true,\n    status: status || 'UNKNOWN',\n    output: '',\n    timeout: false,\n    error: ''\n  };"
+                  },
+                  "outcomes": {
+                    "success": "1777606940044"
+                  },
+                  "code": "JOBSTATUSCHECK",
+                  "id": "1777573599692",
+                  "inputs": [],
+                  "outputSpecification": "{\n  \"$schema\": \"http://json-schema.org/draft-04/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"result\": {\n      \"type\": \"object\"\n    },\n    \"timeout\": {\n      \"type\": \"boolean\"\n    },\n    \"error\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"output\",\n    \"timeout\",\n    \"error\"\n  ]\n}",
+                  "type": "CODE"
+                },
+                {
+                  "metadata": {
+                    "name": "setCount"
+                  },
+                  "outcomes": {
+                    "success": "end_1777573231483"
+                  },
+                  "code": "SETCOUNT",
+                  "id": "1777606940044",
+                  "inputs": [
+                    {
+                      "id": "1777609280488",
+                      "scope": "JOB",
+                      "value": "{{$context.$nodes.LOOP_STATUS.JOBSTATUSCHECK.$output.result.status}}",
+                      "name": "status",
+                      "type": "string"
+                    },
+                    {
+                      "id": "1777609268870",
+                      "scope": "JOB",
+                      "value": "{{$context.$nodes.LOOP_STATUS.JOBSTATUSCHECK.$output.result.output}}",
+                      "name": "formula",
+                      "type": "string"
+                    },
+                    {
+                      "id": "1777608262961",
+                      "name": "jobStatus",
+                      "scope": "JOB",
+                      "type": "boolean",
+                      "value": "{{$context.$nodes.LOOP_STATUS.JOBSTATUSCHECK.$output.result.execute}}"
+                    },
+                    {
+                      "id": "1777606945150",
+                      "name": "count",
+                      "scope": "JOB",
+                      "type": "integer",
+                      "value": "{{$context.$variables.count+1}}"
+                    }
+                  ],
+                  "type": "SET_FIELDS"
+                }
+              ],
+              "rootNode": "start_1777573231483"
+            },
+            "name": "loop status"
+          },
+          "outcomes": {
+            "success": "1777606963353"
+          },
+          "code": "LOOP_STATUS",
+          "id": "1777573231483",
+          "inputs": [
+            {
+              "id": "1777573231484_1",
+              "name": "condition",
+              "type": "string",
+              "value": "{{$context.$variables.jobStatus}}"
+            }
+          ],
+          "type": "WHILE"
+        },
+        {
+          "metadata": {
+            "name": "Init Variables"
+          },
+          "outcomes": {
+            "success": "1777140896542"
+          },
+          "code": "INIT_VARIABLES",
+          "id": "1777573454918",
+          "inputs": [
+            {
+              "id": "1777606922875",
+              "name": "count",
+              "scope": "JOB",
+              "type": "integer",
+              "value": "0"
+            },
+            {
+              "id": "1777573460856",
+              "name": "jobStatus",
+              "scope": "JOB",
+              "type": "boolean",
+              "value": "true"
+            }
+          ],
+          "type": "SET_FIELDS"
+        },
+        {
+          "metadata": {
+            "name": "outputLLM"
+          },
+          "outcomes": {
+            "success": "1777435333347"
+          },
+          "code": "OUTPUTLLM",
+          "id": "1777606963353",
+          "inputs": [
+            {
+              "id": "1777606963355_1",
+              "name": "prompt",
+              "type": "string",
+              "value": "Output \nCount: {{$context.$variables.count}}\nStatus: {{$context.$variables.status}}\nFormula: {{$context.$variables.formula}}\n"
+            }
+          ],
+          "type": "LLM"
+        }
+      ],
+      "rootNode": "start",
+      "variables": [
+        {
+          "id": "1777609212760",
+          "name": "status",
+          "scope": "CONVERSATION",
+          "type": "string"
+        },
+        {
+          "id": "1777609194374",
+          "name": "formula",
+          "scope": "CONVERSATION",
+          "type": "string"
+        },
+        {
+          "id": "1777606912458",
+          "name": "count",
+          "scope": "CONVERSATION",
+          "type": "integer"
+        },
+        {
+          "id": "1777573410876",
+          "name": "jobStatus",
+          "scope": "CONVERSATION",
+          "type": "boolean"
+        }
+      ],
+      "errorHandlers": [
+        {
+          "type": "EMAIL",
+          "inputs": [
+            {
+              "name": "toList",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "name": "ccList",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "name": "subject",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "name": "body",
+              "type": "string",
+              "value": ""
+            }
+          ]
+        }
+      ]
+    },
+    "modelConfiguration": {
+      "modelProperties": {
+        "k": 0,
+        "max_completion_tokens": 32000,
+        "reasoning_effort": "high"
+      },
+      "code": "ORA_MODEL_CONFIG_PREMIUM_OPEN_AI_GPT_4_1_MINI",
+      "model": "OCI_GPT_5_MINI",
+      "modelName": "Gpt-5 Mini",
+      "provider": "CERT_PREMIUM"
+    },
+    "jsonSchemaName": "Workflow.spec",
+    "jsonSchemaVersion": "1",
+    "inputs": [],
+    "outputSpecification": " ",
+    "agentsValueMappings": [],
+    "humanApprovalFlag": false,
+    "waitFlag": false,
+    "triggers": [
+      {
+        "type": "REST",
+        "inputs": [
+          {
+            "id": "1777436083901",
+            "name": "OraMessageHint",
+            "scope": "JOB",
+            "type": "string"
+          }
+        ]
+      }
+    ],
+    "costSavings": 0,
+    "timeSavings": 10,
+    "chatExpTPFileUploadEnabledFlag": false,
+    "chatExpThirdPartyDetails": [],
+    "policyIds": []
+  },
+  "dependencies": {
+    "boFunctionNodes": [
+      {
+        "ObjectProperties": {
+          "jsonSchemaName": "SupportedBusinessObject.objectProperties",
+          "jsonSchemaVersion": 1,
+          "tools": [
+            {
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "bodyTemplate": "{\n  \"message\": \"{pMessage}\",\n  \"template_code\": \"{pTemplate_code}\",\n  \"llm\": \"{pLlm}\",\n   \"editor_code\":\"{pEditor_code}\",\n   \"session_id\":\"{pSession_id}\"\n}",
+              "description": "Generate Fast Formula from natural language. Blocking - waits for LLM completion. Returns formula code in text field.",
+              "id": 0,
+              "isNew": true,
+              "name": "generateFormulaSync",
+              "operationType": "POST",
+              "parameterDefinitions": [
+                {
+                  "dataType": "string",
+                  "description": "Natural language requirement describing what the formula should do. Example: Generate a time entry rule formula that validates minimum hours per period.",
+                  "id": 19,
+                  "isToken": true,
+                  "name": "pMessage"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Business key from FF_FORMULA_TEMPLATES.TEMPLATE_CODE. Identifies the reference formula template. Always required. Example: ORA_HCM_FF_TER_MIN_HOURS_001",
+                  "id": 20,
+                  "isToken": true,
+                  "name": "pTemplate_code"
+                },
+                {
+                  "dataType": "string",
+                  "description": "LLM model selector. Values: GPT5MINI (default, GPT-5 Mini) or GPT41MINI (GPT-4.1 Mini). Optional.",
+                  "id": 21,
+                  "isToken": true,
+                  "name": "pLlm"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Current formula code in the editor. When provided, the LLM modifies this code instead of generating from scratch. Optional.",
+                  "id": 22,
+                  "isToken": true,
+                  "name": "pEditor_code"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Session ID (Agent Studio conversationId) for multi-turn conversation. Pass back the value from a previous response to continue refining. Optional.",
+                  "id": 23,
+                  "isToken": true,
+                  "name": "pSession_id"
+                }
+              ],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/chat/sync",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [
+                {
+                  "query": {
+                    "message": "Generate a time entry rule formula that validates minimum hours",
+                    "template_code": "ORA_HCM_FF_TER_MIN_HOURS_001",
+                    "llm": "GPT5MINI"
+                  },
+                  "description": "Generate a time entry rule formula with minimum hours validation using GPT-5 Mini model.",
+                  "id": 13,
+                  "stringValue": "{\"message\":\"Generate a time entry rule formula that validates minimum hours\",\"template_code\":\"ORA_HCM_FF_TER_MIN_HOURS_001\",\"llm\":\"GPT5MINI\"}"
+                }
+              ],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "bodyTemplate": "{\n  \"message\": \"{pMessage}\",\n  \"template_code\": \"{pTemplate_code}\",\n  \"llm\": \"{pLlm}\",\n   \"editor_code\":\"{pEditor_code}\",\n   \"session_id\":\"{pSession_id}\"\n}",
+              "description": "Submit formula generation job. Returns jobId immediately. Poll status via pollJobStatus.",
+              "id": 1,
+              "isNew": true,
+              "name": "generateFormulaAsync",
+              "operationType": "POST",
+              "parameterDefinitions": [
+                {
+                  "dataType": "string",
+                  "description": "Natural language requirement describing what the formula should do. Example: Generate a time entry rule formula that validates minimum hours per period.",
+                  "id": 36,
+                  "isToken": true,
+                  "name": "pMessage"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Business key from FF_FORMULA_TEMPLATES.TEMPLATE_CODE. Identifies the reference formula template. Always required. Example: ORA_HCM_FF_TER_MIN_HOURS_001",
+                  "id": 37,
+                  "isToken": true,
+                  "name": "pTemplate_code"
+                },
+                {
+                  "dataType": "string",
+                  "description": "LLM model selector. Values: GPT5MINI (default, GPT-5 Mini) or GPT41MINI (GPT-4.1 Mini). Optional.",
+                  "id": 38,
+                  "isToken": true,
+                  "name": "pLlm"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Current formula code in the editor. When provided, the LLM modifies this code instead of generating from scratch. Optional.",
+                  "id": 39,
+                  "isToken": true,
+                  "name": "pEditor_code"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Session ID (Agent Studio conversationId) for multi-turn conversation. Pass back the value from a previous response to continue refining. Optional.",
+                  "id": 40,
+                  "isToken": true,
+                  "name": "pSession_id"
+                }
+              ],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/chat",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [
+                {
+                  "query": {
+                    "message": "Generate an element skip formula",
+                    "template_code": "ORA_HCM_FF_ELEMENT_SKIP_001",
+                    "llm": "GPT5MINI"
+                  },
+                  "description": "Generate a time entry rule formula with minimum hours validation using GPT-5 Mini model.",
+                  "id": 30,
+                  "stringValue": "{\"message\":\"Generate an element skip formula\",\"template_code\":\"ORA_HCM_FF_ELEMENT_SKIP_001\",\"llm\":\"GPT5MINI\"}"
+                }
+              ],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {},
+              "bodyTemplate": "",
+              "description": "Poll async job status by jobId. Returns status (RUNNING/COMPLETE/ERROR) and formula code when complete.",
+              "id": 2,
+              "isNew": true,
+              "name": "pollJobStatus",
+              "operationType": "GET",
+              "parameterDefinitions": [
+                {
+                  "dataType": "string",
+                  "description": "Job ID returned by the async Generate Formula endpoint (POST /chat). Used to poll execution status until COMPLETE or ERROR.",
+                  "id": 43,
+                  "isToken": true,
+                  "name": "pJob_Id"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Optional wait in seconds before polling status. Use 10 to slow Agent Studio while-loop polling. Values above 30 are capped by the service.",
+                  "id": 44,
+                  "isToken": true,
+                  "name": "pWait_Seconds"
+                }
+              ],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/chat/status/{pJob_Id}?wait_seconds={pWait_Seconds}",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {},
+              "bodyTemplate": "",
+              "description": "List available formula templates filtered by formula type. Each template has reference code and additional rules.",
+              "id": 3,
+              "isNew": true,
+              "name": "listTemplates",
+              "operationType": "GET",
+              "parameterDefinitions": [],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/templates",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {},
+              "bodyTemplate": "",
+              "description": "List all formula types with display names.",
+              "id": 4,
+              "isNew": true,
+              "name": "listFormulaTypes",
+              "operationType": "GET",
+              "parameterDefinitions": [],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/formula-types",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "bodyTemplate": "{\n  \"code\": \"{pCode}\"\n}",
+              "description": "Validate Fast Formula syntax with 3-layer checks (syntax, semantic, rules).",
+              "id": 5,
+              "isNew": true,
+              "name": "validateFormula",
+              "operationType": "POST",
+              "parameterDefinitions": [
+                {
+                  "dataType": "string",
+                  "description": "Fast Formula source code to validate. The validator runs 3-layer checks: syntax parsing, semantic analysis (undeclared variables, unassigned outputs), and business rules (missing RETURN).",
+                  "id": 48,
+                  "isToken": true,
+                  "name": "pCode"
+                }
+              ],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/validate",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [
+                {
+                  "query": {
+                    "code": "DEFAULT FOR hours IS 0\nINPUTS ARE hours\nl_pay = hours * 25\nRETURN l_pay"
+                  },
+                  "description": "Validate a simple hourly pay formula with DEFAULT, INPUTS ARE, and RETURN.",
+                  "id": 46,
+                  "stringValue": "{\"code\":\"DEFAULT FOR hours IS 0\\nINPUTS ARE hours\\nl_pay = hours * 25\\nRETURN l_pay\"}"
+                }
+              ],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {},
+              "bodyTemplate": "",
+              "description": "Health check endpoint.",
+              "id": 6,
+              "isNew": true,
+              "name": "healthCheck",
+              "operationType": "GET",
+              "parameterDefinitions": [],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/health",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            }
+          ]
+        },
+        "ObjectCode": "ORA_HCM_FF_FASTFORMULAGENERATORBUSINESSOBJECT",
+        "Family": "HCM",
+        "Product": "GLOBAL_PAYROLL",
+        "ObjectSource": "HCM_SEARCH",
+        "Category": null,
+        "RestResourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants",
+        "RestResourceIdentifier": "identifier_not_known",
+        "RestSupportedOperations": "{\"allowedOperations\": {\"GET\": true, \"POST\": true, \"PATCH\": true, \"DELETE\": true}}",
+        "ParentSupptObjectId": null,
+        "MandatoryFlag": false,
+        "SeededFlag": false,
+        "ObjectDisplayName": "Fast Formula Generator Business Object",
+        "Name": "Fast Formula Generator Business Object",
+        "Description": "AI-powered Fast Formula code generator for Oracle HCM. Accepts natural language requirements and returns syntactically valid Fast Formula source code. Supports formula types including Payroll, Time and Labor, and Absence Management. Provides sync, async, and streaming endpoints with multi-turn conversation support via Agent Studio.",
+        "CreatedBy": "TM-MFITZIMMONS",
+        "CreationDate": "2026-04-22T18:18:00.840+00:00"
+      },
+      {
+        "ObjectProperties": {
+          "jsonSchemaName": "SupportedBusinessObject.objectProperties",
+          "jsonSchemaVersion": 1,
+          "tools": [
+            {
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "bodyTemplate": "{\n  \"message\": \"{pMessage}\",\n  \"template_code\": \"{pTemplate_code}\",\n  \"llm\": \"{pLlm}\",\n   \"editor_code\":\"{pEditor_code}\",\n   \"session_id\":\"{pSession_id}\"\n}",
+              "description": "Generate Fast Formula from natural language. Blocking - waits for LLM completion. Returns formula code in text field.",
+              "id": 0,
+              "isNew": true,
+              "name": "generateFormulaSync",
+              "operationType": "POST",
+              "parameterDefinitions": [
+                {
+                  "dataType": "string",
+                  "description": "Natural language requirement describing what the formula should do. Example: Generate a time entry rule formula that validates minimum hours per period.",
+                  "id": 19,
+                  "isToken": true,
+                  "name": "pMessage"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Business key from FF_FORMULA_TEMPLATES.TEMPLATE_CODE. Identifies the reference formula template. Always required. Example: ORA_HCM_FF_TER_MIN_HOURS_001",
+                  "id": 20,
+                  "isToken": true,
+                  "name": "pTemplate_code"
+                },
+                {
+                  "dataType": "string",
+                  "description": "LLM model selector. Values: GPT5MINI (default, GPT-5 Mini) or GPT41MINI (GPT-4.1 Mini). Optional.",
+                  "id": 21,
+                  "isToken": true,
+                  "name": "pLlm"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Current formula code in the editor. When provided, the LLM modifies this code instead of generating from scratch. Optional.",
+                  "id": 22,
+                  "isToken": true,
+                  "name": "pEditor_code"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Session ID (Agent Studio conversationId) for multi-turn conversation. Pass back the value from a previous response to continue refining. Optional.",
+                  "id": 23,
+                  "isToken": true,
+                  "name": "pSession_id"
+                }
+              ],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/chat/sync",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [
+                {
+                  "query": {
+                    "message": "Generate a time entry rule formula that validates minimum hours",
+                    "template_code": "ORA_HCM_FF_TER_MIN_HOURS_001",
+                    "llm": "GPT5MINI"
+                  },
+                  "description": "Generate a time entry rule formula with minimum hours validation using GPT-5 Mini model.",
+                  "id": 13,
+                  "stringValue": "{\"message\":\"Generate a time entry rule formula that validates minimum hours\",\"template_code\":\"ORA_HCM_FF_TER_MIN_HOURS_001\",\"llm\":\"GPT5MINI\"}"
+                }
+              ],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "bodyTemplate": "{\n  \"message\": \"{pMessage}\",\n  \"template_code\": \"{pTemplate_code}\",\n  \"llm\": \"{pLlm}\",\n   \"editor_code\":\"{pEditor_code}\",\n   \"session_id\":\"{pSession_id}\"\n}",
+              "description": "Submit formula generation job. Returns jobId immediately. Poll status via pollJobStatus.",
+              "id": 1,
+              "isNew": true,
+              "name": "generateFormulaAsync",
+              "operationType": "POST",
+              "parameterDefinitions": [
+                {
+                  "dataType": "string",
+                  "description": "Natural language requirement describing what the formula should do. Example: Generate a time entry rule formula that validates minimum hours per period.",
+                  "id": 36,
+                  "isToken": true,
+                  "name": "pMessage"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Business key from FF_FORMULA_TEMPLATES.TEMPLATE_CODE. Identifies the reference formula template. Always required. Example: ORA_HCM_FF_TER_MIN_HOURS_001",
+                  "id": 37,
+                  "isToken": true,
+                  "name": "pTemplate_code"
+                },
+                {
+                  "dataType": "string",
+                  "description": "LLM model selector. Values: GPT5MINI (default, GPT-5 Mini) or GPT41MINI (GPT-4.1 Mini). Optional.",
+                  "id": 38,
+                  "isToken": true,
+                  "name": "pLlm"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Current formula code in the editor. When provided, the LLM modifies this code instead of generating from scratch. Optional.",
+                  "id": 39,
+                  "isToken": true,
+                  "name": "pEditor_code"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Session ID (Agent Studio conversationId) for multi-turn conversation. Pass back the value from a previous response to continue refining. Optional.",
+                  "id": 40,
+                  "isToken": true,
+                  "name": "pSession_id"
+                }
+              ],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/chat",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [
+                {
+                  "query": {
+                    "message": "Generate an element skip formula",
+                    "template_code": "ORA_HCM_FF_ELEMENT_SKIP_001",
+                    "llm": "GPT5MINI"
+                  },
+                  "description": "Generate a time entry rule formula with minimum hours validation using GPT-5 Mini model.",
+                  "id": 30,
+                  "stringValue": "{\"message\":\"Generate an element skip formula\",\"template_code\":\"ORA_HCM_FF_ELEMENT_SKIP_001\",\"llm\":\"GPT5MINI\"}"
+                }
+              ],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {},
+              "bodyTemplate": "",
+              "description": "Poll async job status by jobId. Returns status (RUNNING/COMPLETE/ERROR) and formula code when complete.",
+              "id": 2,
+              "isNew": true,
+              "name": "pollJobStatus",
+              "operationType": "GET",
+              "parameterDefinitions": [
+                {
+                  "dataType": "string",
+                  "description": "Job ID returned by the async Generate Formula endpoint (POST /chat). Used to poll execution status until COMPLETE or ERROR.",
+                  "id": 43,
+                  "isToken": true,
+                  "name": "pJob_Id"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Optional wait in seconds before polling status. Use 10 to slow Agent Studio while-loop polling. Values above 30 are capped by the service.",
+                  "id": 44,
+                  "isToken": true,
+                  "name": "pWait_Seconds"
+                }
+              ],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/chat/status/{pJob_Id}?wait_seconds={pWait_Seconds}",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {},
+              "bodyTemplate": "",
+              "description": "List available formula templates filtered by formula type. Each template has reference code and additional rules.",
+              "id": 3,
+              "isNew": true,
+              "name": "listTemplates",
+              "operationType": "GET",
+              "parameterDefinitions": [],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/templates",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {},
+              "bodyTemplate": "",
+              "description": "List all formula types with display names.",
+              "id": 4,
+              "isNew": true,
+              "name": "listFormulaTypes",
+              "operationType": "GET",
+              "parameterDefinitions": [],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/formula-types",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "bodyTemplate": "{\n  \"code\": \"{pCode}\"\n}",
+              "description": "Validate Fast Formula syntax with 3-layer checks (syntax, semantic, rules).",
+              "id": 5,
+              "isNew": true,
+              "name": "validateFormula",
+              "operationType": "POST",
+              "parameterDefinitions": [
+                {
+                  "dataType": "string",
+                  "description": "Fast Formula source code to validate. The validator runs 3-layer checks: syntax parsing, semantic analysis (undeclared variables, unassigned outputs), and business rules (missing RETURN).",
+                  "id": 48,
+                  "isToken": true,
+                  "name": "pCode"
+                }
+              ],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/validate",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [
+                {
+                  "query": {
+                    "code": "DEFAULT FOR hours IS 0\nINPUTS ARE hours\nl_pay = hours * 25\nRETURN l_pay"
+                  },
+                  "description": "Validate a simple hourly pay formula with DEFAULT, INPUTS ARE, and RETURN.",
+                  "id": 46,
+                  "stringValue": "{\"code\":\"DEFAULT FOR hours IS 0\\nINPUTS ARE hours\\nl_pay = hours * 25\\nRETURN l_pay\"}"
+                }
+              ],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {},
+              "bodyTemplate": "",
+              "description": "Health check endpoint.",
+              "id": 6,
+              "isNew": true,
+              "name": "healthCheck",
+              "operationType": "GET",
+              "parameterDefinitions": [],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/health",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            }
+          ]
+        },
+        "ObjectCode": "ORA_HCM_FF_FASTFORMULAGENERATORBUSINESSOBJECT",
+        "Family": "HCM",
+        "Product": "GLOBAL_PAYROLL",
+        "ObjectSource": "HCM_SEARCH",
+        "Category": null,
+        "RestResourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants",
+        "RestResourceIdentifier": "identifier_not_known",
+        "RestSupportedOperations": "{\"allowedOperations\": {\"GET\": true, \"POST\": true, \"PATCH\": true, \"DELETE\": true}}",
+        "ParentSupptObjectId": null,
+        "MandatoryFlag": false,
+        "SeededFlag": false,
+        "ObjectDisplayName": "Fast Formula Generator Business Object",
+        "Name": "Fast Formula Generator Business Object",
+        "Description": "AI-powered Fast Formula code generator for Oracle HCM. Accepts natural language requirements and returns syntactically valid Fast Formula source code. Supports formula types including Payroll, Time and Labor, and Absence Management. Provides sync, async, and streaming endpoints with multi-turn conversation support via Agent Studio.",
+        "CreatedBy": "TM-MFITZIMMONS",
+        "CreationDate": "2026-04-22T18:18:00.840+00:00"
+      },
+      {
+        "ObjectProperties": {
+          "jsonSchemaName": "SupportedBusinessObject.objectProperties",
+          "jsonSchemaVersion": 1,
+          "tools": [
+            {
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "bodyTemplate": "{\n  \"message\": \"{pMessage}\",\n  \"template_code\": \"{pTemplate_code}\",\n  \"llm\": \"{pLlm}\",\n   \"editor_code\":\"{pEditor_code}\",\n   \"session_id\":\"{pSession_id}\"\n}",
+              "description": "Generate Fast Formula from natural language. Blocking - waits for LLM completion. Returns formula code in text field.",
+              "id": 0,
+              "isNew": true,
+              "name": "generateFormulaSync",
+              "operationType": "POST",
+              "parameterDefinitions": [
+                {
+                  "dataType": "string",
+                  "description": "Natural language requirement describing what the formula should do. Example: Generate a time entry rule formula that validates minimum hours per period.",
+                  "id": 19,
+                  "isToken": true,
+                  "name": "pMessage"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Business key from FF_FORMULA_TEMPLATES.TEMPLATE_CODE. Identifies the reference formula template. Always required. Example: ORA_HCM_FF_TER_MIN_HOURS_001",
+                  "id": 20,
+                  "isToken": true,
+                  "name": "pTemplate_code"
+                },
+                {
+                  "dataType": "string",
+                  "description": "LLM model selector. Values: GPT5MINI (default, GPT-5 Mini) or GPT41MINI (GPT-4.1 Mini). Optional.",
+                  "id": 21,
+                  "isToken": true,
+                  "name": "pLlm"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Current formula code in the editor. When provided, the LLM modifies this code instead of generating from scratch. Optional.",
+                  "id": 22,
+                  "isToken": true,
+                  "name": "pEditor_code"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Session ID (Agent Studio conversationId) for multi-turn conversation. Pass back the value from a previous response to continue refining. Optional.",
+                  "id": 23,
+                  "isToken": true,
+                  "name": "pSession_id"
+                }
+              ],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/chat/sync",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [
+                {
+                  "query": {
+                    "message": "Generate a time entry rule formula that validates minimum hours",
+                    "template_code": "ORA_HCM_FF_TER_MIN_HOURS_001",
+                    "llm": "GPT5MINI"
+                  },
+                  "description": "Generate a time entry rule formula with minimum hours validation using GPT-5 Mini model.",
+                  "id": 13,
+                  "stringValue": "{\"message\":\"Generate a time entry rule formula that validates minimum hours\",\"template_code\":\"ORA_HCM_FF_TER_MIN_HOURS_001\",\"llm\":\"GPT5MINI\"}"
+                }
+              ],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "bodyTemplate": "{\n  \"message\": \"{pMessage}\",\n  \"template_code\": \"{pTemplate_code}\",\n  \"llm\": \"{pLlm}\",\n   \"editor_code\":\"{pEditor_code}\",\n   \"session_id\":\"{pSession_id}\"\n}",
+              "description": "Submit formula generation job. Returns jobId immediately. Poll status via pollJobStatus.",
+              "id": 1,
+              "isNew": true,
+              "name": "generateFormulaAsync",
+              "operationType": "POST",
+              "parameterDefinitions": [
+                {
+                  "dataType": "string",
+                  "description": "Natural language requirement describing what the formula should do. Example: Generate a time entry rule formula that validates minimum hours per period.",
+                  "id": 36,
+                  "isToken": true,
+                  "name": "pMessage"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Business key from FF_FORMULA_TEMPLATES.TEMPLATE_CODE. Identifies the reference formula template. Always required. Example: ORA_HCM_FF_TER_MIN_HOURS_001",
+                  "id": 37,
+                  "isToken": true,
+                  "name": "pTemplate_code"
+                },
+                {
+                  "dataType": "string",
+                  "description": "LLM model selector. Values: GPT5MINI (default, GPT-5 Mini) or GPT41MINI (GPT-4.1 Mini). Optional.",
+                  "id": 38,
+                  "isToken": true,
+                  "name": "pLlm"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Current formula code in the editor. When provided, the LLM modifies this code instead of generating from scratch. Optional.",
+                  "id": 39,
+                  "isToken": true,
+                  "name": "pEditor_code"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Session ID (Agent Studio conversationId) for multi-turn conversation. Pass back the value from a previous response to continue refining. Optional.",
+                  "id": 40,
+                  "isToken": true,
+                  "name": "pSession_id"
+                }
+              ],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/chat",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [
+                {
+                  "query": {
+                    "message": "Generate an element skip formula",
+                    "template_code": "ORA_HCM_FF_ELEMENT_SKIP_001",
+                    "llm": "GPT5MINI"
+                  },
+                  "description": "Generate a time entry rule formula with minimum hours validation using GPT-5 Mini model.",
+                  "id": 30,
+                  "stringValue": "{\"message\":\"Generate an element skip formula\",\"template_code\":\"ORA_HCM_FF_ELEMENT_SKIP_001\",\"llm\":\"GPT5MINI\"}"
+                }
+              ],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {},
+              "bodyTemplate": "",
+              "description": "Poll async job status by jobId. Returns status (RUNNING/COMPLETE/ERROR) and formula code when complete.",
+              "id": 2,
+              "isNew": true,
+              "name": "pollJobStatus",
+              "operationType": "GET",
+              "parameterDefinitions": [
+                {
+                  "dataType": "string",
+                  "description": "Job ID returned by the async Generate Formula endpoint (POST /chat). Used to poll execution status until COMPLETE or ERROR.",
+                  "id": 43,
+                  "isToken": true,
+                  "name": "pJob_Id"
+                },
+                {
+                  "dataType": "string",
+                  "description": "Optional wait in seconds before polling status. Use 10 to slow Agent Studio while-loop polling. Values above 30 are capped by the service.",
+                  "id": 44,
+                  "isToken": true,
+                  "name": "pWait_Seconds"
+                }
+              ],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/chat/status/{pJob_Id}?wait_seconds={pWait_Seconds}",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {},
+              "bodyTemplate": "",
+              "description": "List available formula templates filtered by formula type. Each template has reference code and additional rules.",
+              "id": 3,
+              "isNew": true,
+              "name": "listTemplates",
+              "operationType": "GET",
+              "parameterDefinitions": [],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/templates",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {},
+              "bodyTemplate": "",
+              "description": "List all formula types with display names.",
+              "id": 4,
+              "isNew": true,
+              "name": "listFormulaTypes",
+              "operationType": "GET",
+              "parameterDefinitions": [],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/formula-types",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "bodyTemplate": "{\n  \"code\": \"{pCode}\"\n}",
+              "description": "Validate Fast Formula syntax with 3-layer checks (syntax, semantic, rules).",
+              "id": 5,
+              "isNew": true,
+              "name": "validateFormula",
+              "operationType": "POST",
+              "parameterDefinitions": [
+                {
+                  "dataType": "string",
+                  "description": "Fast Formula source code to validate. The validator runs 3-layer checks: syntax parsing, semantic analysis (undeclared variables, unassigned outputs), and business rules (missing RETURN).",
+                  "id": 48,
+                  "isToken": true,
+                  "name": "pCode"
+                }
+              ],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/validate",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [
+                {
+                  "query": {
+                    "code": "DEFAULT FOR hours IS 0\nINPUTS ARE hours\nl_pay = hours * 25\nRETURN l_pay"
+                  },
+                  "description": "Validate a simple hourly pay formula with DEFAULT, INPUTS ARE, and RETURN.",
+                  "id": 46,
+                  "stringValue": "{\"code\":\"DEFAULT FOR hours IS 0\\nINPUTS ARE hours\\nl_pay = hours * 25\\nRETURN l_pay\"}"
+                }
+              ],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            },
+            {
+              "headers": {},
+              "bodyTemplate": "",
+              "description": "Health check endpoint.",
+              "id": 6,
+              "isNew": true,
+              "name": "healthCheck",
+              "operationType": "GET",
+              "parameterDefinitions": [],
+              "resourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants/health",
+              "resourceType": "HCM_SEARCH",
+              "sampleQueries": [],
+              "type": "BUS_OBJECT",
+              "useNativeAuthentication": true
+            }
+          ]
+        },
+        "ObjectCode": "ORA_HCM_FF_FASTFORMULAGENERATORBUSINESSOBJECT",
+        "Family": "HCM",
+        "Product": "GLOBAL_PAYROLL",
+        "ObjectSource": "HCM_SEARCH",
+        "Category": null,
+        "RestResourcePath": "/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants",
+        "RestResourceIdentifier": "identifier_not_known",
+        "RestSupportedOperations": "{\"allowedOperations\": {\"GET\": true, \"POST\": true, \"PATCH\": true, \"DELETE\": true}}",
+        "ParentSupptObjectId": null,
+        "MandatoryFlag": false,
+        "SeededFlag": false,
+        "ObjectDisplayName": "Fast Formula Generator Business Object",
+        "Name": "Fast Formula Generator Business Object",
+        "Description": "AI-powered Fast Formula code generator for Oracle HCM. Accepts natural language requirements and returns syntactically valid Fast Formula source code. Supports formula types including Payroll, Time and Labor, and Absence Management. Provides sync, async, and streaming endpoints with multi-turn conversation support via Agent Studio.",
+        "CreatedBy": "TM-MFITZIMMONS",
+        "CreationDate": "2026-04-22T18:18:00.840+00:00"
+      }
+    ],
+    "agentNodes": [],
+    "workflowNodes": [],
+    "documentProcessorNodes": [],
+    "ragDocumentToolNodes": [],
+    "toolNodes": [],
+    "externalRestNodes": []
+  },
+  "WorkflowCode": "PAYROLL_FF_TESTING1",
+  "Name": "Payroll FF Testing1",
+  "Description": "Testing Fast formula Generator",
+  "Family": "HCM",
+  "Product": "GLOBAL_PAYROLL",
+  "HiddenFlag": false,
+  "AiAppsCompatibleFlag": true,
+  "UseCaseId": "NA",
+  "SourceWorkflowId": null,
+  "AccessModifier": "public",
+  "StartQuestionOne": null,
+  "StartQuestionTwo": null,
+  "StartQuestionThree": null,
+  "FollowUpPromptEnabledFlag": false,
+  "FollowUpPrompt": "Based on the following conversion: $param.system_context.chat_history generate $param.system_context.number_of_follow_up_questions\nfollow up questions only while strictly adhering to the JSON Schema format mentioned below. Remove the ```json markdown from the output.\nHere is the JSON Schema format the output should adhere to:\n[{\"question\": \"<put first question generated here>\"}, {\"question\": \"<put second question generated here>\"}, {\"question\": \"<put third question generated here>\"}",
+  "Architecture": "data_pipeline",
+  "MaximumInteractions": null,
+  "StartAgentId": null,
+  "agents": [],
+  "agentMappings": [],
+  "partnerMetadata": {
+    "Description": "",
+    "Name": ""
+  }
+}

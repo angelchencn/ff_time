@@ -15,7 +15,7 @@
 
 | Backend | Stack | LLM | Status |
 |---------|-------|-----|--------|
-| Java/Jersey (`java/`) | Grizzly HTTP, hand-written parser, JDBC | Agent Studio (GPT-5 Mini / GPT-4.1 Mini), Spectra, or OpenAI GPT-5.4 | **Primary** |
+| Java/Jersey (`java/`) | Grizzly HTTP, hand-written parser, JDBC | Agent Studio (GPT-5.4 Mini / GPT-5 Mini / Llama 3.3 70B / GPT OSS 120B), Spectra, or OpenAI GPT-5.4 | **Primary** |
 | Python/FastAPI (`backend/`) | Lark parser, SQLAlchemy, ChromaDB | Claude API | Legacy |
 
 ---
@@ -29,7 +29,8 @@
 |                   React Frontend                          |
 |   Monaco Editor + Chat + Simulation + Templates Panel     |
 |   (TypeScript, Vite, Ant Design, Zustand)                 |
-|   Model Selector: GPT-5 Mini / GPT-4.1 Mini (Fusion)     |
+|   Model Selector: Default / GPT54MINI / GPT5MINI /        |
+|                   Llama33 / GptOss (Fusion)               |
 |                   GPT 5.4 (Local Dev)                     |
 +------------------------+---------------------------------+
                          | REST / SSE
@@ -74,7 +75,7 @@ Environment variable: LLM_PROVIDER
 
   LLM_PROVIDER unset   ->  AgentStudioProvider (DEFAULT)
   (default)                FAIOrchestratorAgentClientV2 SDK
-                           Agent Studio workflow: HCM_FF_GENERATOR
+                           Agent Studio workflow: ORA_HCM_FF_GENERATOR
 
   LLM_PROVIDER=spectra ->  FusionAiProvider (Spectra direct)
                            FAICompletionsClient SDK
@@ -104,13 +105,13 @@ FastFormulaResource: extract request fields
 AiService.chatOnce()
   |-- getSystemPrompt() -> FF_FORMULA_TEMPLATES (SYSTEMPROMPT_FLAG=Y)
   |-- extractReferenceFormula() -> template body OR RagService
-  |-- buildPromptContext() -> PromptContext (8 fields)
+  |-- buildPromptContext() -> PromptContext (9 fields)
   |
   v
 AgentStudioProvider.completeWithContext()
   |-- buildAgentRequest() -> AgentRequestV2 (first turn: all params; subsequent: EditorCode only)
-  |-- invokeAgentAsyncAsUser() -> POST /agent/v2/HCM_FF_GENERATOR/invokeAsync
-  |-- pollForCompletion() -> GET /agent/v2/HCM_FF_GENERATOR/status/{jobId}
+  |-- invokeAgentAsyncAsUser() -> POST /agent/v2/ORA_HCM_FF_GENERATOR/invokeAsync
+  |-- pollForCompletion() -> GET /agent/v2/ORA_HCM_FF_GENERATOR/status/{jobId}
   |-- storeConversationId() -> ThreadLocal + ConcurrentHashMap
   |
   v
@@ -135,7 +136,7 @@ Response: {"text": "<formula code>", "session_id": "<conversationId>"}
 | Language | Java 17+ | Backend runtime |
 | Parser | Hand-written (Tokenizer -> FFParser) | Fast Formula -> AST |
 | Interpreter | Tree-walking | Simulation |
-| LLM (Default) | FAIOrchestratorAgentClientV2 (reflection) | Agent Studio: GPT-5 Mini / GPT-4.1 Mini |
+| LLM (Default) | FAIOrchestratorAgentClientV2 (reflection) | Agent Studio: GPT-5.4 Mini / GPT-5 Mini / Llama 3.3 70B / GPT OSS 120B |
 | LLM (Spectra) | FAICompletionsClient (reflection) | Direct Spectra completions |
 | LLM (Local) | OpenAI API (java.net.http) | GPT-5.4 |
 | Database | Oracle DB (JDBC) | Templates, formula types, formulas, debug logs |
@@ -176,18 +177,18 @@ public interface LlmProvider {
 
 | Provider | Class | Model | Selection |
 |----------|-------|-------|-----------|
-| **Agent Studio** | `AgentStudioProvider` | GPT-5 Mini / GPT-4.1 Mini | **Default** (no LLM_PROVIDER env) |
+| **Agent Studio** | `AgentStudioProvider` | GPT-5.4 Mini / GPT-5 Mini / Llama 3.3 70B / GPT OSS 120B | **Default** (no LLM_PROVIDER env) |
 | Spectra | `FusionAiProvider` | Configurable via prompt_code | `LLM_PROVIDER=spectra` |
 | OpenAI | `OpenAiProvider` | GPT-5.4 (chat) / GPT-5.4-mini (autocomplete) | `LLM_PROVIDER=openai` |
 
 #### 3.2.3 AgentStudioProvider
 
-Uses `FAIOrchestratorAgentClientV2` SDK (loaded via reflection) to call the Agent Studio workflow `HCM_FF_GENERATOR`.
+Uses `FAIOrchestratorAgentClientV2` SDK (loaded via reflection) to call the Agent Studio workflow `ORA_HCM_FF_GENERATOR`.
 
 **Key behaviors:**
 - `formula_type` is derived from the template's `FORMULA_TYPE_ID` FK (null -> "Custom"), not from the request body
 - `USE_SYSTEM_PROMPT_FLAG` on the template controls whether the system prompt (~730 lines FF language spec) is included. 'N' = skip, rely only on reference formula + additional rules
-- First turn: passes ALL variables (SystemPrompt, FormulaType, ReferenceFormula, AdditionalRules, EditorCode, LLM)
+- First turn: passes ALL variables (SystemPrompt, FormulaType, ReferenceFormula, AdditionalRules, EditorCode, Llm)
 - Subsequent turns: passes only EditorCode (Conversation-scoped variables retained by Agent Studio)
 - Manages `conversationId` via ThreadLocal + ConcurrentHashMap for multi-turn conversations
 - `invokeAsync` + `pollForCompletion` pattern (2s interval, 5 min max timeout)
@@ -204,13 +205,14 @@ public record PromptContext(
     String editorCode,         // current Monaco editor content
     String additionalRules,    // per-template prompt overlay
     String chatHistory,        // prior turns OR Agent Studio conversationId
-    String promptCode          // LLM model selector (e.g. "GPT5MINI")
+    String promptCode,         // LLM model selector (e.g. "GPT54MINI", "Llama33")
+    String workflowCode        // optional Agent Studio workflow override
 )
 ```
 
 #### 3.2.5 Agent Studio Workflow
 
-Workflow code: `HCM_FF_GENERATOR`
+Workflow code: `ORA_HCM_FF_GENERATOR`
 
 | Variable | Scope | Description |
 |---|---|---|
@@ -218,7 +220,7 @@ Workflow code: `HCM_FF_GENERATOR`
 | `FormulaType` | Conversation | Formula type name |
 | `ReferenceFormula` | Conversation | Template body or RAG examples |
 | `AdditionalRules` | Conversation | Per-template prompt overlay |
-| `LLM` | Conversation | Model selector (GPT5MINI / GPT41MINI) |
+| `Llm` | Conversation | Optional model selector (`GPT54MINI`, `GPT5MINI`, `Llama33`, `GptOss`); blank defaults to `GPT54MINI` |
 | `EditorCode` | User Question | Current editor code (per-turn) |
 
 **LLM Node Properties:**
@@ -258,6 +260,7 @@ Workflow code: `HCM_FF_GENERATOR`
 |--------|----------|----------|----------|
 | POST | `/chat` | `{jobId, session_id, status}` | **Async** -- submit job, return immediately |
 | GET | `/chat/status/{jobId}` | `{status, text, jobId}` | Poll async job status |
+| GET | `/chat/status/{jobId}?wait_seconds=10` | `{status, text, jobId}` | Wait before polling async job status |
 | POST | `/chat/sync` | `{text, session_id}` | **Blocking** -- wait for completion (HTTP 500 on error) |
 | POST | `/chat/stream` | SSE stream | **Streaming** via Agent Studio invokeStream |
 
@@ -304,9 +307,9 @@ Chat request body: `{message, template_code, llm?, editor_code?, session_id?}`. 
 |----------|--------|----------|
 | **Type** | `GET /formula-types` | 123 formula types, searchable, A-Z sorted |
 | **Start with** | `GET /templates?formula_type=X` | DB-backed templates per formula type |
-| **Model** | Static options | Fusion: dropdown (GPT-5 Mini / GPT-4.1 Mini). Local: static "GPT 5.4" |
+| **Model** | Static options | Fusion: dropdown (Default, GPT54MINI, GPT5MINI, Llama33, GptOss). Local: static "GPT 5.4" |
 
-Model selector sends `llm` parameter (e.g. `"GPT5MINI"`, `"GPT41MINI"`) for Fusion environments only.
+Model selector sends `llm` parameter (e.g. `"GPT54MINI"`, `"Llama33"`) for Fusion environments only. Selecting Default omits `llm`, so Agent Studio routes to the workflow default `GPT54MINI`.
 
 ### 4.3 Server Switching
 
@@ -342,9 +345,9 @@ Features:
 
 ### 5.2 Agent Studio Workflow
 
-Workflow `HCM_FF_GENERATOR` configured in Fusion AI Agent Studio with:
-- Switch node on `$variables.LLM` (GPT5MINI / GPT41MINI)
-- Two LLM nodes: GPT-5 Mini (Oracle Premium), GPT-4.1 Mini (Oracle Premium)
+Workflow `ORA_HCM_FF_GENERATOR` configured in Fusion AI Agent Studio with:
+- Switch node on `$variables.Llm`, defaulting blank values to `GPT54MINI`
+- Four LLM nodes: GPT-5.4 Mini, GPT-5 Mini, Llama 3.3 70B, and GPT OSS 120B
 - Prompt template using `{{$context.$variables.*}}` and `{{$context.$system.*}}`
 
 Seed file: `seeddata/WorkflowSD.xml` (loaded via `FaiAgentSDAM`).
@@ -374,7 +377,7 @@ Registers the Fast Formula Generator as a reusable **Supported Business Object**
 |---|---|---|
 | `generateFormulaSync` | POST | `/chat/sync` |
 | `generateFormulaAsync` | POST | `/chat` |
-| `pollJobStatus` | GET | `/chat/status/{pJob_Id}` |
+| `pollJobStatus` | GET | `/chat/status/{pJob_Id}?wait_seconds={pWait_Seconds}` |
 | `listTemplates` | GET | `/templates` |
 | `listFormulaTypes` | GET | `/formula-types` |
 | `validateFormula` | POST | `/validate` |
@@ -415,7 +418,7 @@ Deployed as part of the HCM Payroll REST service on WebLogic.
 
 **Prerequisites:**
 - `AdfHcmFaiGenAiSdk.jar` on classpath (for `FAIOrchestratorAgentClientV2`)
-- Agent Studio workflow `HCM_FF_GENERATOR` published
+- Agent Studio workflow `ORA_HCM_FF_GENERATOR` published
 - System prompt rows in `FF_FORMULA_TEMPLATES` with `SYSTEMPROMPT_FLAG='Y'`
 - Calling user has Agent Studio execution permission
 

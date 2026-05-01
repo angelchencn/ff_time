@@ -4,7 +4,7 @@
 
 The Fast Formula AI Generator provides REST endpoints that accept a natural language requirement and return complete, syntactically valid Oracle Fast Formula source code. The backend routes through the **Fusion AI Agent Studio** workflow engine (`FAIOrchestratorAgentClientV2`), which handles LLM selection, prompt rendering, and conversation management.
 
-The default Agent Studio workflow code is `HCM_FF_GENERATOR`.
+The default Agent Studio workflow code is `ORA_HCM_FF_GENERATOR`.
 
 ---
 
@@ -31,7 +31,7 @@ The Fast Formulas Generator is pre-registered as a **Supported Business Object**
 |---|---|---|---|
 | `generateFormulaSync` | POST | `/chat/sync` | **Recommended** -- blocking, returns full formula |
 | `generateFormulaAsync` | POST | `/chat` | Async submit, returns `jobId` |
-| `pollJobStatus` | GET | `/chat/status/{pJob_Id}` | Poll async job status |
+| `pollJobStatus` | GET | `/chat/status/{pJob_Id}?wait_seconds={pWait_Seconds}` | Poll async job status, optionally waiting before the poll |
 | `listTemplates` | GET | `/templates` | List formula templates |
 | `listFormulaTypes` | GET | `/formula-types` | List all formula types |
 | `validateFormula` | POST | `/validate` | 3-layer syntax/semantic/rules validation |
@@ -43,9 +43,16 @@ The Fast Formulas Generator is pre-registered as a **Supported Business Object**
 |---|---|---|
 | `pMessage` | Yes | Natural language requirement |
 | `pTemplate_code` | Yes | Business key from `FF_FORMULA_TEMPLATES.TEMPLATE_CODE` (e.g. `ORA_HCM_FF_TER_MIN_HOURS_001`) |
-| `pLlm` | No | `GPT5MINI` (default) or `GPT41MINI` |
+| `pLlm` | No | Optional model selector. Leave blank to use the workflow default `GPT54MINI`; supported values are `GPT54MINI`, `GPT5MINI`, `Llama33`, and `GptOss` |
 | `pEditor_code` | No | Current editor code for refinement |
 | `pSession_id` | No | Agent Studio `conversationId` for multi-turn |
+
+### Tool Parameters (pollJobStatus)
+
+| Parameter | Required | Description |
+|---|---|---|
+| `pJob_Id` | Yes | Job ID returned by `generateFormulaAsync` / `POST /chat` |
+| `pWait_Seconds` | No | Optional wait before polling. Use `10` for Agent Studio while-loop polling; values above `30` are capped by the service |
 
 ### How to Use from a Workflow
 
@@ -74,6 +81,7 @@ Sample query embedded in the seed data:
 | `POST /chat/sync` | POST | JSON | **Recommended** -- blocking, waits for LLM to complete, returns full response |
 | `POST /chat` | POST | JSON | Async -- submits job, returns `jobId` immediately |
 | `GET /chat/status/{jobId}` | GET | JSON | Poll async job status |
+| `GET /chat/status/{jobId}?wait_seconds=10` | GET | JSON | Wait up to 10 seconds before polling async job status |
 | `POST /chat/stream` | POST | SSE | True streaming via Agent Studio `invokeStream` |
 
 **Base URL (Fusion):**
@@ -96,7 +104,7 @@ Blocking endpoint. Submits to Agent Studio, polls internally until complete, ret
 | `template_code` | string | **Yes** | -- | Business key from `FF_FORMULA_TEMPLATES.TEMPLATE_CODE`. Server fetches the template's formula body, additional rules, formula type (from FK), and `USE_SYSTEM_PROMPT_FLAG` from DB. Always required -- even on multi-turn follow-ups |
 | `editor_code` | string | No | `""` | Existing formula code to modify/refine. When provided, the LLM edits this code instead of generating from scratch |
 | `session_id` | string | No | auto-generated | Session ID (Agent Studio conversationId) for multi-turn conversation. Reuse the value from the first response to continue refining |
-| `llm` | string | No | `"GPT5MINI"` | LLM model selector. Available: `"GPT5MINI"` (GPT-5 Mini), `"GPT41MINI"` (GPT-4.1 Mini). Passed as the `LLM` workflow variable in Agent Studio |
+| `llm` | string | No | workflow default `GPT54MINI` | LLM model selector. Available: `GPT54MINI`, `GPT5MINI`, `Llama33`, `GptOss`. If omitted or blank, the backend does not pass `Llm` and the Agent Studio Switch defaults to `GPT54MINI` |
 
 Note: `formula_type` is **not** in the request body. It is derived server-side from the template's `FORMULA_TYPE_ID` FK in `FF_FORMULA_TYPES`. NULL FK defaults to "Custom".
 
@@ -135,7 +143,7 @@ Note: `formula_type` is **not** in the request body. It is derived server-side f
 {
   "message": "Generate a flow schedule formula that returns the next scheduled date every 2 weeks",
   "template_code": "ORA_HCM_FF_FLOW_SCHEDULE_838595",
-  "llm": "GPT41MINI"
+  "llm": "Llama33"
 }
 ```
 
@@ -180,7 +188,9 @@ Same fields as `/chat/sync`.
 
 ## 3. GET `/chat/status/{jobId}` (Poll)
 
-Poll the status of an async job submitted via `POST /chat`.
+Poll the status of an async job submitted via `POST /chat`. Add `wait_seconds=10`
+when a workflow needs the poll call itself to pause before checking status. Values
+above 30 seconds are capped by the service.
 
 ### Response
 
@@ -220,7 +230,7 @@ Poll the status of an async job submitted via `POST /chat`.
 1. POST /chat -> {"jobId": "abc-123", "status": "SUBMITTED"}
 2. GET /chat/status/abc-123 -> {"status": "RUNNING"}
    ... (poll every 2 seconds)
-3. GET /chat/status/abc-123 -> {"status": "COMPLETE", "text": "..."}
+3. GET /chat/status/abc-123?wait_seconds=10 -> {"status": "COMPLETE", "text": "..."}
 ```
 
 ---
@@ -248,10 +258,13 @@ Same fields as `/chat/sync`.
 
 | Value | Model | Notes |
 |---|---|---|
-| `GPT5MINI` | GPT-5 Mini (Oracle Premium) | **Default** |
-| `GPT41MINI` | GPT-4.1 Mini (Oracle Premium) | Alternative |
+| omitted / blank | Workflow default | Agent Studio Switch routes to `GPT54MINI` |
+| `GPT54MINI` | GPT-5.4 Mini (Oracle Premium) | Default LLM node |
+| `GPT5MINI` | GPT-5 Mini (Oracle Premium) | Premium alternative |
+| `Llama33` | Llama 3.3 70B (Oracle Basic) | Basic provider alternative |
+| `GptOss` | GPT OSS 120B (Oracle Basic) | Basic provider alternative |
 
-The `llm` field is passed as the `LLM` workflow variable in Agent Studio. The workflow's Switch node routes to the corresponding LLM Node.
+The `llm` field is passed as the `Llm` workflow input in Agent Studio. The workflow's Switch node routes to the corresponding LLM node. In the UI, choosing **Default** omits `llm` so the workflow default is used.
 
 ---
 
@@ -422,7 +435,7 @@ Then invoke generation using the seeded `TemplateCode`:
 
 ### Workflow Code
 
-`HCM_FF_GENERATOR`
+`ORA_HCM_FF_GENERATOR`
 
 ### Workflow Variables
 
@@ -432,14 +445,14 @@ Then invoke generation using the seeded `TemplateCode`:
 | `FormulaType` | Conversation | Formula type name |
 | `ReferenceFormula` | Conversation | Template body or RAG-retrieved examples |
 | `AdditionalRules` | Conversation | Per-template prompt overlay |
-| `LLM` | Conversation | LLM model selector (GPT5MINI / GPT41MINI) |
+| `Llm` | Conversation | Optional model selector (`GPT54MINI`, `GPT5MINI`, `Llama33`, `GptOss`); blank defaults to `GPT54MINI` |
 | `EditorCode` | User Question | Current editor code (per-turn, may change) |
 
 ### First Turn vs Subsequent Turns
 
 | Turn | Parameters Sent | conversationId |
 |---|---|---|
-| First | ALL variables (SystemPrompt, FormulaType, ReferenceFormula, AdditionalRules, EditorCode, LLM). SystemPrompt is empty if template has `USE_SYSTEM_PROMPT_FLAG='N'`. FormulaType is derived from template FK. | empty (new conversation) |
+| First | ALL variables (SystemPrompt, FormulaType, ReferenceFormula, AdditionalRules, EditorCode, Llm). SystemPrompt is empty if template has `USE_SYSTEM_PROMPT_FLAG='N'`. FormulaType is derived from template FK. | empty (new conversation) |
 | Subsequent | EditorCode only (Conversation-scoped variables retained by Agent Studio). template_code is always re-sent for server-side lookup. | reused from first response |
 
 ### Workflow Structure
@@ -448,11 +461,15 @@ Then invoke generation using the seeded `TemplateCode`:
 Start
   |
   v
-Choose LLM (Switch on $variables.LLM)
+Choose LLM (Switch on $variables.Llm)
+  |
+  +-- GPT54MINI --> LLM Node (GPT-5.4 Mini, Oracle Premium)
   |
   +-- GPT5MINI --> LLM Node (GPT-5 Mini, Oracle Premium)
   |
-  +-- GPT41MINI --> LLM Node (GPT-4.1 Mini, Oracle Premium)
+  +-- Llama33 --> LLM Node (Llama 3.3 70B, Oracle Basic)
+  |
+  +-- GptOss --> LLM Node (GPT OSS 120B, Oracle Basic)
   |
   v
 End
@@ -534,18 +551,18 @@ AiService.chatOnce() / submitAsync() / streamChat()
   v
 AgentStudioProvider (default)
   +-- FAIOrchestratorAgentClientV2 (SDK, reflection)
-  +-- invokeAgentAsyncAsUser() -> POST /agent/v2/HCM_FF_GENERATOR/invokeAsync
-  +-- getAgentRequestStatusAsUser() -> GET /agent/v2/HCM_FF_GENERATOR/status/{jobId}
+  +-- invokeAgentAsyncAsUser() -> POST /agent/v2/ORA_HCM_FF_GENERATOR/invokeAsync
+  +-- getAgentRequestStatusAsUser() -> GET /agent/v2/ORA_HCM_FF_GENERATOR/status/{jobId}
   +-- parameters: {SystemPrompt, FormulaType, ReferenceFormula,
-  |                AdditionalRules, EditorCode, LLM}
+  |                AdditionalRules, EditorCode, Llm}
   |
   v
-Agent Studio Workflow (HCM_FF_GENERATOR)
-  +-- Switch on LLM variable
-  +-- GPT5MINI node or GPT41MINI node
+Agent Studio Workflow (ORA_HCM_FF_GENERATOR)
+  +-- Switch on Llm variable
+  +-- GPT54MINI, GPT5MINI, Llama33, or GptOss node
   |
   v
-LLM (GPT-5 Mini / GPT-4.1 Mini)
+LLM (GPT-5.4 Mini / GPT-5 Mini / Llama 3.3 70B / GPT OSS 120B)
   |
   v
 Response: generated Fast Formula source code
@@ -566,7 +583,7 @@ Response: generated Fast Formula source code
 | Component | Requirement |
 |---|---|
 | FAI SDK | `AdfHcmFaiGenAiSdk.jar` on classpath (for `FAIOrchestratorAgentClientV2`) |
-| Agent Studio Workflow | `HCM_FF_GENERATOR` workflow published in Agent Studio |
+| Agent Studio Workflow | `ORA_HCM_FF_GENERATOR` workflow published in Agent Studio |
 | System Prompt | At least one active row in `FF_FORMULA_TEMPLATES` with `SYSTEMPROMPT_FLAG='Y'` and `ACTIVE_FLAG='Y'` |
 | Template Config | Each template needs `USE_SYSTEM_PROMPT_FLAG` ('Y' = include system prompt, 'N' = skip). Column added to `FF_FORMULA_TEMPLATES` with default 'Y' |
 | Formula Template Seed Data | `FormulaTemplatesSD.xml` applied through the FND seed data loader for `FastFormulaServiceAM` / `FormulaTemplates` |
