@@ -57,6 +57,7 @@ public class FastFormulaResource {
         String templateBody = null;
         String templateRule = null;
         String formulaType = CUSTOM_TYPE;
+        boolean useSystemPrompt = true;
         if (templateCodeKey != null && !templateCodeKey.isBlank()) {
             try {
                 Map<String, Object> template = templateService.findByTemplateCode(templateCodeKey);
@@ -65,6 +66,8 @@ public class FastFormulaResource {
                     templateRule = (String) template.get("rule");
                     String ftName = (String) template.get("formula_type_name");
                     formulaType = (ftName != null && !ftName.isBlank()) ? ftName : CUSTOM_TYPE;
+                    String useSpFlag = (String) template.get("use_system_prompt_flag");
+                    useSystemPrompt = !"N".equalsIgnoreCase(useSpFlag);
                 }
             } catch (SQLException e) {
                 AppsLogger.write(this, e, AppsLogger.SEVERE);
@@ -81,7 +84,8 @@ public class FastFormulaResource {
                     "POST /chat (async): formulaType=" + formulaType
                             + " session=" + sessionId
                             + " llm=" + llm
-                            + " workflowCode=" + workflowCode,
+                            + " workflowCode=" + workflowCode
+                            + " useSystemPrompt=" + useSystemPrompt,
                     AppsLogger.INFO);
         }
 
@@ -95,9 +99,11 @@ public class FastFormulaResource {
         List<Map<String, String>> history = new ArrayList<>(sessionStore.getHistory(sessionId));
 
         try {
-            String asyncResponse = aiService.submitAsync(
+            AiService.AsyncSubmitResult asyncSubmit = aiService.submitAsyncWithDebugLog(
                     message, editorCode, formulaType, history, customSampleCode,
-                    resolveEffectiveRule(sessionId, templateRule), llm, workflowCode);
+                    resolveEffectiveRule(sessionId, templateRule), llm, workflowCode,
+                    useSystemPrompt);
+            String asyncResponse = asyncSubmit.response();
 
             // Parse jobId from the provider response
             String jobId = "";
@@ -110,6 +116,7 @@ public class FastFormulaResource {
 
             return Response.ok(Map.of(
                     "jobId", jobId,
+                    "log_id", asyncSubmit.logId(),
                     "session_id", sessionId,
                     "status", "SUBMITTED"
             )).build();
@@ -132,10 +139,13 @@ public class FastFormulaResource {
     @Path("/chat/status/{jobId}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response chatStatus(@PathParam("jobId") String jobId,
-                               @QueryParam("wait_seconds") String waitSeconds) {
+                               @QueryParam("wait_seconds") String waitSeconds,
+                               @QueryParam("log_id") String logId) {
         if (AppsLogger.isEnabled(AppsLogger.FINER)) {
             AppsLogger.write(this,
-                    "GET /chat/status/" + jobId + " waitSeconds=" + waitSeconds,
+                    "GET /chat/status/" + jobId
+                            + " waitSeconds=" + waitSeconds
+                            + " logId=" + logId,
                     AppsLogger.FINER);
         }
 
@@ -159,7 +169,9 @@ public class FastFormulaResource {
             result.put("jobId", jobId);
             if ("COMPLETE".equals(status) && !output.isEmpty()) {
                 // Post-process: fix DEFAULT value types
-                result.put("text", AiService.fixDefaultTypes(output));
+                String fixedOutput = AiService.fixDefaultTypes(output);
+                result.put("text", fixedOutput);
+                recordAsyncResponse(logId, fixedOutput, false);
             } else if (!output.isEmpty()) {
                 result.put("text", output);
             }
@@ -168,7 +180,9 @@ public class FastFormulaResource {
             }
             // Forward error if present
             if (node.has("error") && !node.path("error").isNull()) {
-                result.put("error", node.path("error").asText(""));
+                String error = node.path("error").asText("");
+                result.put("error", error);
+                recordAsyncResponse(logId, error, true);
             }
 
             return Response.ok(result).build();
@@ -193,6 +207,21 @@ public class FastFormulaResource {
         int effectiveWaitSeconds = normalizeStatusWaitSeconds(waitSeconds);
         if (effectiveWaitSeconds > 0) {
             Thread.sleep(effectiveWaitSeconds * 1000L);
+        }
+    }
+
+    private void recordAsyncResponse(String logIdText, String response, boolean isError) {
+        if (logIdText == null || logIdText.isBlank()) return;
+        try {
+            long logId = Long.parseLong(logIdText);
+            if (logId <= 0) return;
+            LlmDebugDBLog.getInstance().recordResponse(logId, response, isError);
+        } catch (NumberFormatException nfe) {
+            if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
+                AppsLogger.write(this,
+                        "Ignoring invalid async LLM debug log_id=" + logIdText,
+                        AppsLogger.WARNING);
+            }
         }
     }
 

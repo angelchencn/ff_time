@@ -25,34 +25,8 @@ import static org.junit.Assert.*;
 public class AiServiceTest {
 
     @Test
-    public void systemPromptContainsKeywords() {
-        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("Fast Formula"));
-        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("DEFAULT"));
-    }
-
-    @Test
-    public void systemPromptContainsFusionCloudDeclaration() {
-        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("Fusion Cloud"));
-        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("Do NOT use EBS"));
-    }
-
-    @Test
-    public void systemPromptContainsFormulaTypeFirst() {
-        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("Formula Type First"));
-        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("formula_status"));
-        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("skip_flag"));
-    }
-
-    @Test
-    public void systemPromptContainsAntiHallucination() {
-        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("Anti-Hallucination"));
-        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("PLACEHOLDER"));
-    }
-
-    @Test
-    public void systemPromptContainsCompileSelfCheck() {
-        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("Compile Self-Check"));
-        assertTrue(AiService.DEFAULT_SYSTEM_PROMPT.contains("READ-ONLY"));
+    public void defaultSystemPromptIsDisabled() {
+        assertEquals("", AiService.DEFAULT_SYSTEM_PROMPT);
     }
 
     // ── Provider selection tests (flattened from @Nested ProviderSelectionTests) ──

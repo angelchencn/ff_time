@@ -8,7 +8,7 @@ export default defineConfig({
     proxy: {
       // Proxy Fusion Cloud requests to bypass CORS
       '/fusion-proxy': {
-        target: 'https://cptcneaqy.fusionapps.ocs.oc-test.com',
+        target: 'https://cptclwvqy.fusionapps.ocs.oc-test.com',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/fusion-proxy/, ''),
@@ -18,6 +18,18 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/cookie-cutter-proxy/, ''),
+      },
+      '/cne-agent-proxy': {
+        target: 'https://cptcneaqy.fusionapps.ocs.oc-test.com',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/cne-agent-proxy/, ''),
+      },
+      '/silver-resp-proxy': {
+        target: 'https://cpdcgktqy-silver-manual.fre.vanity.facptest.com',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/silver-resp-proxy/, ''),
       },
     },
   },

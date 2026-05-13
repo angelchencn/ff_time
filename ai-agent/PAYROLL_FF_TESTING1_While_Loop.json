@@ -30,6 +30,7 @@
           "metadata": {
             "businessObjectCode": "ORA_HCM_FF_FASTFORMULAGENERATORBUSINESSOBJECT",
             "functionName": "generateFormulaAsync",
+            "processJson": true,
             "name": "Invoke FF_BO"
           },
           "outcomes": {
@@ -42,13 +43,13 @@
               "id": "1777495329020_1",
               "name": "pMessage",
               "type": "string",
-              "value": "Formula that subtracts the time not worked entry for the scheduled shift from a reported time entry's calculated duration if the entries match shift."
+              "value": "Formula that validates if reported time entries are less than a defined minimum hours value."
             },
             {
               "id": "1777495329020_2",
               "name": "pTemplate_code",
               "type": "string",
-              "value": "ORA_HCM_FF_TEST_TIME_CALCULATION_FORMULA_765678"
+              "value": "ORA_HCM_FF_TIME_ENTRY_FORMULA_652124"
             },
             {
               "id": "1777495329021_3",
@@ -148,7 +149,7 @@
               "id": "1777435415006_1",
               "name": "prompt",
               "type": "string",
-              "value": "You will receive this JSON object:\n  {{$context.$nodes.INVOKE_FFBO.$output}} and   {{$context.$nodes.INVOKEASYNC.$output}}\n\n\n  Return plain text only.\n\n  Message:\n  {{$context.$nodes.INVOKE_FFBO.$input.pMessage}}\n\n  Template:\n  {{$context.$nodes.INVOKE_FFBO.$input.pTemplate_code}}\n\n  Session_Id:\n  {{$context.$nodes.INVOKE_FFBO.$output.session_id}}\n\n  Job_Id:\n  {{$context.$nodes.INVOKE_FFBO.$output.jobId}}\n\n  Job Status:\n {{$context.$nodes.LOOP_STATUS.JOBSTATUSCHECK.$output.result.status}} \n\n  Formula Text:\n {{$context.$nodes.LOOP_STATUS.JOBSTATUSCHECK.$output.result.output}} \n\n  Rules:\n  1. Do not output JSON.\n  2. Do not output Markdown code fences.\n  3. Preserve Formula Text exactly.\n  4. Convert escaped newline characters \"\\n\" into real line breaks.\n  5. Do not summarize or rewrite the formula.\n  6. Do not add explanations..."
+              "value": "  Return plain text only.\n\n  Message:\n  {{$context.$nodes.INVOKE_FFBO.$input.pMessage}}\n\n  Template:\n  {{$context.$nodes.INVOKE_FFBO.$input.pTemplate_code}}\n\n  Session_Id:\n  {{$context.$nodes.INVOKE_FFBO.$output.session_id}}\n\n  Job_Id:\n  {{$context.$nodes.INVOKE_FFBO.$output.jobId}}\n\n Count:\n {{$context.$variables.count}}\n\n  Job Status:\n {{$context.$variables.status}}\n\n  Formula Text:\n {{$context.$variables.formula}} \n\n  Rules:\n  1. Do not output JSON.\n  2. Do not output Markdown code fences.\n  3. Preserve Formula Text exactly.\n  4. Convert escaped newline characters \"\\n\" into real line breaks.\n  5. Do not summarize or rewrite the formula.\n  6. Do not add explanations..."
             }
           ],
           "type": "LLM"
@@ -324,7 +325,7 @@
               "id": "1777606963355_1",
               "name": "prompt",
               "type": "string",
-              "value": "Output \nCount: {{$context.$variables.count}}\nStatus: {{$context.$variables.status}}\nFormula: {{$context.$variables.formula}}\n"
+              "value": "Output \nCount: {{$context.$variables.count}}\nStatus: {{$context.$variables.status}}\nFormula: {{$context.$variables.formula}}"
             }
           ],
           "type": "LLM"
@@ -569,14 +570,14 @@
                 {
                   "dataType": "string",
                   "description": "Job ID returned by the async Generate Formula endpoint (POST /chat). Used to poll execution status until COMPLETE or ERROR.",
-                  "id": 43,
+                  "id": 9,
                   "isToken": true,
                   "name": "pJob_Id"
                 },
                 {
-                  "dataType": "string",
+                  "dataType": "integer",
                   "description": "Optional wait in seconds before polling status. Use 10 to slow Agent Studio while-loop polling. Values above 30 are capped by the service.",
-                  "id": 44,
+                  "id": 10,
                   "isToken": true,
                   "name": "pWait_Seconds"
                 }
@@ -682,8 +683,8 @@
         "ObjectDisplayName": "Fast Formula Generator Business Object",
         "Name": "Fast Formula Generator Business Object",
         "Description": "AI-powered Fast Formula code generator for Oracle HCM. Accepts natural language requirements and returns syntactically valid Fast Formula source code. Supports formula types including Payroll, Time and Labor, and Absence Management. Provides sync, async, and streaming endpoints with multi-turn conversation support via Agent Studio.",
-        "CreatedBy": "TM-MFITZIMMONS",
-        "CreationDate": "2026-04-22T18:18:00.840+00:00"
+        "CreatedBy": "SEED_DATA_FROM_APPLICATION",
+        "CreationDate": "2026-04-24T20:25:43+00:00"
       },
       {
         "ObjectProperties": {
@@ -830,14 +831,14 @@
                 {
                   "dataType": "string",
                   "description": "Job ID returned by the async Generate Formula endpoint (POST /chat). Used to poll execution status until COMPLETE or ERROR.",
-                  "id": 43,
+                  "id": 9,
                   "isToken": true,
                   "name": "pJob_Id"
                 },
                 {
-                  "dataType": "string",
+                  "dataType": "integer",
                   "description": "Optional wait in seconds before polling status. Use 10 to slow Agent Studio while-loop polling. Values above 30 are capped by the service.",
-                  "id": 44,
+                  "id": 10,
                   "isToken": true,
                   "name": "pWait_Seconds"
                 }
@@ -943,8 +944,8 @@
         "ObjectDisplayName": "Fast Formula Generator Business Object",
         "Name": "Fast Formula Generator Business Object",
         "Description": "AI-powered Fast Formula code generator for Oracle HCM. Accepts natural language requirements and returns syntactically valid Fast Formula source code. Supports formula types including Payroll, Time and Labor, and Absence Management. Provides sync, async, and streaming endpoints with multi-turn conversation support via Agent Studio.",
-        "CreatedBy": "TM-MFITZIMMONS",
-        "CreationDate": "2026-04-22T18:18:00.840+00:00"
+        "CreatedBy": "SEED_DATA_FROM_APPLICATION",
+        "CreationDate": "2026-04-24T20:25:43+00:00"
       },
       {
         "ObjectProperties": {
@@ -1091,14 +1092,14 @@
                 {
                   "dataType": "string",
                   "description": "Job ID returned by the async Generate Formula endpoint (POST /chat). Used to poll execution status until COMPLETE or ERROR.",
-                  "id": 43,
+                  "id": 9,
                   "isToken": true,
                   "name": "pJob_Id"
                 },
                 {
-                  "dataType": "string",
+                  "dataType": "integer",
                   "description": "Optional wait in seconds before polling status. Use 10 to slow Agent Studio while-loop polling. Values above 30 are capped by the service.",
-                  "id": 44,
+                  "id": 10,
                   "isToken": true,
                   "name": "pWait_Seconds"
                 }
@@ -1204,8 +1205,8 @@
         "ObjectDisplayName": "Fast Formula Generator Business Object",
         "Name": "Fast Formula Generator Business Object",
         "Description": "AI-powered Fast Formula code generator for Oracle HCM. Accepts natural language requirements and returns syntactically valid Fast Formula source code. Supports formula types including Payroll, Time and Labor, and Absence Management. Provides sync, async, and streaming endpoints with multi-turn conversation support via Agent Studio.",
-        "CreatedBy": "TM-MFITZIMMONS",
-        "CreationDate": "2026-04-22T18:18:00.840+00:00"
+        "CreatedBy": "SEED_DATA_FROM_APPLICATION",
+        "CreationDate": "2026-04-24T20:25:43+00:00"
       }
     ],
     "agentNodes": [],

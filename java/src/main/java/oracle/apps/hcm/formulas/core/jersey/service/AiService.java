@@ -44,6 +44,7 @@ public class AiService {
             "oracle.apps.hcm.formulas.core.jersey.service.AgentStudioProvider";
 
     private final LlmProvider provider;
+    private final DebugRecorder debugRecorder;
     private final RagService ragService = new RagService();
 
     /** Cached system prompt — loaded from DB on first use, then held in memory. */
@@ -51,6 +52,7 @@ public class AiService {
 
     public AiService() {
         this.provider = selectProvider();
+        this.debugRecorder = new DbDebugRecorder();
         if (AppsLogger.isEnabled(AppsLogger.INFO)) {
             AppsLogger.write(AiService.class,
                     "AiService initialized with provider: " + provider.name()
@@ -79,14 +81,6 @@ public class AiService {
     }
 
     /**
-     * Returns the effective system prompt. On first call, attempts to load
-     * from the {@code FF_FORMULA_TEMPLATES} table (the single row with
-     * {@code SYSTEMPROMPT_FLAG='Y'} and {@code ACTIVE_FLAG='Y'}). If the
-     * DB is unreachable or the row is missing/inactive, falls back to the
-     * hardcoded {@link #DEFAULT_SYSTEM_PROMPT} constant. The result is
-     * cached for the lifetime of this instance.
-     */
-    /**
      * Returns the effective system prompt. On first call, queries
      * {@code FF_FORMULA_TEMPLATES} for all active rows with
      * {@code SYSTEMPROMPT_FLAG='Y'}, ordered by {@code SORT_ORDER}.
@@ -97,8 +91,8 @@ public class AiService {
      * disable individual sections from the Manage Templates UI without
      * touching code.
      *
-     * <p>Falls back to {@link #DEFAULT_SYSTEM_PROMPT} when the DB is
-     * unreachable or no active rows exist.</p>
+     * <p>If the DB is unreachable or no active rows exist, no hardcoded
+     * default system prompt is applied.</p>
      */
     public String getSystemPrompt() {
         String cached = cachedSystemPrompt;
@@ -200,7 +194,28 @@ public class AiService {
 
     /** Constructor for testing — inject a custom provider. */
     public AiService(LlmProvider provider) {
+        this(provider, new DbDebugRecorder());
+    }
+
+    /** Constructor for testing — inject a custom provider and debug recorder. */
+    AiService(LlmProvider provider, DebugRecorder debugRecorder) {
         this.provider = provider;
+        this.debugRecorder = debugRecorder;
+        this.cachedSystemPrompt = DEFAULT_SYSTEM_PROMPT;
+    }
+
+    public record AsyncSubmitResult(String response, long logId) {}
+
+    interface DebugRecorder {
+        long record(String model, int maxTokens, String endpoint,
+                    PromptContext context, String response);
+    }
+
+    private static class DbDebugRecorder implements DebugRecorder {
+        public long record(String model, int maxTokens, String endpoint,
+                           PromptContext context, String response) {
+            return LlmDebugDBLog.getInstance().record(model, maxTokens, endpoint, context, response);
+        }
     }
 
     /** Expose the underlying provider for direct calls (e.g. extract-prompt). */
@@ -509,11 +524,35 @@ public class AiService {
     public String submitAsync(String message, String editorCode, String formulaType,
                               List<Map<String, String>> history,
                               String customSampleCode, String customRule, String promptCode,
-                              String workflowCode) {
+                              String workflowCode,
+                              boolean useSystemPrompt) {
+        return submitAsyncWithDebugLog(message, editorCode, formulaType, history,
+                customSampleCode, customRule, promptCode, workflowCode, useSystemPrompt)
+                .response();
+    }
+
+    public AsyncSubmitResult submitAsyncWithDebugLog(String message, String editorCode,
+                              String formulaType,
+                              List<Map<String, String>> history,
+                              String customSampleCode, String customRule, String promptCode,
+                              String workflowCode,
+                              boolean useSystemPrompt) {
         PromptContext context = buildPromptContext(
                 message, editorCode, formulaType, history, customSampleCode, customRule,
+                promptCode, workflowCode, useSystemPrompt);
+        String response = provider.submitAsync(context);
+        long logId = debugRecorder.record(provider.name(), MAX_TOKENS_CHAT,
+                "submitAsync", context, "");
+        return new AsyncSubmitResult(response, logId);
+    }
+
+    /** Back-compat overload without useSystemPrompt (defaults to enabled). */
+    public String submitAsync(String message, String editorCode, String formulaType,
+                              List<Map<String, String>> history,
+                              String customSampleCode, String customRule, String promptCode,
+                              String workflowCode) {
+        return submitAsync(message, editorCode, formulaType, history, customSampleCode, customRule,
                 promptCode, workflowCode, true);
-        return provider.submitAsync(context);
     }
 
     /** Back-compat overload without workflowCode. */
@@ -652,8 +691,11 @@ public class AiService {
 
     // ── System Prompt ───────────────────────────────────────────────────────
 
-    /** Hardcoded fallback used when no DB system prompt template is available. */
-    public static final String DEFAULT_SYSTEM_PROMPT = "You are an expert assistant for Oracle Fusion Cloud HCM Fast Formula — a domain-specific language used to "
+    /** Hardcoded fallback is disabled; system prompts should come from DB templates. */
+    public static final String DEFAULT_SYSTEM_PROMPT = "";
+
+    @SuppressWarnings("unused")
+    private static final String DISABLED_DEFAULT_SYSTEM_PROMPT = "You are an expert assistant for Oracle Fusion Cloud HCM Fast Formula — a domain-specific language used to "
             + "configure payroll, time, and absence rules in Oracle Fusion Cloud.\n\n"
             + "IMPORTANT: This is Oracle Fusion Cloud HCM ONLY. Do NOT use EBS (E-Business Suite) or legacy "
             + "Oracle Applications Fast Formula syntax, APIs, or patterns. If you are unsure whether a feature "

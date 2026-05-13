@@ -25,7 +25,7 @@ function createLocalStorage(initial = {}) {
   };
 }
 
-test('migrates saved VP DEV Agent endpoint to fastFormulaAssistants', async () => {
+test('migrates saved VP DEV Agent endpoint and name', async () => {
   globalThis.localStorage = createLocalStorage({
     ff_servers: JSON.stringify([
       {
@@ -48,10 +48,70 @@ test('migrates saved VP DEV Agent endpoint to fastFormulaAssistants', async () =
   );
 
   const servers = useServerStore.getState().servers;
-  assert.equal(servers[0].name, 'VP DEV Agent');
-  assert.equal(servers[0].apiPrefix, FAST_FORMULA_ASSISTANTS);
+  assert.deepEqual(
+    servers.map((server) => server.name),
+    ['VP Dev', 'VP QA', 'Cookie Cutter', 'Silver Resp'],
+  );
+  const vpQa = servers.find((server) => server.name === 'VP QA');
+  assert.ok(vpQa);
+  assert.equal(vpQa.apiPrefix, FAST_FORMULA_ASSISTANTS);
+  const savedServers = JSON.parse(globalThis.localStorage.getItem('ff_servers'));
   assert.equal(
-    JSON.parse(globalThis.localStorage.getItem('ff_servers'))[0].apiPrefix,
+    savedServers.find((server) => server.baseUrl === '/fusion-proxy').name,
+    'VP QA',
+  );
+  assert.equal(
+    savedServers.find((server) => server.baseUrl === '/fusion-proxy').apiPrefix,
     FAST_FORMULA_ASSISTANTS,
+  );
+});
+
+test('adds VP Dev and Silver Resp to existing saved server list', async () => {
+  globalThis.localStorage = createLocalStorage({
+    ff_servers: JSON.stringify([
+      {
+        name: 'VP QA',
+        baseUrl: '/fusion-proxy',
+        apiPrefix: FAST_FORMULA_ASSISTANTS,
+        auth: { username: 'tm-mfitzimmons', password: 'Welcome1' },
+      },
+      {
+        name: 'cookie cutter',
+        baseUrl: '/cookie-cutter-proxy',
+        apiPrefix: FAST_FORMULA_ASSISTANTS,
+        auth: { username: 'tm-mfitzimmons', password: 'Welcome1' },
+      },
+    ]),
+  });
+
+  const { useServerStore } = await import(
+    `../src/stores/serverStore.ts?case=${Date.now()}`
+  );
+
+  const servers = useServerStore.getState().servers;
+  assert.deepEqual(
+    servers.map((server) => server.name),
+    ['VP Dev', 'VP QA', 'Cookie Cutter', 'Silver Resp'],
+  );
+  const vpDev = servers.find((server) => server.name === 'VP Dev');
+  const silverResp = servers.find((server) => server.name === 'Silver Resp');
+
+  assert.ok(vpDev);
+  assert.equal(vpDev.baseUrl, '/cne-agent-proxy');
+  assert.equal(vpDev.apiPrefix, FAST_FORMULA_ASSISTANTS);
+  assert.deepEqual(vpDev.auth, { username: 'tm-mfitzimmons', password: 'Welcome1' });
+  assert.ok(silverResp);
+  assert.equal(silverResp.baseUrl, '/silver-resp-proxy');
+  assert.equal(silverResp.apiPrefix, FAST_FORMULA_ASSISTANTS);
+  assert.deepEqual(silverResp.auth, { username: 'tm-mfitzimmons', password: 'Welcome1' });
+  assert.ok(
+    JSON.parse(globalThis.localStorage.getItem('ff_servers')).some(
+      (server) => server.name === 'VP Dev',
+    ),
+  );
+  assert.ok(
+    JSON.parse(globalThis.localStorage.getItem('ff_servers')).some(
+      (server) => server.name === 'Silver Resp',
+    ),
   );
 });

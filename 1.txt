@@ -1,204 +1,182 @@
-/* +======================================================================+
-| Copyright (c) 2009 Oracle Corporation |
-| Redwood Shores, California, USA |
-| All rights reserved. |
-+======================================================================+
-*
+/*******************************************************************************
+ *                                                                      *
+ * Formula Name : ORA_WFM_TCR_DAILY_OT_PREMIUM_SPLIT_AP                *
+ *                                                                      *
+ * Formula Type : Time Calculation Rules                                *
+ *                                                                      *
+ * Description  : Splits daily worked hours into regular, OT, and       *
+ *                premium OT buckets.                                   *
+ *                                                                      *
+ * Detail       : Returns hours up to 8 in the under-threshold bucket,  *
+ *                the next 2 hours in the OT bucket, and any hours      *
+ *                above 10 in the premium OT bucket. The formula        *
+ *                assumes detail entries are processed in time order     *
+ *                and uses end-of-day / end-of-period markers to reset   *
+ *                the daily accumulator.                                 *
+ *                                                                      *
+ * Rule Parameters : None. Thresholds are fixed at 8 and 10.            *
+ *                                                                      *
+ * Change History                                                       *
+ * --------------                                                       *
+ * Who                          Ver     Date           Description      *
+ * ---------------------------   ------  ------------   --------------- *
+ * Time and Labor Formula AI Agent 1.0   2026-MAY-07    Created.        *
+ *                                                                      *
+ ******************************************************************************/
 
-Formula Name : WFM_THRESHOLD_WEEKLY_40_TIME_CALCULATION_RULE_AP
-Formula Type: Time Calculation Rules
-Description: Generates an overtime entry for hours above a weekly
-          threshold (default 40 hours). Hours up to the weekly
-          threshold are returned in the under-threshold bucket and
-          any hours above the threshold are returned in a separate
-          over-threshold bucket.  For example, 9 hours each day:
-          - Day 1-4: 9 hours -> all in UNDER
-          - Day 5: 9 hours -> 4 UNDER, 5 OVER
-          - Day 6+: all in OVER (until week reset)
-Note: This formula processes the time card records in the order provided.
-  The weekly counter resets when the run summation level indicates the
-  end of the measure period (END_PERIOD) or when configured header
-  summation level indicates a different reset point.
-Change History
-Who Ver Date Description
-*----------------- ------ ------------ -----------------------------------------
-
-Oracle Delivered 1.0 2026-APR-28 Initial adaptation for weekly 40 hrs
-***************************************************************************/
-
-/*
-
-Block 1: Default Declarations
-*/
+/* Block 1: Default Declarations */
 DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS IS EMPTY_TEXT_NUMBER
 DEFAULT FOR measure IS EMPTY_NUMBER_NUMBER
-DEFAULT FOR StartTime IS EMPTY_DATE_NUMBER
 
-/*
-
-Block 2: Inputs
-*/
+/* Block 2: Inputs */
 INPUTS ARE
-HWM_CTXARY_RECORD_POSITIONS,
-measure,
-StartTime
+    HWM_CTXARY_RECORD_POSITIONS,
+    measure
 
-/*
-
-Block 3: Context and Parameter Setup
-*/
-
-/* Formula identity and logging contexts */
-ffName = 'WFM_THRESHOLD_WEEKLY_40_TIME_CALCULATION_RULE_AP -v1.0'
+/* Block 3: Context and Parameter Setup */
 ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
 rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
-rLog = add_rlog (ffs_id, rule_id, '>>> Enter - ' || ffName )
+ffName = 'ORA_WFM_TCR_DAILY_OT_PREMIUM_SPLIT_AP'
+rLog = add_rlog(ffs_id, rule_id, '>>> Enter - ' || ffName)
 
-/* Null constants and sentinels */
-NullDate = '01-JAN-1900'(DATE)
-NullDateTime = '1900/01/01 00:00:00'(DATE)
-NullText = 'FF_NULL'
+NullText = '**FF_NULL**'
+RecPositionEndPeriod = 'END_PERIOD'
+RecPositionEndDay = 'END_DAY'
+RecPositionDetail = 'DETAIL'
 
-/* Boolean/Text sentinels */
-sTrue = 'Y'
-sFalse = 'N'
-
-/* Record position constants */
-RecPositoinEoPeriod = 'END_PERIOD'
-RecPositoinEoDay = 'END_DAY'
-RecPositoinDetail = 'DETAIL'
-
-/* Summation level tokens */
-sumLvlTimeCard = 'TIMECARD'
-sumLvlDay = 'DAY'
-sumLvlDetail = 'DETAIL'
-
-/* Rule header values */
 hSumLvl = Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
 hExecType = Get_Hdr_Text(rule_id, 'RULE_EXEC_TYPE', 'CREATE')
 
-hCreateYn = 'N'
-if (upper(hExecType) = 'CREATE') then (
-hCreateYn = 'Y'
+rLog = add_rlog(
+    ffs_id,
+    rule_id,
+    'Rule Header: ffs_id=' || TO_CHAR(ffs_id) ||
+    ' , rule_id=' || TO_CHAR(rule_id) ||
+    ' , hSumLvl=' || hSumLvl ||
+    ' , hExecType=' || hExecType
 )
 
-/* Rule parameters: weekly limit (default to 40 hours) */
-pMaxHrs = get_rvalue_number (rule_id, 'DEFINED_LIMIT', 40)
+thresholdUnder = 8
+thresholdPremium = 10
 
-/* Log header/context */
-rLog = add_rlog (ffs_id, rule_id,
-'Context/Parameters: hSumLvl=' || hSumLvl ||
-' , hExecType=' || hExecType ||
-' , hCreateYn=' || hCreateYn ||
-' , pMaxHrs=' || TO_CHAR(pMaxHrs) )
+rLog = add_rlog(
+    ffs_id,
+    rule_id,
+    'Thresholds: under=' || TO_CHAR(thresholdUnder) ||
+    ' , premium=' || TO_CHAR(thresholdPremium)
+)
 
-/*
+/* Block 4: Processing Logic */
+OUT_MEASURE_UNDER = EMPTY_NUMBER_NUMBER
+OUT_MEASURE_OT = EMPTY_NUMBER_NUMBER
+OUT_MEASURE_PREMIUM = EMPTY_NUMBER_NUMBER
 
-Block 4: Processing Logic
-*/
-
-/* Initialize outputs */
-MEASURE_UNDER = EMPTY_NUMBER_NUMBER
-MEASURE_OVER = EMPTY_NUMBER_NUMBER
-
-/* Weekly running total (hours accumulated in current measure period/week) */
-wkTotalHrsWeek = 0
-
-/* Safety and counters */
-max_loop = 500
-max_ary = HWM_CTXARY_RECORD_POSITIONS.count
-rLog = add_rlog (ffs_id, rule_id, 'Total time card records to process = ' || TO_CHAR(max_ary) )
+dayWorkedHrs = 0
+max_loop = 1000
+tcRecordCount = HWM_CTXARY_RECORD_POSITIONS.count
 
 nidx = 0
-WHILE (nidx < max_ary) LOOP
+
+WHILE (nidx < tcRecordCount) LOOP
 (
-nidx = nidx + 1
+    nidx = nidx + 1
 
-/* initialize per-record locals */
-tcRecPos = NullText
-tcMeasure = 0
-tcStartTime = NullDate
+    IF (nidx > max_loop) THEN
+    (
+        ex = RAISE_ERROR(
+                 ffs_id,
+                 rule_id,
+                 'Formula ' || ffName || ' terminated due to possible end-less loop.'
+             )
+    )
 
-if (HWM_CTXARY_RECORD_POSITIONS.exists(nidx)) then ( tcRecPos = HWM_CTXARY_RECORD_POSITIONS[nidx] )
-if (MEASURE.exists(nidx)) then ( tcMeasure = MEASURE[nidx] )
-if (STARTTIME.exists(nidx)) then ( tcStartTime = STARTTIME[nidx] )
+    tcMeasure = 0
+    tcRecPos = NullText
 
-rLog = add_rlog(ffs_id, rule_id,
-'Processing record ' || TO_CHAR(nidx) ||
-' , recPos=' || tcRecPos ||
-' , measure=' || TO_CHAR(tcMeasure) ||
-' , start=' || TO_CHAR(tcStartTime) ||
-' , wkTotalHrsWeek=' || TO_CHAR(wkTotalHrsWeek) )
+    IF (measure.exists(nidx)) THEN
+    (
+        tcMeasure = measure[nidx]
+    )
 
-/* Only process records with measure > 0 */
-if (tcMeasure <> 0) then
-(
-remainingUnder = pMaxHrs - wkTotalHrsWeek
+    IF (HWM_CTXARY_RECORD_POSITIONS.exists(nidx)) THEN
+    (
+        tcRecPos = HWM_CTXARY_RECORD_POSITIONS[nidx]
+    )
 
-if (remainingUnder > 0) then
-(
-  if (tcMeasure <= remainingUnder) then
-  (
-    /* Entire entry fits under weekly threshold */
-    MEASURE_UNDER[nidx] = tcMeasure
-    MEASURE_OVER[nidx]  = 0
-    wkTotalHrsWeek = wkTotalHrsWeek + tcMeasure
+    rLog = add_rlog(
+        ffs_id,
+        rule_id,
+        'Record ' || TO_CHAR(nidx) ||
+        ' , recPos=' || tcRecPos ||
+        ' , measure=' || TO_CHAR(tcMeasure) ||
+        ' , dayWorkedHrs=' || TO_CHAR(dayWorkedHrs)
+    )
 
-    rLog = add_rlog(ffs_id, rule_id,
-           'All UNDER: idx=' || TO_CHAR(nidx) || ' under=' || TO_CHAR(MEASURE_UNDER[nidx]) ||
-           ' over=' || TO_CHAR(MEASURE_OVER[nidx]) || ' wkTotal=' || TO_CHAR(wkTotalHrsWeek) )
-  )
-  else
-  (
-    /* Split: part goes under, remainder goes over */
-    MEASURE_UNDER[nidx] = remainingUnder
-    MEASURE_OVER[nidx]  = tcMeasure - remainingUnder
-    wkTotalHrsWeek = wkTotalHrsWeek + tcMeasure
+    IF (UPPER(tcRecPos) = RecPositionDetail) THEN
+    (
+        allocUnder = 0
+        allocOt = 0
+        allocPremium = 0
 
-    rLog = add_rlog(ffs_id, rule_id,
-           'Split record: idx=' || TO_CHAR(nidx) ||
-           ' under=' || TO_CHAR(MEASURE_UNDER[nidx]) ||
-           ' over=' || TO_CHAR(MEASURE_OVER[nidx]) ||
-           ' wkTotal=' || TO_CHAR(wkTotalHrsWeek) )
-  )
+        IF (tcMeasure > 0) THEN
+        (
+            remainingUnder = thresholdUnder - dayWorkedHrs
+            IF (remainingUnder < 0) THEN
+            (
+                remainingUnder = 0
+            )
+
+            allocUnder = LEAST(tcMeasure, remainingUnder)
+            remAfterUnder = tcMeasure - allocUnder
+
+            remainingOtCap = thresholdPremium - dayWorkedHrs - allocUnder
+            IF (remainingOtCap < 0) THEN
+            (
+                remainingOtCap = 0
+            )
+
+            allocOt = LEAST(remAfterUnder, remainingOtCap)
+            allocPremium = remAfterUnder - allocOt
+
+            IF (allocPremium < 0) THEN
+            (
+                allocPremium = 0
+            )
+
+            dayWorkedHrs = dayWorkedHrs + tcMeasure
+        )
+
+        OUT_MEASURE_UNDER[nidx] = allocUnder
+        OUT_MEASURE_OT[nidx] = allocOt
+        OUT_MEASURE_PREMIUM[nidx] = allocPremium
+
+        rLog = add_rlog(
+            ffs_id,
+            rule_id,
+            'Bucket split: under=' || TO_CHAR(allocUnder) ||
+            ' , ot=' || TO_CHAR(allocOt) ||
+            ' , premium=' || TO_CHAR(allocPremium) ||
+            ' , runningDay=' || TO_CHAR(dayWorkedHrs)
+        )
+    )
+
+    IF (
+           UPPER(tcRecPos) = RecPositionEndDay
+        OR UPPER(tcRecPos) = RecPositionEndPeriod
+       ) THEN
+    (
+        rLog = add_rlog(
+            ffs_id,
+            rule_id,
+            'End of day/period marker encountered. Day accumulator reset.'
+        )
+        dayWorkedHrs = 0
+    )
 )
-else
-(
-  /* Weekly threshold already reached: all goes to over */
-  MEASURE_UNDER[nidx] = 0
-  MEASURE_OVER[nidx]  = tcMeasure
-  wkTotalHrsWeek = wkTotalHrsWeek + tcMeasure
 
-  rLog = add_rlog(ffs_id, rule_id,
-         'All OVER: idx=' || TO_CHAR(nidx) || ' over=' || TO_CHAR(MEASURE_OVER[nidx]) ||
-         ' wkTotal=' || TO_CHAR(wkTotalHrsWeek) )
-)
-) /* end if tcMeasure <> 0 */
+rLog = add_rlog(ffs_id, rule_id, '<<< Exit - ' || ffName)
 
-/* Reset weekly total at end of measure period / timecard period boundary /
-IF (hSumLvl = sumLvlTimeCard AND tcRecPos = RecPositoinEoPeriod) THEN
-(
-rLog = add_rlog(ffs_id, rule_id, 'End of period encountered - resetting weekly total (END_PERIOD).')
-wkTotalHrsWeek = 0
-) ELSE IF (hSumLvl = sumLvlDay AND tcRecPos = RecPositoinEoDay) THEN
-(
-/ If system is running per-day summation, reset on end of day.
-Typically weekly threshold should be applied across the measure period,
-so ensure summation level is set appropriately when configuring the rule. */
-rLog = add_rlog(ffs_id, rule_id, 'End of day encountered - resetting weekly total (END_DAY).')
-wkTotalHrsWeek = 0
-)
-
-/* Guard against runaway loops /
-if (nidx > max_loop) then (
-ex = raise_error(ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.' )
-)
-) / End WHILE */
-
-rLog = add_rlog(ffs_id, rule_id, '<<< Exit - ' || ffName )
-
-/*
-
-Block 5: Outputs
-*/
-RETURN MEASURE_UNDER, MEASURE_OVER
+/* Block 5: Outputs */
+RETURN OUT_MEASURE_UNDER,
+       OUT_MEASURE_OT,
+       OUT_MEASURE_PREMIUM

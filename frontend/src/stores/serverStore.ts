@@ -12,21 +12,40 @@ const FAST_FORMULA_ASSISTANTS_PREFIX =
   '/hcmRestApi/redwood/11.13.18.05/fastFormulaAssistants';
 const LEGACY_VP_DEV_PREFIX =
   '/hcmRestApi/redwood/11.13.18.05/calculationEntries';
+const CNE_AGENT_SERVER: ServerConfig = {
+  name: 'VP Dev',
+  baseUrl: '/cne-agent-proxy',
+  apiPrefix: FAST_FORMULA_ASSISTANTS_PREFIX,
+  auth: { username: 'tm-mfitzimmons', password: 'Welcome1' },
+};
+const SILVER_RESP_SERVER: ServerConfig = {
+  name: 'Silver Resp',
+  baseUrl: '/silver-resp-proxy',
+  apiPrefix: FAST_FORMULA_ASSISTANTS_PREFIX,
+  auth: { username: 'tm-mfitzimmons', password: 'Welcome1' },
+};
+const VP_QA_SERVER: ServerConfig = {
+  name: 'VP QA',
+  baseUrl: '/fusion-proxy',
+  apiPrefix: FAST_FORMULA_ASSISTANTS_PREFIX,
+  auth: { username: 'tm-mfitzimmons', password: 'Welcome1' },
+};
+const COOKIE_CUTTER_SERVER: ServerConfig = {
+  name: 'Cookie Cutter',
+  baseUrl: '/cookie-cutter-proxy',
+  apiPrefix: FAST_FORMULA_ASSISTANTS_PREFIX,
+  auth: { username: 'tm-mfitzimmons', password: 'Welcome1' },
+};
 
 const DEFAULT_SERVERS: ServerConfig[] = [
-  {
-    name: 'VP DEV Agent',
-    baseUrl: '/fusion-proxy',
-    apiPrefix: FAST_FORMULA_ASSISTANTS_PREFIX,
-    auth: { username: 'tm-mfitzimmons', password: 'Welcome1' },
-  },
-  {
-    name: 'cookie cutter',
-    baseUrl: '/cookie-cutter-proxy',
-    apiPrefix: FAST_FORMULA_ASSISTANTS_PREFIX,
-    auth: { username: 'tm-mfitzimmons', password: 'Welcome1' },
-  },
+  CNE_AGENT_SERVER,
+  VP_QA_SERVER,
+  COOKIE_CUTTER_SERVER,
+  SILVER_RESP_SERVER,
 ];
+const DEFAULT_SERVER_ORDER = new Map(
+  DEFAULT_SERVERS.map((server, index) => [server.baseUrl, index]),
+);
 
 const STORAGE_KEY = 'ff_servers';
 const INDEX_KEY = 'ff_server_index';
@@ -52,17 +71,58 @@ function saveServers(servers: ServerConfig[]) {
 
 function migrateSavedServers(servers: ServerConfig[]): { servers: ServerConfig[]; changed: boolean } {
   let changed = false;
-  const migrated = servers.map((server) => {
+  let migrated = servers.map((server) => {
     if (
       server.name === 'VP DEV Agent'
       && server.baseUrl === '/fusion-proxy'
-      && server.apiPrefix === LEGACY_VP_DEV_PREFIX
+      && (server.apiPrefix === LEGACY_VP_DEV_PREFIX
+        || server.apiPrefix === FAST_FORMULA_ASSISTANTS_PREFIX)
     ) {
       changed = true;
-      return { ...server, apiPrefix: FAST_FORMULA_ASSISTANTS_PREFIX };
+      return {
+        ...server,
+        name: 'VP QA',
+        apiPrefix: FAST_FORMULA_ASSISTANTS_PREFIX,
+      };
+    }
+    if (
+      server.name === 'CNE Agent'
+      && server.baseUrl === CNE_AGENT_SERVER.baseUrl
+    ) {
+      changed = true;
+      return { ...server, name: 'VP Dev' };
+    }
+    if (
+      server.name === 'cookie cutter'
+      && server.baseUrl === COOKIE_CUTTER_SERVER.baseUrl
+    ) {
+      changed = true;
+      return { ...server, name: 'Cookie Cutter' };
     }
     return server;
   });
+
+  const hasVpDev = migrated.some((server) => server.baseUrl === CNE_AGENT_SERVER.baseUrl);
+  if (!hasVpDev) {
+    migrated = [...migrated, CNE_AGENT_SERVER];
+    changed = true;
+  }
+  const hasSilverResp = migrated.some((server) => server.baseUrl === SILVER_RESP_SERVER.baseUrl);
+  if (!hasSilverResp) {
+    migrated = [...migrated, SILVER_RESP_SERVER];
+    changed = true;
+  }
+
+  const ordered = [...migrated].sort((first, second) => {
+    const firstOrder = DEFAULT_SERVER_ORDER.get(first.baseUrl) ?? Number.MAX_SAFE_INTEGER;
+    const secondOrder = DEFAULT_SERVER_ORDER.get(second.baseUrl) ?? Number.MAX_SAFE_INTEGER;
+    return firstOrder - secondOrder;
+  });
+  const orderChanged = ordered.some((server, index) => server !== migrated[index]);
+  if (orderChanged) {
+    migrated = ordered;
+    changed = true;
+  }
 
   return { servers: migrated, changed };
 }

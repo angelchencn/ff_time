@@ -90,15 +90,15 @@ public class LlmDebugDBLog {
     /**
      * Record a structured PromptContext to the database.
      */
-    public void record(String model, int maxTokens, String endpoint,
+    public long record(String model, int maxTokens, String endpoint,
                        PromptContext context) {
-        record(model, maxTokens, endpoint, context, null);
+        return record(model, maxTokens, endpoint, context, null);
     }
 
     /**
      * Record with optional response text.
      */
-    public void record(String model, int maxTokens, String endpoint,
+    public long record(String model, int maxTokens, String endpoint,
                        PromptContext context, String response) {
         try (Connection conn = DbConfig.getConnection()) {
             // 1. Pre-fetch sequence value (getGeneratedKeys() not reliable
@@ -172,6 +172,8 @@ public class LlmDebugDBLog {
                         AppsLogger.FINER);
             }
 
+            return logId;
+
         } catch (Exception e) {
             // Debug logging should never break the main flow
             if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
@@ -179,6 +181,7 @@ public class LlmDebugDBLog {
                         "[LlmDebugDBLog] Failed to record: " + e.getMessage(),
                         AppsLogger.WARNING);
             }
+            return -1L;
         }
     }
 
@@ -225,6 +228,12 @@ public class LlmDebugDBLog {
             }
 
             if (response != null && !response.isBlank()) {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "DELETE FROM PAY_ACTION_LOG_LINES "
+                        + "WHERE ACTION_LOG_ID = ? AND LINE_NUMBER = 100")) {
+                    ps.setLong(1, logId);
+                    ps.executeUpdate();
+                }
                 try (PreparedStatement ps = conn.prepareStatement(INSERT_LINE_SQL)) {
                     insertLine(ps, logId, 100, "RESPONSE|" + truncateWithEllipsis(response));
                 }

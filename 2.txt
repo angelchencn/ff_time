@@ -1,346 +1,185 @@
-package oracle.apps.hcm.formulas.core.jersey.util;
+/* +======================================================================+
+ *
+ * Formula Name : ORA_WFM_TCR_DAILY_OT_SPLIT_AP
+ *
+ * Formula Type:  Time Calculation Rules
+ *
+ * Description:   Splits a daily measure into an under-threshold bucket,
+ *                an overtime bucket for the first 2 hours above the
+ *                daily threshold, and a premium overtime bucket for any
+ *                hours above the premium threshold.
+ *
+ * Detail:        Hours up to the daily OT threshold are returned as-is.
+ *                The next 2 hours are returned in the OT bucket.
+ *                Any remaining hours above the premium threshold are
+ *                returned in the premium OT bucket.
+ *                If an END_DAY or END_PERIOD row has a zero measure, the
+ *                formula falls back to HWM_CTXARY_HWM_MEASURE_DAY.
+ *
+ * Rule Parameters (example names expected on rule):
+ *   DEFINED_LIMIT (Number) - Daily OT threshold; default 8
+ *   Premium threshold is calculated as DEFINED_LIMIT + 2
+ *
+ * Change History
+ * --------------
+ * Who                          Ver      Date           Description
+ *-----------------             ------   ------------   -----------------------------------------
+ * Time and Labor Formula AI Agent
+ *                              1.0      2026-MAY-07   Initial development per user request
+ *
+ ***************************************************************************/
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+/*
+ * Block 1: Default Declarations
+ */
+DEFAULT FOR HWM_CTXARY_RECORD_POSITIONS IS EMPTY_TEXT_NUMBER
+DEFAULT FOR HWM_CTXARY_HWM_MEASURE_DAY IS EMPTY_NUMBER_NUMBER
+DEFAULT FOR measure IS EMPTY_NUMBER_NUMBER
+DEFAULT FOR StartTime IS EMPTY_DATE_NUMBER
 
-import java.nio.charset.StandardCharsets;
+/*
+ * Block 2: Inputs
+ */
+INPUTS ARE
+  HWM_CTXARY_RECORD_POSITIONS,
+  HWM_CTXARY_HWM_MEASURE_DAY,
+  measure,
+  StartTime
 
-import oracle.apps.fnd.applcore.log.AppsLogger;
+/*
+ * Block 3: Context and Parameter Setup
+ */
+ffName = 'ORA_WFM_TCR_DAILY_OT_SPLIT_AP -v1.0 '
+ffs_id = GET_CONTEXT(HWM_FFS_ID, 0)
+rule_id = GET_CONTEXT(HWM_RULE_ID, 0)
+rLog = add_rlog (ffs_id, rule_id, '>>> Enter - ' || ffName )
 
-import org.apache.hc.client5.http.auth.AuthScope;
-import org.apache.hc.client5.http.auth.Credentials;
-import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
-import org.apache.hc.client5.http.classic.methods.HttpPost;
-import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.ClassicHttpResponse;
-import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.HttpHost;
-import org.apache.hc.core5.http.HttpResponse;
-import org.apache.hc.core5.http.HttpStatus;
-import org.apache.hc.core5.http.io.entity.StringEntity;
+NullDate = '01-JAN-1900'(DATE)
+NullDateTime = '1900/01/01 00:00:00'(DATE)
+NullText = '**FF_NULL**'
+sTrue = 'Y'
+sFalse = 'N'
 
-public class ConnectionHelper {
+RecPositionEndPeriod = 'END_PERIOD'
+RecPositionEndDay = 'END_DAY'
+RecPositionDetail = 'DETAIL'
 
-    ProxyInfo proxyInfo;
+hSumLvl = Get_Hdr_Text(rule_id, 'RUN_SUMMATION_LEVEL', 'TIMECARD')
+hExecType = Get_Hdr_Text(rule_id, 'RULE_EXEC_TYPE', 'CREATE')
 
-    public ConnectionHelper() {
-        initializeProxy();
-    }
+hCreateYn = sFalse
+if (upper(hExecType) = 'CREATE') then (
+  hCreateYn = sTrue
+)
 
-    private void initializeProxy() {
-        if (proxyInfo == null) {
-            if (System.getProperties().containsKey("http.proxyHost")) {
-                proxyInfo = new ProxyInfo();
-                proxyInfo.setHost(System.getProperty("http.proxyHost"));
-                proxyInfo.setPort(Integer.getInteger("http.proxyPort", 80));
+dailyThreshold = get_rvalue_number (rule_id, 'DEFINED_LIMIT', 8)
+premiumThreshold = dailyThreshold + 2
 
-                if (System.getProperties().containsKey("http.proxyUser")) {
-                    proxyInfo.setUsername(System.getProperty("http.proxyUser"));
-                    proxyInfo.setPassword(System.getProperty("http.proxyPassword"));
-                }
-            }
-        }
-        if (AppsLogger.isEnabled(AppsLogger.INFO)) {
-            AppsLogger.write(ConnectionHelper.class,
-                    "proxyInfo::" + proxyInfo + ", proxyHost::" + System.getProperty("http.proxyHost")
-                    + ", proxyUser::" + System.getProperty("http.proxyUser")
-                    + ", proxyPassword::" + System.getProperty("http.proxyPassword")
-                    + ", http.proxyPort::" + System.getProperty("http.proxyPort")
-                    + ", http.nonProxyHost::" + System.getProperty("http.nonProxyHosts"),
-                    AppsLogger.INFO);
-        }
-    }
+rLog = add_rlog (ffs_id, rule_id, 'Rule Header and Parameters: ' ||
+                 'ffs_id=' || TO_CHAR(ffs_id) ||
+                 '; rule_id=' || TO_CHAR(rule_id) ||
+                 '; hSumLvl=' || hSumLvl ||
+                 '; hExecType=' || hExecType ||
+                 '; hCreateYn=' || hCreateYn ||
+                 '; dailyThreshold=' || TO_CHAR(dailyThreshold) ||
+                 '; premiumThreshold=' || TO_CHAR(premiumThreshold) )
 
-    private HttpPost buildPostMethod(String pRestURL, String pAuthentificationToken) {
-        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-            AppsLogger.write(this, "Method Start: buildPostMethod", AppsLogger.FINER);
-        }
-        HttpPost postRequest = new HttpPost(pRestURL);
-        postRequest.setHeader("Authorization", "Bearer"+ " " + pAuthentificationToken);
-        postRequest.setHeader("x-li-forma", "json");
-        postRequest.setHeader("Content-Type", "application/json");
-        postRequest.setHeader("Accept", "application/json");
-        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-            AppsLogger.write(this, "Method End: buildPostMethod", AppsLogger.FINER);
-        }
-        return postRequest;
-    }
+/*
+ * Block 4: Processing Logic
+ */
+MEASURE_UNDER = EMPTY_NUMBER_NUMBER
+MEASURE_OVER = EMPTY_NUMBER_NUMBER
+MEASURE_PREMIUM = EMPTY_NUMBER_NUMBER
 
+tcRecordCount = HWM_CTXARY_RECORD_POSITIONS.count
+max_loop = 1000
 
-    /**
-     * Does the value match the pattern? The pattern may:
-     * <ul>
-     * <li> begin with "*", so compare with the end of the value
-     * <li> end with a "*", so compare with the start of the value
-     * <li> contains no "*", so compare with the entire value
-     * </ul>
-     *
-     * The pattern may not contain multiple "*"
-     *
-     * @param pattern The (possibly) wildcarded pattern to match
-     * @param host The value being tested against the pattern
-     * @return True if the value matches the pattern, else false
-     */
-    private boolean isHostPatternMatch(String pattern, String host) {
-        boolean matches = false;
-        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-            AppsLogger.write(this, "isHostPatternMatch starts pattern::" + pattern + ", host::" + host, AppsLogger.FINER);
-        }
-        pattern = pattern.toLowerCase().trim();
-        host = host.toLowerCase().trim();
+nidx = 0
+WHILE (nidx < tcRecordCount) LOOP
+(
+  nidx = nidx + 1
 
-        // Cannot match if there is more than one "*" in the pattern
-        // String[] tmp = pattern.split("*");
-        if (pattern.contains("*")) {
-            // Starts with "*" - match end of the value
-            if (pattern.startsWith("*")) {
-                pattern = pattern.replace("*", "");
+  if (nidx > max_loop) then (
+    ex = RAISE_ERROR (ffs_id, rule_id, 'Formula ' || ffName || ' terminated due to possible end-less loop.')
+  )
 
-                matches = host.endsWith(pattern);
-            } else
-            // Ends with "*" - match beginning of the value
-            if (pattern.endsWith("*")) {
-                pattern = pattern.replace("*", "");
-                matches = host.startsWith(pattern);
-            }
-        } else {
-            matches = host.equals(pattern);
-        }
-        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-            AppsLogger.write(this, "isHostPatternMatch ends matches::" + matches, AppsLogger.FINER);
-        }
-        return matches;
-    }
+  tcMeasure = 0
+  tcMeasureDay = 0
+  tcRecPos = NullText
+  tcStartTime = NullDateTime
+  tcDayKey = NullDate
+  posType = NullText
+  splitMeasure = 0
 
+  if (HWM_CTXARY_RECORD_POSITIONS.exists(nidx)) then (
+    tcRecPos = HWM_CTXARY_RECORD_POSITIONS[nidx]
+  )
+  if (measure.exists(nidx)) then (
+    tcMeasure = measure[nidx]
+  )
+  if (HWM_CTXARY_HWM_MEASURE_DAY.exists(nidx)) then (
+    tcMeasureDay = HWM_CTXARY_HWM_MEASURE_DAY[nidx]
+  )
+  if (StartTime.exists(nidx)) then (
+    tcStartTime = StartTime[nidx]
+    tcDayKey = TRUNC(tcStartTime)
+  )
 
+  if (tcRecPos = RecPositionDetail) then (
+    posType = RecPositionDetail
+  ) else if (tcRecPos = RecPositionEndDay) then (
+    posType = RecPositionEndDay
+  ) else if (tcRecPos = RecPositionEndPeriod) then (
+    posType = RecPositionEndPeriod
+  )
 
-    /**
-     * isNonProxyHost - finds if the url has a non proxy host
-     */
-    private boolean isNonProxyHost(String hostUrl) {
-        boolean isNonProxyHost = false;
-        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-            AppsLogger.write(this, "isNonProxyHost starts hostUrl::" + hostUrl, AppsLogger.FINER);
-        }
-        String nonProxyHosts = System.getProperty("http.nonProxyHosts");
+  rLog = add_rlog (ffs_id, rule_id, 'Row ' || TO_CHAR(nidx) ||
+                   '; recPos=' || tcRecPos ||
+                   '; posType=' || posType ||
+                   '; startTime=' || TO_CHAR(tcStartTime) ||
+                   '; dayKey=' || TO_CHAR(tcDayKey) ||
+                   '; measure=' || TO_CHAR(tcMeasure) ||
+                   '; measureDay=' || TO_CHAR(tcMeasureDay) )
 
-        if (nonProxyHosts != null && !"".equals(nonProxyHosts)) {
-            String host = hostUrl.replace("https://", "");
-            host = host.replace("http://", "");
-            String[] url = host.split("/");
-            host = url[0];
-            // Remove optional port number if specified
-            int port = host.indexOf(":");
-            if (port > 0) {
-                host = host.substring(0, port);
-            }
-            // Look for a match in the nonProxyHosts string
-            String[] tmp = nonProxyHosts.split("\\|");
-            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                AppsLogger.write(this, "isNonProxyHost nonProxyHosts::" + nonProxyHosts + ", tmp[] ::" + tmp, AppsLogger.FINER);
-            }
-            for (int i = 0; i < tmp.length; i++) {
-                String pattern = tmp[i];
-                if (isHostPatternMatch(pattern, host)) {
-                    isNonProxyHost = true;
-                    break;
-                }
-            }
-        }
-        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-            AppsLogger.write(this, "isNonProxyHost ends isNonProxyHost::" + isNonProxyHost, AppsLogger.FINER);
-        }
-        return isNonProxyHost;
-    }
+  /* Default to the measure on the row. If the row is an END_DAY or END_PERIOD
+   * summary row and the measure is zero, use the day measure instead.
+   */
+  splitMeasure = tcMeasure
+  if (splitMeasure = 0 and tcMeasureDay > 0 and
+      (posType = RecPositionEndDay or posType = RecPositionEndPeriod)) then (
+    splitMeasure = tcMeasureDay
+  )
 
-    /**
-     * This methods return HttpClient with proxy settings if any otherwise
-     * returns back default HttpClient passed.
-     *
-     * @param pRestURL
-     * @return
-     */
-    private CloseableHttpClient updateProxy(String pRestURL) {
-        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-            AppsLogger.write(this, "Method Start: updateProxy", AppsLogger.FINER);
-        }
-        CloseableHttpClient httpClient = null;
-        HttpHost proxy;
-        if (proxyInfo != null && !isNonProxyHost(pRestURL)) {
-            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                AppsLogger.write(this, "Proxy is enabled . Setting Proxy", AppsLogger.FINER);
-            }
-            if (proxyInfo.getUsername() != null) {
-                if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                    AppsLogger.write(this, "Setting Proxy Credentials.", AppsLogger.FINER);
-                }
-                proxy = new HttpHost(proxyInfo.getHost(), proxyInfo.getPort());
-                Credentials credentials = new UsernamePasswordCredentials(proxyInfo.getUsername(), proxyInfo.getPassword().toCharArray());
-                AuthScope authScope = new AuthScope(proxyInfo.getHost(), proxyInfo.getPort());
-                BasicCredentialsProvider provider = new BasicCredentialsProvider();
-                provider.setCredentials(authScope, credentials);
-                httpClient = HttpClients.custom()
-                                        .setProxy(proxy)
-                                        .setDefaultCredentialsProvider(provider)
-                                        .build();
+  if (splitMeasure > 0) then (
+    if (splitMeasure <= dailyThreshold) then (
+      MEASURE_UNDER[nidx] = splitMeasure
+      MEASURE_OVER[nidx] = 0
+      MEASURE_PREMIUM[nidx] = 0
+    ) else if (splitMeasure <= premiumThreshold) then (
+      MEASURE_UNDER[nidx] = dailyThreshold
+      MEASURE_OVER[nidx] = splitMeasure - dailyThreshold
+      MEASURE_PREMIUM[nidx] = 0
+    ) else (
+      MEASURE_UNDER[nidx] = dailyThreshold
+      MEASURE_OVER[nidx] = premiumThreshold - dailyThreshold
+      MEASURE_PREMIUM[nidx] = splitMeasure - premiumThreshold
+    )
+  ) else (
+    MEASURE_UNDER[nidx] = 0
+    MEASURE_OVER[nidx] = 0
+    MEASURE_PREMIUM[nidx] = 0
+  )
 
-                if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                    AppsLogger.write(this, "Setting Proxy Credentials Done.", AppsLogger.FINER);
-                }
-            }
-            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                AppsLogger.write(this, "Setting Proxy Done", AppsLogger.FINER);
-            }
-        }
+  rLog = add_rlog (ffs_id, rule_id, 'Split Result: ' ||
+                   '; splitMeasure=' || TO_CHAR(splitMeasure) ||
+                   '; MEASURE_UNDER=' || TO_CHAR(MEASURE_UNDER[nidx]) ||
+                   '; MEASURE_OVER=' || TO_CHAR(MEASURE_OVER[nidx]) ||
+                   '; MEASURE_PREMIUM=' || TO_CHAR(MEASURE_PREMIUM[nidx]) )
+)
 
-        if (httpClient == null) {
-            httpClient = HttpClientBuilder.create()
-                                          .useSystemProperties()
-                                          .build();
-        }
+rLog = add_rlog (ffs_id, rule_id, '<<< Exit - ' || ffName )
 
-        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-            AppsLogger.write(this, "Method End: updateProxy", AppsLogger.FINER);
-        }
-        return httpClient;
-    }
-
-
-
-    /**
-     * doPost
-     * @param pRestURL
-     * @param pJsonContent
-     * @param authenticationToken
-     * @return Object
-     *
-     */
-    public Object doPost(String pRestURL, String pJsonContent, String authenticationToken) throws Exception {
-        if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-            AppsLogger.write(this, "Method Start: doPost", AppsLogger.FINER);
-        }
-        HttpPost postRequest = null;
-        CloseableHttpClient httpClient = null;
-        try {
-
-
-            postRequest = buildPostMethod(pRestURL, authenticationToken);
-            StringEntity requestEntity =
-                new StringEntity(pJsonContent, ContentType.APPLICATION_JSON, "UTF-8", false);
-            postRequest.setEntity(requestEntity);
-            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                AppsLogger.write(this, "doPost: updating proxy", AppsLogger.FINER);
-            }
-            httpClient = updateProxy(pRestURL);
-
-            long time1 = System.currentTimeMillis();
-            HttpResponse response = httpClient.execute(postRequest);
-            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                AppsLogger.write(this, "Total time to get AI suggestions: " + (System.currentTimeMillis() - time1), AppsLogger.FINER);
-            }
-            int responseStatus = response.getCode();
-            ByteArrayOutputStream bos=new ByteArrayOutputStream();
-            ((ClassicHttpResponse) response).getEntity().writeTo(bos);
-            String stringUsingnewcode=bos.toString(StandardCharsets.UTF_8.name());
-            String responseAsString=stringUsingnewcode;
-           // String responseAsString = EntityUtils.toString(((ClassicHttpResponse) response).getEntity(), "UTF-8");
-
-            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                AppsLogger.write(this, "String from response after custom code=   " + stringUsingnewcode + "\n", AppsLogger.FINER);
-            }
-           // logDebug("String from response using existing code=   "+ responseAsString+"\n");
-
-
-            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                AppsLogger.write(this, "Response Status: " + responseStatus, AppsLogger.FINER);
-            }
-            if (HttpStatus.SC_OK != responseStatus) {
-                // WARNING not SEVERE ? this is NOT inside a catch block.
-                // PSR rejects SEVERE here.
-                if (AppsLogger.isEnabled(AppsLogger.WARNING)) {
-                    AppsLogger.write(this,
-                            "ConnectionHelper.doPost StateCode: " + responseStatus
-                            + " | StatusText: " + response.getReasonPhrase()
-                            + "\nResponse Body: " + responseAsString,
-                            AppsLogger.WARNING);
-                }
-                /*CAUTION: Do not change the format of the RuntimeException constructor string as integrators are
-                 relying on this format to process for error code and error message.*/
-                throw new RuntimeException("ConnectionHelper.doPost StateCode: " + responseStatus +
-                         " | StatusText: " + response.getReasonPhrase() +
-                         "\nResponse Body: " + responseAsString);
-            }
-            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                AppsLogger.write(this, "Method Just Before End: ConnectionHelper.doPost", AppsLogger.FINER);
-            }
-            return responseAsString;
-
-//        } catch (ParseException e) {
-//            AppsLogger.write(this, e, AppsLogger.SEVERE);
-//            throw new RuntimeException(e);
-        } catch (IOException e) {
-            // SEVERE inside catch ? inline so PSR sees the catch frame.
-            AppsLogger.write(this, e, AppsLogger.SEVERE);
-            throw new RuntimeException(e);
-        } finally {
-            closeHttpClient(httpClient);
-            if (AppsLogger.isEnabled(AppsLogger.FINER)) {
-                AppsLogger.write(this, "Method End: doPost", AppsLogger.FINER);
-            }
-        }
-    }
-
-
-    private void closeHttpClient(CloseableHttpClient httpClient) {
-        if (httpClient != null) {
-            try {
-                httpClient.close();
-            } catch (Exception e) {
-                // SEVERE inside catch ? inline so PSR sees the catch frame.
-                AppsLogger.write(this, e, AppsLogger.SEVERE);
-            }
-        }
-    }
-
-    class ProxyInfo {
-        private String pHost;
-        private Integer pPort;
-        private String pUsername;
-        private String pPassword;
-
-        public void setHost(String pHost) {
-            this.pHost = pHost;
-        }
-
-        public String getHost() {
-            return pHost;
-        }
-
-        public void setPort(Integer pPort) {
-            this.pPort = pPort;
-        }
-
-        public Integer getPort() {
-            return pPort;
-        }
-
-        public void setUsername(String pUsername) {
-            this.pUsername = pUsername;
-        }
-
-        public String getUsername() {
-            return pUsername;
-        }
-
-        public void setPassword(String pPassword) {
-            this.pPassword = pPassword;
-        }
-
-        public String getPassword() {
-            return pPassword;
-        }
-    }
-}
+/*
+ * Block 5: Outputs and Return
+ */
+RETURN MEASURE_UNDER, MEASURE_OVER, MEASURE_PREMIUM

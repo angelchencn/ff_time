@@ -130,19 +130,30 @@ public class ApiTest {
     }
 
     @Test
-    public void chatStatusAcceptsOptionalWaitSeconds() throws Exception {
-        Method method = FastFormulaResource.class.getMethod("chatStatus", String.class, String.class);
+    public void chatStatusAcceptsOptionalWaitSecondsAndLogId() throws Exception {
+        Method method = FastFormulaResource.class.getMethod(
+                "chatStatus", String.class, String.class, String.class);
         Annotation[] waitParamAnnotations = method.getParameterAnnotations()[1];
-        QueryParam queryParam = null;
+        Annotation[] logIdParamAnnotations = method.getParameterAnnotations()[2];
+        QueryParam waitSecondsQueryParam = null;
+        QueryParam logIdQueryParam = null;
         for (Annotation annotation : waitParamAnnotations) {
             if (annotation instanceof QueryParam) {
-                queryParam = (QueryParam) annotation;
+                waitSecondsQueryParam = (QueryParam) annotation;
+                break;
+            }
+        }
+        for (Annotation annotation : logIdParamAnnotations) {
+            if (annotation instanceof QueryParam) {
+                logIdQueryParam = (QueryParam) annotation;
                 break;
             }
         }
 
         assertNotNull(method);
-        assertNotNull(queryParam);
-        assertEquals("wait_seconds", queryParam.value());
+        assertNotNull(waitSecondsQueryParam);
+        assertNotNull(logIdQueryParam);
+        assertEquals("wait_seconds", waitSecondsQueryParam.value());
+        assertEquals("log_id", logIdQueryParam.value());
     }
 }

@@ -31,7 +31,7 @@ FROM FND_APPL_TAXONOMY fat,
 where fat.module_id = module_id.source_module_id;
 
 select * from PAY_ACTION_LOGs where name = 'FF_AI_GENERATE' order by creation_date desc;
-select * from PAY_ACTION_LOG_LINES where action_log_id = 100107017904941;
+select * from PAY_ACTION_LOG_LINES where action_log_id = 100106920627252;
 
 select * from fusion.fai_workflows_vl where workflow_code = 'ORA_HCM_FF_GENERATOR';
 select * from fusion.FAI_WORKFLOWS_B where workflow_code like 'ORA_HCM_FF_GENERATOR%';
@@ -95,6 +95,8 @@ update ff_formula_templates set template_code = 'ORA_HCM_FF_LANGUAGE_REFERENCE' 
 update "ff_formula_templates_tl" set name = 'Fast Formula Language Reference', description = 'Complete Oracle Fusion Cloud HCM Fast Formula language specification for LLM code generation — covers data types, statement ordering, operators, control flow, built-in functions, formula type output contracts, naming conventions, and anti-hallucination rules.' where template_id = 100106861371859;
 
 select * from ff_formula_types;
+select * from ff_formula_templates_vl;
+
 
 delete from ff_formula_templates_tl where template_id in (select template_id from FF_FORMULA_TEMPLATES_VL where formula_type_id is not null);
 delete from ff_formula_templates where formula_type_id is not null;
